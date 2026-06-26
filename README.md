@@ -164,13 +164,17 @@ cp -r day_sum ~/.claude/skills/
 
 ## 前置依赖
 
-| 工具 | 安装方式 | 用途 |
-|------|---------|------|
-| CodeGraph | `npm install -g @colbymchenry/codegraph` | 代码知识图谱 |
-| code-review-graph | `pip install code-review-graph` | 代码审查图谱 |
-| comet | `npm install -g @rpamis/comet` | OpenSpec + Superpowers 工作流 |
+| 工具 | GitHub | 安装方式 | 用途 |
+|------|--------|---------|------|
+| CodeGraph | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) | `npm install -g @colbymchenry/codegraph` | 代码知识图谱，MCP 提供代码探索能力 |
+| code-review-graph | [tirth8205/code-review-graph](https://github.com/tirth8205/code-review-graph) | `pip install code-review-graph` | 代码审查图谱，变更影响分析 |
+| comet | [rpamis/comet](https://github.com/rpamis/comet) | `npm install -g @rpamis/comet` | OpenSpec + Superpowers 五阶段工作流 |
+| OpenSpec | [Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec) | `openspec init`（comet 已包含） | 需求/设计/任务结构化管理 |
+| Superpowers | [obra/superpowers](https://github.com/obra/superpowers) | 随 comet 安装 | TDD、brainstorming、计划执行等 skill 体系 |
 
 > `project-init` 会自动检测未安装的工具并提示。`update-project-docs` 和 `code_zl` 无额外依赖。
+>
+> **推荐安装顺序：** Superpowers → comet（含 OpenSpec）→ CodeGraph → code-review-graph
 
 ## 使用场景
 
