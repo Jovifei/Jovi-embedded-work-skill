@@ -1,0 +1,25 @@
+{
+  "skill_name": "project-init",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/project-init D:\\work\\smart-controller-4G-gd32f303\\Project",
+      "expected_behavior": "Should scan project for .codegraph/, .code-review-graph/, docs/README.md, .comet/, .openspec/, show detection results table, confirm with user, then execute missing init steps in order: codegraph index, code-review-graph init+build, update-project-docs bootstrap, comet init."
+    },
+    {
+      "id": 2,
+      "prompt": "项目初始化 D:\\work\\new-embedded-board",
+      "expected_behavior": "Should detect ALL tools uninitialized, show full execution list, confirm with user, run all 4 essential init steps (codegraph, code-review-graph, update-project-docs, comet), ask about openspec as optional, output completion report."
+    },
+    {
+      "id": 3,
+      "prompt": "/project-init D:\\work\\smart-controller-gd32f4",
+      "expected_behavior": "Should detect most tools already initialized (codegraph, code-review-graph, comet, docs), show skip list, only execute truly missing items. Should NOT re-run already initialized tools."
+    },
+    {
+      "id": 4,
+      "prompt": "init project for my new STM32 firmware repo at D:\\work\\stm32-sensor-hub",
+      "expected_behavior": "Should trigger project-init skill, scan the STM32 project structure, detect missing tools, and initialize them. update-project-docs bootstrap should detect STM32 HAL/LL library and generate appropriate CLAUDE.md."
+    }
+  ]
+}

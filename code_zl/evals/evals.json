@@ -1,0 +1,25 @@
+{
+  "skill_name": "code_zl",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/code_zl src/modbus.c src/host_comm.c",
+      "expected_behavior": "Should read both files, add standard function header comments (Name/Input/Output/Description format), add inline comments for key logic, use // style not /* */, add section separators with // ====================. Report summary table at end."
+    },
+    {
+      "id": 2,
+      "prompt": "整理我暂存的代码",
+      "expected_behavior": "Should first run git diff --cached --name-only to identify changed files, then only comment the changed parts (new functions get headers, new fields get inline comments). Should NOT touch unchanged old code."
+    },
+    {
+      "id": 3,
+      "prompt": "/code_zl inc/main.h",
+      "expected_behavior": "Should add // comments to every macro, enum value, struct field, and function declaration. Should NOT add file header comment to .h file. Should NOT add /* GUARD */ to #endif. Struct fields should have aligned inline comments."
+    },
+    {
+      "id": 4,
+      "prompt": "给 can.c 添加注释，参照 docs/协议表.md",
+      "expected_behavior": "Should first read docs/协议表.md for protocol details, then add comments referencing protocol field meanings, register addresses, bit definitions. Comments should cite the protocol document path."
+    }
+  ]
+}

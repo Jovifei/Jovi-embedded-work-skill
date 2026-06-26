@@ -1,0 +1,25 @@
+{
+  "skill_name": "day_sum",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "总结今天的开发记录 docs/开发记录.md",
+      "expected_behavior": "Should read the dev log file, extract entries by date, generate structured summary with 发现问题/分析/解决 format, use X.Y.Z numbering, include specific file names and function names."
+    },
+    {
+      "id": 2,
+      "prompt": "daily summary for this week's work",
+      "expected_behavior": "Should identify all dates in the log, group by date, generate summary for each date with proper numbering (X.Y format), include commit hashes where available."
+    },
+    {
+      "id": 3,
+      "prompt": "总结 5.20 和 5.21 的工作",
+      "expected_behavior": "Should extract only entries for dates 5.20 and 5.21, generate summary for those specific dates only, skip all other dates."
+    },
+    {
+      "id": 4,
+      "prompt": "把 git log 里的提交总结成日报",
+      "expected_behavior": "Should run git log for recent commits, extract commit messages and changed files, organize into the standard 发现问题/分析/解决 format with commit hashes."
+    }
+  ]
+}

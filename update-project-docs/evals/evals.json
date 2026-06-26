@@ -1,0 +1,42 @@
+{
+  "skill_name": "update-project-docs",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "将以上嵌入式固件调试对话总结，并判断应该写入哪个文档。如果已有文档能承载，不要新增；需要先读 README.md 和 GUIDE.md。",
+      "expected_output": "应先定位文档体系入口，抽取用户目标、已确认事实、已完成改动、验证证据和待办事项，再建议写入既有文档或输出总结。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "总结 04-DBG-UART接收丢包排查.md，并检查是否需要补充 Mermaid TB 排查流程图，低相关内容不要保留。",
+      "expected_output": "应读取目标文档、README 和 GUIDE，抽取现象、证据、假设、验证和根因元素，判断保留/删除/补充内容，并优先使用 flowchart TB 表达排查流程。",
+      "files": [
+        "04-DBG-UART接收丢包排查.md"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "重构 Modbus 协议文档，结合驱动代码、ISR、任务处理和测试日志，纠正文档里和代码不一致的寄存器、函数名和验证路径。",
+      "expected_output": "应以代码和日志事实校正文档，区分当前实现与目标能力，搜索相关调用点而不是只看同名文件，更新既有文档并给出验证证据。",
+      "files": [
+        "drivers",
+        "user",
+        "tests",
+        "03-SER-通信协议"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I have a new embedded project at D:\\work\\my-new-board with no documentation. Initialize the docs.",
+      "expected_output": "Should detect missing docs/README.md, enter Bootstrap mode, scan project structure (src/, inc/, build files), identify MCU/RTOS/peripherals, generate docs/GUIDE.md + docs/README.md + CLAUDE.md + docs/01-ARC-系统架构.md, then confirm with user before writing.",
+      "files": []
+    },
+    {
+      "id": 5,
+      "prompt": "在 D:\\work\\smart-controller-4G-gd32f303\\Project 初始化文档",
+      "expected_output": "Should detect GD32F303 MCU, FreeRTOS, Modbus+CAN+UART architecture, generate Chinese-language scaffold docs with accurate module table and task list from xTaskCreate calls.",
+      "files": []
+    }
+  ]
+}
