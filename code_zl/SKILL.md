@@ -320,6 +320,209 @@ DEBUG_4G_PRINTF("[MQTT] at_mqtt_publish FAIL TIMEOUT topic=%s\r\n", topic);
 DEBUG_4G_PRINTF("[MQTT-URC] +MQTTURC: \"conn\",%d,%d => %s", conn_id, result_code, desc);
 ```
 
+### 七、main.c 与 FreeRTOS 任务创建结构（F427 风格）
+
+**核心原则**：main.c 是系统入口的"目录"，一眼能看出"初始化了什么、创建了哪些任务、调度器何时启动"。初始化与任务创建严格分离——模块 init 函数只做 init，不创建任务；所有 FreeRTOS 任务集中在 main.c 用 `app_create_task_checked` 创建。
+
+#### 7.1 模块 init 函数禁止创建任务
+
+**反例**（旧 F303 风格，已废弃）：
+```c
+void f303_4g_init(void)
+{
+    modem_init();
+    if (s_control_task_handle == NULL)
+    {
+        (void)xTaskCreate(f303_4g_control_task, "4gctl", 256U, NULL, 4U, &s_control_task_handle);
+    }
+}
+```
+
+**正例**（F427 modem_setup 风格）：
+```c
+void f303_4g_init(void)
+{
+    modem_product_info_t product_info;
+
+    f303_4g_load_default_product_info(&product_info);
+    if ((product_info.product_id[0] != '\0') && (product_info.product_secret[0] != '\0'))
+    {
+        s_f303_product_info = product_info;
+        s_f303_product_valid = true;
+        modem_set_product_info(&s_f303_product_info);
+    }
+
+    modem_register_event_cb(f303_4g_on_event, NULL);
+    modem_init(); // 只初始化，不创建任务
+}
+```
+
+**为什么**：main.c 是任务清单的"唯一真源"。任务散落在各模块 init 里会让"系统有哪些任务"无法一眼看清，也无法统一做 `configASSERT` 检查。条件创建（`if (handle == NULL)`）更是反模式——凭证动态注入应通过运行时 API（如 `modem_ml307r_set_reg_state`）触发，而不是动态创建任务。
+
+#### 7.2 任务栈大小、优先级、句柄集中在 main.h
+
+```c
+/* ==================== 任务栈大小（words） ==================== */
+#define TASK_STACK_ML307R 1024U // 4G 模块联网任务
+#define TASK_STACK_4GCTL  256U  // 4G 控制任务（订阅管理 + LED 刷新）
+#define TASK_STACK_MB4G   256U  // Modbus 从机任务
+#define TASK_STACK_DEBUG  256U  // 调试串口任务
+
+/* ==================== 任务优先级 ==================== */
+#define TASK_PRIO_ML307R 5U
+#define TASK_PRIO_4GCTL  4U
+#define TASK_PRIO_MB4G   3U
+#define TASK_PRIO_DEBUG  4U
+
+/* ==================== 任务句柄 ==================== */
+extern TaskHandle_t g_hdl_ml307r; // 4G 模块联网任务句柄
+extern TaskHandle_t g_hdl_4gctl;  // 4G 控制任务句柄
+extern TaskHandle_t g_hdl_mb4g;   // Modbus 从机任务句柄
+extern TaskHandle_t g_hdl_debug;  // 调试串口打印任务句柄
+```
+
+**规则**：
+- 栈大小/优先级**必须用宏**，禁止 `xTaskCreate(..., 256, ...)` 魔法数字
+- 句柄**必须 `extern` 声明在 main.h**，定义在 main.c 文件头
+- 宏命名 `TASK_STACK_<模块>` / `TASK_PRIO_<模块>`，句柄 `g_hdl_<模块>`
+- main.h 必须 include `FreeRTOS.h` + `task.h`（让 `TaskHandle_t` 可用）
+
+#### 7.3 main.c 标准模板
+
+```c
+#include "main.h"
+#include "modbus_slave_4g.h"
+#include "4g_product.h"
+#include "4g_api.h"
+#include "debug.h"
+#include "watchdog.h"
+
+TaskHandle_t g_hdl_ml307r = NULL; // 4G 模块联网任务句柄
+TaskHandle_t g_hdl_4gctl  = NULL; // 4G 控制任务句柄
+TaskHandle_t g_hdl_mb4g   = NULL; // Modbus 从机任务句柄
+TaskHandle_t g_hdl_debug  = NULL; // 调试串口打印任务句柄
+
+/*---------------------------------------------------------------------------
+ Name        : static void app_create_task_checked(TaskFunction_t task_code,
+                                                    const char *name,
+                                                    uint16_t stack_words,
+                                                    UBaseType_t priority,
+                                                    TaskHandle_t *handle)
+ Input       : task_code   - 任务函数指针
+               name        - 任务名（调试用）
+               stack_words - 栈大小（字）
+               priority    - 任务优先级
+               handle      - 任务句柄输出（可为 NULL）
+ Output      : 无
+ Description : 创建任务并断言成功。调度器启动前调用，失败即停机。
+---------------------------------------------------------------------------*/
+static void app_create_task_checked(TaskFunction_t task_code,
+                                    const char *name,
+                                    uint16_t stack_words,
+                                    UBaseType_t priority,
+                                    TaskHandle_t *handle)
+{
+    BaseType_t ok = xTaskCreate(task_code, name, stack_words, NULL, priority, handle);
+    configASSERT(ok == pdPASS);
+    configASSERT(handle == NULL || *handle != NULL);
+}
+
+/*---------------------------------------------------------------------------
+ Name        : int main(void)
+ Input       : 无
+ Output      : 无（正常不返回）
+ Description : 系统入口。按顺序完成：
+               1. NVIC 优先级分组（Pre4/Sub0，全部抢占优先级）
+               2. 调试串口初始化（含开机 LOGO 打印）
+               3. 打印上次复位原因
+               4. 板级 IO 初始化
+               5. 4G 网关初始化（凭证 + 产品信息 + 事件回调 + modem_init）
+               6. 创建所有 FreeRTOS 任务
+               7. 启动调度器（vTaskStartScheduler 后不再返回）
+---------------------------------------------------------------------------*/
+int main(void)
+{
+    // NVIC 4 位全部用于抢占优先级，无子优先级，适合 FreeRTOS
+    nvic_priority_group_set(NVIC_PRIGROUP_PRE4_SUB0);
+
+    uart_debug_init();                 // 调试串口
+    app_watchdog_print_reset_reason(); // 打印上次复位原因（须在 debug 串口初始化后）
+
+    f303_board_io_init(); // 板级 IO（LED PB3/PB4/PB5）
+    f303_4g_init();       // 4G 网关初始化（modem_init，任务在下面集中创建）
+
+    /* 创建任务 */
+    app_create_task_checked(modem_ml307r_task,  "modem4g", TASK_STACK_ML307R, TASK_PRIO_ML307R, &g_hdl_ml307r); // 4G 模块联网任务
+    app_create_task_checked(f303_4g_control_task, "4gctl",  TASK_STACK_4GCTL,  TASK_PRIO_4GCTL,  &g_hdl_4gctl);  // 4G 控制任务（订阅管理 + LED 刷新）
+    app_create_task_checked(modbus_slave4g_task, "mb4g",   TASK_STACK_MB4G,   TASK_PRIO_MB4G,   &g_hdl_mb4g);   // Modbus 从机任务
+    app_create_task_checked(debug_task,         "debug",  TASK_STACK_DEBUG,  TASK_PRIO_DEBUG,  &g_hdl_debug);  // 调试串口打印任务
+
+    vTaskStartScheduler();
+
+    // 正常情况下不应到达此处
+    while (1)
+    {
+    }
+}
+```
+
+**结构要点**：
+1. **全局句柄定义在文件头**（include 之后），每个句柄行尾注释说明用途
+2. **`app_create_task_checked` 是 static 包装函数**，每个工程固定一份，签名照搬
+3. **main 函数体严格分两段**：上半段初始化调用（每行带 `// 说明` 行尾注释），下半段 `/* 创建任务 */` 分节
+4. **每个 `app_create_task_checked` 调用行尾必须注释任务用途**
+5. **`vTaskStartScheduler()` 之后跟 `while (1) {}` 兜底**，注释"正常情况下不应到达此处"
+
+#### 7.4 任务函数对 main 可见
+
+需要在 main.c 创建的任务函数**必须**：
+- 改为非 `static`（去掉 `static` 前缀）
+- 在对应模块的 `.h` 中声明，行尾注释"main 创建，内部自初始化硬件"
+
+```c
+// modbus_slave_4g.h
+void modbus_slave4g_task(void *arg); // Modbus 从机任务（main 创建，内部自初始化硬件）
+```
+
+任务函数内部第一件事是调本模块的 init（硬件初始化在任务上下文，不在 main）：
+```c
+void modbus_slave4g_task(void *arg)
+{
+    (void)arg;
+    modbus_slave4g_init();    // 硬件初始化（USART1、GPIO、NVIC）
+    f303_4g_gateway_init();   // 依赖的网关初始化
+
+    for (;;)
+    {
+        // ...
+    }
+}
+```
+
+#### 7.5 FreeRTOSConfig.h 必须定义 configASSERT
+
+`app_create_task_checked` 依赖 `configASSERT`。若 FreeRTOSConfig.h 未定义，必须补上：
+
+```c
+#ifndef configASSERT
+#define configASSERT(x) do { if ((x) == 0) { __disable_irq(); for (;;) { } } } while (0)
+#endif
+```
+
+放在 `xPortSysTickHandler` 等中断别名定义之后、`#endif /* FREERTOS_CONFIG_H */` 之前。
+
+#### 7.6 常见违规与修复
+
+| 违规 | 修复 |
+|------|------|
+| 模块 init 里 `xTaskCreate` | 移到 main.c 的 `/* 创建任务 */` 段，init 函数只做 `modem_init()` 等纯初始化 |
+| `xTaskCreate(..., 256, 3, ...)` 魔法数字 | 抽成 `TASK_STACK_XXX` / `TASK_PRIO_XXX` 宏放 main.h |
+| 任务句柄散落在模块 .c 的 static 变量 | 改为 `g_hdl_xxx` 全局变量，extern 在 main.h |
+| 任务函数是 `static`，main.c 无法引用 | 去掉 static，在模块 .h 声明 |
+| `(void)xTaskCreate(...)` 忽略返回值 | 改用 `app_create_task_checked`，`configASSERT` 兜底 |
+| `if (handle == NULL) xTaskCreate(...)` 条件创建 | 删除条件——任务无条件创建，运行时状态用 `set_reg_state` 等 API 控制 |
+| `configASSERT` 未定义导致编译错误 | 在 FreeRTOSConfig.h 末尾补 `#define configASSERT(x) ...` |
+
 ## 执行流程
 
 ### 单文件处理

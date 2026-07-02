@@ -99,13 +99,9 @@ New or renamed Markdown documents should follow:
 {NN}-{TYPE}-{中文文档名}.md
 ```
 
-Series directories should follow:
+Each document lives in its type directory (`{NN}-{TYPE}-{名称}/`). NN is the sequence number within that directory (00 reserved for 阅读指引 and templates, 01+ for content).
 
-```text
-{NN}-SER-{中文系列名}/00-阅读指引.md
-```
-
-Use the type codes defined in `GUIDE.md`: `SER`, `ARC`, `REF`, `SOP`, `DBG`, `TST`, `PORT`, `RPT`.
+Use the type codes defined in `GUIDE.md`: `REF`, `ARC`, `REQ`, `COM`, `PLN`, `WORK`, `TST`, `DBG`, `RPT`, `TOD`, `STUD`.
 
 ### 6. Use Mermaid `flowchart TB`
 
@@ -151,40 +147,45 @@ Create `docs/GUIDE.md` with this template, filling in the project name from buil
 ```markdown
 # 文档编写指南 — {项目名}
 
+## 目录结构
+```
+docs/
+├── README.md                    # 文档索引入口
+├── GUIDE.md                     # 本文件：编写规范
+├── 00-REF-参考/                 # 参考资料（数据手册、用户手册）
+├── 01-ARC-架构/                 # 系统架构、模块设计
+├── 02-REQ-需求/                 # 产品需求、功能规格
+├── 03-COM-协议/                 # 通信协议定义（Modbus、MQTT、AT）
+├── 04-PLN-计划/                 # 总体计划、阶段规划
+├── 05-WORK-执行/                # 构建步骤、调试步骤、移植记录
+├── 06-TST-测试/                 # 测试计划、测试报告
+├── 07-DBG-调试/                 # 问题排查记录
+├── 08-RPT-报告/                 # 开发记录、工作周报、分析报告、评审记录
+├── 09-TOD-待完成/               # 待完成事项跟踪、技术债务
+└── 10-STUD-学习/                # 学习笔记、技术调研
+```
+
+每个目录内含 `00-阅读指引.md`，描述该类型文档的用途、模板、关系。
+
 ## 命名规范
 - 文档: `{NN}-{TYPE}-{中文文档名}.md`
-- 系列目录: `{NN}-SER-{中文系列名}/00-阅读指引.md`
+- NN 为目录内序号，从 01 开始（00 保留给阅读指引和模板）
+- TYPE 与目录类型码一致
 
 ## 类型码
-| 代码 | 类型 | 说明 |
-|------|------|------|
-| SER | 系列 | 多篇相关文档组成的系列 |
-| ARC | 架构 | 系统架构、模块设计 |
-| REF | 参考 | 协议表、寄存器映射、API 参考 |
-| SOP | 流程 | 操作流程、调试步骤 |
-| DBG | 调试 | 问题排查记录 |
-| TST | 测试 | 测试计划、测试报告 |
-| PORT | 移植 | 移植记录、适配说明 |
-| RPT | 报告 | 分析报告、评审记录 |
-
-## 文档模板
-### 单篇文档结构
-```
-# 标题
-## 概述
-## 详细内容
-## 验证状态
-```
-
-### 调试记录结构
-```
-# 标题
-## 现象
-## 排查过程
-## 根因
-## 解决方案
-## 验证结果
-```
+| 序号 | 代码 | 类型 | 目录 | 说明 |
+|------|------|------|------|------|
+| 00 | REF | 参考 | `00-REF-参考/` | 数据手册、用户手册、芯片资料 |
+| 01 | ARC | 架构 | `01-ARC-架构/` | 系统架构、模块设计、设计背景 |
+| 02 | REQ | 需求 | `02-REQ-需求/` | 产品需求、功能规格、验收标准 |
+| 03 | COM | 协议 | `03-COM-协议/` | 通信协议：Modbus 寄存器表、MQTT 规范 |
+| 04 | PLN | 计划 | `04-PLN-计划/` | 总体计划、阶段规划、待实现跟踪 |
+| 05 | WORK | 执行 | `05-WORK-执行/` | 构建步骤、调试步骤、移植记录、操作流程 |
+| 06 | TST | 测试 | `06-TST-测试/` | 测试计划、测试报告、测试模板 |
+| 07 | DBG | 调试 | `07-DBG-调试/` | 问题排查记录、Bug 分析 |
+| 08 | RPT | 报告 | `08-RPT-报告/` | 开发记录、工作周报、分析报告、评审记录 |
+| 09 | TOD | 待完成 | `09-TOD-待完成/` | 待完成事项、技术债务、已知问题 |
+| 10 | STUD | 学习 | `10-STUD-学习/` | 学习笔记、技术调研过程 |
 
 ## 信任规则
 | 标记 | 含义 |
@@ -195,7 +196,7 @@ Create `docs/GUIDE.md` with this template, filling in the project name from buil
 | 🎯 目标能力 | 设计目标，尚未实现 |
 
 ## 质量检查
-- [ ] 读过 README.md 和 GUIDE.md
+- [ ] 读过对应目录的 `00-阅读指引.md`
 - [ ] 提取了硬件/固件/协议/持久化/验证/文档元素
 - [ ] 实现声明有代码/日志/测试证据
 - [ ] 区分了当前实现、目标能力、参考行为、待验证
@@ -203,8 +204,35 @@ Create `docs/GUIDE.md` with this template, filling in the project name from buil
 - [ ] 新文档遵循 `{NN}-{TYPE}-{title}.md` 命名
 - [ ] 流程图使用 `flowchart TB`
 - [ ] 报告了验证证据
-- [ ] 代码改动后运行了 codegraph index
 ```
+
+### Step 0.2b: Create All Type Directories with Reading Guides
+
+Create all 11 directories under `docs/`:
+
+```
+00-REF-参考/  01-ARC-架构/  02-REQ-需求/  03-COM-协议/
+04-PLN-计划/  05-WORK-执行/  06-TST-测试/  07-DBG-调试/
+08-RPT-报告/  09-TOD-待完成/  10-STUD-学习/
+```
+
+Each directory gets a `00-阅读指引.md` with: 用途, 文档结构, 文档模板, 与其他文档的关系.
+
+Additional templates to create:
+- `06-TST-测试/00-模板-测试记录.md` — test record template
+- `07-DBG-调试/00-模板-调试记录.md` — debug record template
+- `08-RPT-报告/00-模板-开发记录.md` — daily development record template (调试型 6 点 / 功能型 / 文档型)
+- `08-RPT-报告/00-模板-工作周报.md` — weekly report template
+- `08-RPT-报告/00-模板-报告.md` — general report template
+
+Key cross-references between directories:
+- `02-REQ` → `04-PLN` (需求分解为计划), → `01-ARC` (需求映射到架构), → `06-TST` (验收标准对应测试)
+- `04-PLN` ← `02-REQ` (计划由需求分解), → `05-WORK` (计划指导执行), → `06-TST` (验证环节)
+- `01-ARC` → `03-COM` (架构定义通信角色), → `00-REF` (引用技术参数)
+- `05-WORK` → `07-DBG` (执行中问题进入调试), ← `04-PLN` (执行是计划的落地)
+- `07-DBG` ← `06-TST` (测试失败触发调试), ← `05-WORK` (执行中遇到的问题)
+- `08-RPT` ← `07-DBG` (调试结论汇总为报告), ← `05-WORK` (执行过程产出开发记录)
+- `09-TOD` ← `04-PLN` (计划未完成项), ← `07-DBG` (暂不修复的问题)
 
 ### Step 0.3: Generate `docs/README.md`
 
@@ -214,25 +242,27 @@ Create `docs/README.md` with this template:
 # {项目名} 文档索引
 
 ## 文档入口
-- [编写指南](GUIDE.md) — 命名规范、模板、质量检查
+- [编写指南](GUIDE.md) — 目录结构、命名规范、类型码、信任规则
 
-## 文档类型
-| 类型 | 代码 | 说明 | 目录 |
+## 目录结构
+| 序号 | 目录 | 类型 | 说明 |
 |------|------|------|------|
-| 系列 | SER | 多篇相关文档 | `NN-SER-*/` |
-| 架构 | ARC | 系统架构、模块设计 | 单篇 |
-| 参考 | REF | 协议表、寄存器映射 | 单篇 |
-| 流程 | SOP | 操作流程、调试步骤 | 单篇 |
-| 调试 | DBG | 问题排查记录 | 单篇 |
-| 测试 | TST | 测试计划、测试报告 | 单篇 |
-| 移植 | PORT | 移植记录、适配说明 | 单篇 |
-| 报告 | RPT | 分析报告、评审记录 | 单篇 |
+| 00 | [00-REF-参考](00-REF-参考/00-阅读指引.md) | 参考 | 数据手册、用户手册、芯片资料 |
+| 01 | [01-ARC-架构](01-ARC-架构/00-阅读指引.md) | 架构 | 系统架构、模块设计、设计背景 |
+| 02 | [02-REQ-需求](02-REQ-需求/00-阅读指引.md) | 需求 | 产品需求、功能规格、验收标准 |
+| 03 | [03-COM-协议](03-COM-协议/00-阅读指引.md) | 协议 | 通信协议：Modbus 寄存器表、MQTT 规范 |
+| 04 | [04-PLN-计划](04-PLN-计划/00-阅读指引.md) | 计划 | 总体计划、阶段规划、待实现跟踪 |
+| 05 | [05-WORK-执行](05-WORK-执行/00-阅读指引.md) | 执行 | 构建步骤、调试步骤、移植记录 |
+| 06 | [06-TST-测试](06-TST-测试/00-阅读指引.md) | 测试 | 测试计划、测试报告、测试模板 |
+| 07 | [07-DBG-调试](07-DBG-调试/00-阅读指引.md) | 调试 | 问题排查记录、Bug 分析 |
+| 08 | [08-RPT-报告](08-RPT-报告/00-阅读指引.md) | 报告 | 开发记录、工作周报、分析报告、评审记录 |
+| 09 | [09-TOD-待完成](09-TOD-待完成/00-阅读指引.md) | 待完成 | 待完成事项、技术债务 |
+| 10 | [10-STUD-学习](10-STUD-学习/00-阅读指引.md) | 学习 | 学习笔记、技术调研 |
 
 ## 现有文档
-{扫描 docs/ 目录生成索引，首次为空}
+{扫描各目录生成索引，首次各目录仅有 00-阅读指引.md}
 
 ## 信任规则
-文档中的实现声明应标注验证状态：
 - ✅ 已验证：有板级测试/日志/示波器证据
 - ⚠️ 待上板验证：仅静态代码分析
 - 📋 参考工程：来自参考项目
@@ -291,9 +321,9 @@ Create `CLAUDE.md` in project root using scan results:
 {从目录结构和头文件提取}
 ```
 
-### Step 0.5: Generate `docs/01-ARC-系统架构.md`
+### Step 0.5: Generate `docs/01-ARC-架构/02-ARC-系统架构.md`
 
-Create the initial architecture doc:
+Create the initial architecture doc in the ARC directory:
 
 ```markdown
 # 系统架构
@@ -408,6 +438,16 @@ Writing requirements:
 - Keep documents useful to an embedded engineer performing a real task.
 
 Do not add decorative background content.
+
+**待实现增量规则：**
+
+执行过程中（Phase 3 证据收集或代码审查时），若发现功能点未被现有需求或计划覆盖：
+
+1. 追加到最相关的计划文档"待实现清单"表格，格式：
+   `| 序号 | 功能点 | 来源需求 | 状态:待实现 | 发现场景 |`
+2. 若无对应计划文档，在 `04-PLN-计划/` 创建新计划文档
+3. 若该功能点属于全新需求，在 `02-REQ-需求/` 追加需求条目
+4. 完成实现后，将状态更新为"已完成"并移入文档末尾"已完成"章节
 
 ### Phase 6: Verify
 
