@@ -11,7 +11,8 @@ jovi-embedded-work/
 ├── project-init/              # 一键初始化工程工具链
 ├── update-project-docs/       # 文档 bootstrap + 日常维护
 ├── code_zl/                   # C 代码注释标准化
-└── day_sum/                   # 开发日报生成
+├── day_sum/                   # 开发日报生成
+└── child-claude/              # 多模型派发编排（父规划+审核，子执行）
 ```
 
 ---
@@ -136,6 +137,43 @@ jovi-embedded-work/
 
 ---
 
+### 5. child-claude — 多模型派发编排
+
+**触发词：** `/child-claude`、`派给子claude`、`用mimo干`、`换便宜模型`、`delegate to child claude`
+
+**功能：** 父 claude（规划+审核）把执行工作派发给子 claude（走便宜模型如 MiMo/DeepSeek），省 token。通过 `--settings` 覆盖切换模型，每次独立会话 + prompt caching 走缓存价。
+
+**核心特性：**
+- `-Profile` 切换模型（mimo / mimo-official / 自定义 profile）
+- `-WorkingDirectory` 硬失败防误改别的工作区
+- `-ResumeId` 复用会话（仅依赖任务）
+- `Stderr`（清洗）+ `RawStderr`（原始）双字段捕获错误
+- profile token 用 `$VAR_NAME` 环境变量引用，无明文泄露
+
+**示例：**
+```
+/child-claude 用 mimo 在 E:\repo 写个加法函数+测试
+
+# 脚本调用
+Invoke-ChildClaude -Task "写 add(a,b)" -Profile mimo -WorkingDirectory "E:\repo"
+```
+
+**派发单模板：**
+```
+Task: <具体描述>
+Path: <文件路径>
+Path boundary: only touch files under <dir>
+Acceptance: <验收标准，如 test.py 跑通>
+Constraint: <约束，如只创建文件不跑命令>
+```
+
+**省 token 策略：**
+- 独立任务 → 新会话（默认，前缀走缓存价）
+- 依赖任务 → `-ResumeId` 复用
+- 失败重做 → 通常新会话（避免继承错误上下文）
+
+---
+
 ## 安装
 
 ### 方式一：git clone（推荐）
@@ -150,12 +188,14 @@ xcopy /E /I project-init %USERPROFILE%\.claude\skills\project-init
 xcopy /E /I update-project-docs %USERPROFILE%\.claude\skills\update-project-docs
 xcopy /E /I code_zl %USERPROFILE%\.claude\skills\code_zl
 xcopy /E /I day_sum %USERPROFILE%\.claude\skills\day_sum
+xcopy /E /I child-claude %USERPROFILE%\.claude\skills\child-claude
 
 # macOS / Linux
 cp -r project-init ~/.claude/skills/
 cp -r update-project-docs ~/.claude/skills/
 cp -r code_zl ~/.claude/skills/
 cp -r day_sum ~/.claude/skills/
+cp -r child-claude ~/.claude/skills/
 ```
 
 ### 方式二：直接下载
