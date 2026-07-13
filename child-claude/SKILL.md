@@ -1,106 +1,120 @@
 ---
 name: child-claude
-description: Delegate execution work to a child Claude Code instance running on a cheaper/different model (MiMo, DeepSeek, etc) to save tokens. Trigger when the user explicitly mentions child claude / delegation / cheap model / switch model (e.g. "让子claude干"/"派发任务"/"用mimo干"/"换便宜模型"), OR when a task is clearly parallelizable and the user hasn't opted out of delegation. Parent claude plans and reviews; child executes via `claude -p` with `--settings` override.
+description: Selectively delegate bounded execution work to a child Claude Code instance on a cheaper or different model to reduce the parent Codex agent's token consumption. Use when the user explicitly requests child Claude or cheaper-model delegation, or when Codex identifies a substantial, well-bounded task where dispatch plus review is likely to consume fewer parent-agent tokens than direct execution. Do not trigger merely because a task is parallelizable or non-trivial; first apply the net-token-savings gate.
 ---
 
-# child-claude: multi-model delegation orchestrator
+# Child Claude
 
-## What this skill does
-When triggered, you (parent claude) enter **orchestration mode**: you push execution to a child claude on a cheaper model, and your job becomes **plan → dispatch → review → iterate**.
+Act as the parent orchestrator. Retain planning, scope control, review, integration, and final verification. Delegate only concrete execution packages whose expected parent-token savings exceed dispatch and review overhead.
 
-- **You (parent)**: split tasks, write dispatch slips, review artifacts, judge pass/fail, do small fixups/integration/verification when that's cheaper than re-dispatch.
-- **Child claude**: executes concrete coding/file ops on a cheaper model (default MiMo `mimo-v2.5-pro`), saving tokens.
+## Apply the delegation gate
 
-## Core principle: delegate by default
-Once triggered, push execution work to child claude. Do NOT write code or edit files yourself unless one of these is true:
-- Task is trivial (one-sentence answer) — answering directly costs less than dispatch overhead.
-- Work needs your judgment (architecture, cross-file reasoning) — you think, then dispatch the mechanical part.
-- Small deterministic fixups, conflict integration, verification scripts, rolling back a failed sub-task — fine to do directly when faster than re-dispatching.
+Before dispatching, compare these two estimates qualitatively:
 
-Your output is **dispatch slips + review verdicts**, not code. But you are not blocked from small integrating/verification work when that's the cheaper path to a correct result.
+- `direct_cost`: parent tokens needed to inspect context, perform the work, debug it, and verify it.
+- `delegate_cost`: parent tokens needed to define the package, inspect the child result, review diffs, correct failures, and verify it.
 
-## Token strategy (read carefully)
-Prompt caching makes the system-prefix (~70k tokens of tool defs) billed at cache price (~0.25x). But **history prefixes also bill at cache price — they are not free**. Therefore:
+Delegate only when `delegate_cost < direct_cost` with a useful margin. When uncertain or approximately equal, execute directly.
 
-- **Independent task → new session** (default): pay only system-prefix cache price, no history.
-- **Dependent task → resume session** (`-ResumeId`): when task B needs task A's output/files, reuse A's `SessionId` to avoid re-explaining context.
-- **Failed task → usually new session**: avoid inheriting bad context; only resume if the same session's context helps fix the failure.
+Strong delegation candidates:
 
-Decision rule: does the next subtask need the previous one's output or files? Yes → resume. No → new session. When in doubt, new session — caching already makes it cheap.
+- Repetitive inspection across many files with a compact requested output.
+- Mechanical edits across a clearly bounded directory.
+- A self-contained implementation package with explicit acceptance tests.
+- Independent research or artifact extraction that would otherwise fill parent context.
+- A long first-pass draft that the parent can review cheaply against a precise rubric.
 
-## Workflow
+Execute directly when:
 
-### 1. Split the task
-Break the user's request into independently verifiable subtasks. For each, write a dispatch slip with:
-- **What**: concrete action.
-- **Where**: file paths — and a path boundary (only touch files under X).
-- **Acceptance**: how to verify (a test that prints "passed", a file to read back).
-- **Constraint**: e.g. "only create files, do not run commands" (avoids permission denials burning turns).
+- The task is small, conversational, or likely faster than writing a dispatch slip.
+- Correctness depends on nuanced context already held by the parent.
+- The child would need most of the conversation or extensive repo explanation.
+- The task is tightly coupled to ongoing parent reasoning or requires frequent back-and-forth.
+- Review would cost about as much as doing the work.
+- The action is sensitive, destructive, permission-heavy, or cannot be independently verified.
 
-### 2. Dispatch
+Parallelizability alone is not a reason to delegate. Never delegate merely to comply with a default or habit.
+
+## Build a bounded package
+
+Give the child only the minimum task-local context. Include:
+
+```text
+Task: <one concrete outcome>
+Working directory: <absolute path>
+Path boundary: only read or change <paths>
+Inputs: <essential facts and files only>
+Acceptance: <observable tests or artifact criteria>
+Constraints: <tools, commands, or prohibited changes>
+Return: <compact result format, changed paths, test evidence>
+```
+
+Always pass `-WorkingDirectory` for file work. Prefer one coherent package over many tiny dispatches; tiny packages often lose the token savings to orchestration overhead.
+
+## Dispatch
+
 ```powershell
-. "$env:USERPROFILE\.claude\skills\child-claude\scripts\Invoke-ChildClaude.ps1"
+. "$env:USERPROFILE\.codex\skills\child-claude\scripts\Invoke-ChildClaude.ps1"
 
-# Independent task — new session, scoped to a working directory
-$r = Invoke-ChildClaude -Task "..." -Profile mimo -WorkingDirectory "E:\path\to\repo"
-
-# Dependent task — resume previous session
-$r = Invoke-ChildClaude -Task "..." -Profile mimo -ResumeId $prev.SessionId -WorkingDirectory "E:\path\to\repo"
+$result = Invoke-ChildClaude `
+  -Task $dispatchSlip `
+  -Profile deepseek-v4-pro `
+  -WorkingDirectory "E:\path\to\repo"
 ```
 
-Always pass `-WorkingDirectory` when the task touches files — it prevents the child from editing the wrong repo/worktree.
+Use a new session for independent work. Use `-ResumeId $previous.SessionId` only when the next package genuinely depends on the prior child's context or output and re-explaining it would cost more.
 
-### 3. Review
+Keep the default tool set narrow. For read-only work, use `-AllowedTools "Read,Glob,Grep"`. Add command execution only when acceptance requires it.
+
+## File-write contract
+
+Write tasks must explicitly include `Write` or `Edit` in `-AllowedTools`; a copied read-only whitelist guarantees that no file can be changed. State the exact destination file and path boundary, and require the child to return changed paths plus verification evidence. Do not ask a write task to produce an artifact while also restricting it to `Read,Glob,Grep`.
+
+After every child call, inspect the launcher object before describing the outcome. Report `Success`, `TimedOut`, `Turns`, `Result`, `Stderr`, and `RawStderr` when a task fails. Do not reduce an unavailable diagnosis to "failed with no changes"; use the structured fields to decide whether to correct the dispatch, retry once, or complete the package directly.
+
+## Read-only inventory contract
+
+Do not delegate broad recursive inventories. Unknown-scale file discovery is cheap and deterministic for the parent to perform with direct local enumeration, while a child must spend multiple slow tool turns discovering the same paths. This usually loses both time and parent-token savings.
+
+Delegate only targeted read-only analysis after the parent has supplied a compact file manifest or a known, narrow path set of at most five files. A review spanning more than five files belongs to the parent, because tool-turn latency removes the token-saving advantage. Read-only tasks cannot create an artifact. Return the analysis inline; never require or expect an output file. Ask for a compact, bounded report with paths, counts, and requested findings, followed by `DONE`.
+
+Use a fresh session and this baseline only for targeted analysis:
+
 ```powershell
-$r | Format-List                    # Success, Result, Cost, ModelUsed, SessionId, WorkingDirectory, Stderr, RawStderr
-Get-ChildClaudeArtifact "E:\..."    # read the produced file
-# run tests / lint to verify quality
-```
-If `$r.Success` is false, read `$r.Stderr` (cleaned) for the real cause (quota, auth, model unavailable, CLI arg errors). If Stderr looks truncated or you suspect over-cleaning, read `$r.RawStderr` for the untouched original — stderr is captured to a separate file so JSON parsing stays clean.
-
-### 4. Verdict
-- **Pass** → next subtask (new session if independent, `-ResumeId` if dependent).
-- **Fail** → re-dispatch with correction note (usually new session; paste what was wrong).
-
-## Switching models (-Profile)
-Each `scripts/profiles/<name>.json` is one model config. To add a model:
-1. Copy `scripts/profiles/_template.json` → `<name>.json`.
-2. Fill `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL` (and the four `ANTHROPIC_DEFAULT_*_MODEL` fields).
-3. Call with `-Profile <name>`.
-
-Requirement: the model must expose an **Anthropic-compatible endpoint** (`/v1/messages` style), not just OpenAI-compatible. If you only have OpenAI-compatible, set up `claude-code-router` first as an adapter.
-
-Note: `ANTHROPIC_AUTH_TOKEN` in profile json supports `$VAR_NAME` interpolation (claude code expands it). To avoid committing tokens in plaintext, store the key in an environment variable and reference it as `"$MI_MO_TOKEN"` in the profile.
-
-## Tool whitelist discipline
-The default `-AllowedTools` is `Read,Edit,Write,Glob,Grep`. This is intentionally narrow:
-- Don't add `Bash` unless the task needs commands — child claude loves to "verify" by running things, which burns turns and hits permission denials.
-- State path boundaries explicitly in the Task slip ("only touch files under E:\repo\src").
-- For read-only review tasks, use `-AllowedTools "Read,Glob,Grep"`.
-
-## Known traps (do not re-step on these)
-1. `~/.claude/settings.json` `env` field overrides process env vars → must use `--settings <file>` to override; setting `$env:` alone does nothing.
-2. PowerShell 5.1 reads UTF-8-without-BOM `.ps1` as GBK → garbles Chinese comments, breaks parse. Keep scripts English-commented + BOM.
-3. PS 5.1 `2>&1` wraps native stderr as `NativeCommandError` → breaks `ConvertFrom-Json`. This skill captures stderr to a temp file instead and parses only stdout.
-4. Without `-WorkingDirectory`, child claude runs in the parent's cwd and may edit the wrong repo — always pass it for file tasks.
-
-## Dispatch slip template
-```
-Task: <concrete description>
-Path: <file path(s)>
-Path boundary: only touch files under <dir>
-Acceptance: <verifiable criterion, e.g. "test_x.py prints 'all tests passed'">
-Constraint: <e.g. "only create files, do not execute commands">
-Reply only: DONE
+$result = Invoke-ChildClaude `
+  -Task $dispatchSlip `
+  -Profile deepseek-v4-pro `
+  -WorkingDirectory "E:\path\to\repo" `
+  -MaxTurns 3 `
+  -TimeoutSeconds 60 `
+  -DiagnosticsPath "E:\path\to\repo\reports\child-claude-diagnostic.json" `
+  -AllowedTools "Read,Glob,Grep"
 ```
 
-## Quick reference
-| Want | Do |
-|---|---|
-| Dispatch a task | `Invoke-ChildClaude -Task "..." -WorkingDirectory "..."` |
-| Use a different model | `-Profile <name>` (default `mimo`) |
-| Continue a previous task | `-ResumeId $prev.SessionId` |
-| Limit tool use | `-AllowedTools "Read,Write"` |
-| Cap turns | `-MaxTurns 5` |
-| Read what child produced | `Get-ChildClaudeArtifact "<path>"` |
-| Diagnose a failure | read `$r.Stderr` (clean) or `$r.RawStderr` (raw) |
+The caller must allow at least 60 seconds for the synchronous launcher call. A successful no-tool request does not prove that tool-using work will finish in the same time. If no result returns within that budget, accept no partial result, record the elapsed time plus stderr/raw stderr, and complete the analysis directly instead of blindly retrying. When a task needs an audit trail, pass `-DiagnosticsPath`; it records only process metadata and byte counts, never the prompt, credentials, stdout, or stderr content.
+
+## Review before accepting
+
+Treat child output as untrusted execution evidence, not a final answer.
+
+1. Inspect `$result.Success`, `$result.Result`, `$result.Stderr`, and changed files.
+2. Confirm every change stays inside the path boundary.
+3. Review the actual diff or artifacts.
+4. Run the acceptance checks independently when practical.
+5. Integrate small corrections directly when cheaper; otherwise re-dispatch a focused correction.
+
+If dispatch fails, inspect `$result.Stderr`; use `$result.RawStderr` only when cleanup may have hidden the cause. Prefer a fresh session after a confused or low-quality attempt. Resume only when retained context has clear value.
+
+## Preserve the token advantage
+
+- Ask for compact replies and artifact paths instead of verbose explanations.
+- Do not paste large child outputs into parent context when files or diffs can be inspected selectively.
+- Do not send secrets unless strictly required; prefer environment-variable references in profiles.
+- Stop delegating if retries erase the expected savings; finish directly or report the real blocker.
+- Mention delegation to the user when it occurs, including what was delegated and that the parent reviewed it.
+
+## Profiles and launcher constraints
+
+Profiles live in `scripts/profiles/`. They require an Anthropic-compatible `/v1/messages` endpoint. Keep tokens in environment variables and reference them from profile JSON rather than storing plaintext credentials.
+
+The launcher deliberately overrides Claude settings, separates stderr from JSON stdout, and supports Windows PowerShell 5.1. Preserve those behaviors when modifying it.

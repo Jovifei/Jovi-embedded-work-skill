@@ -1,61 +1,42 @@
-﻿# child-claude skill
+# child-claude skill
 
-Delegate execution work to a child Claude Code instance running on a cheaper/different model (MiMo, DeepSeek, etc). Parent claude plans and reviews; child executes. Token-saving multi-model orchestration.
-
-## Files
-- `SKILL.md` — instructions Claude reads when the skill triggers
-- `scripts/Invoke-ChildClaude.ps1` — dispatcher function
-- `scripts/profiles/mimo.json` — MiMo config (token via `$MIMO_TOKEN` env var)
-- `scripts/profiles/mimo-official.json` — MiMo official API (token via `$MIMO_OFFICIAL_TOKEN`)
-- `scripts/profiles/_template.json` — blank template for new models
+Selectively delegate a bounded execution package to a child Claude Code instance running on a cheaper or different model. The parent agent retains planning, scope control, review, integration, and final verification. This skill is not a default delegation mechanism: dispatch only when its expected parent-token savings exceed the dispatch and review cost.
 
 ## Install
-1. Copy `child-claude/` into `~/.claude/skills/` (Windows: `%USERPROFILE%\.claude\skills\`)
-2. Set token env vars (PowerShell, current session):
-   ```powershell
-   $env:MIMO_TOKEN = "tp-..."            # for mimo profile
-   $env:MIMO_OFFICIAL_TOKEN = "sk-..."   # for mimo-official profile
-   ```
-   Or `setx MIMO_TOKEN "tp-..."` for permanent. Or edit the profile json to put the token directly (local only — do not commit).
-3. Trigger via `/child-claude` or natural language ("用 mimo 干 X", "派给子 claude", "delegate to child claude")
+
+Copy `child-claude/` into the appropriate global skills root:
+
+- Codex: `%USERPROFILE%\.codex\skills\child-claude`
+- Claude Code: `%USERPROFILE%\.claude\skills\child-claude`
+
+Start a fresh task after installation; existing tasks may retain their launch-time skill catalog.
+
+## Profiles
+
+Profiles are under `scripts/profiles/`. They use environment-variable references only; never put a token in a committed profile.
+
+- `deepseek-v4-pro`: Volcengine Ark coding endpoint, requires `VOLCENGINE_CODING_API_KEY`.
+- `mimo`: requires `MIMO_TOKEN`.
+- `mimo-official`: requires `MIMO_OFFICIAL_TOKEN`.
+- `mimo-1m`: requires `MIMO_1M_TOKEN`.
+
+To add a model, copy `_template.json`, use an Anthropic-compatible endpoint, and reference an environment variable for `ANTHROPIC_AUTH_TOKEN`.
 
 ## Usage
+
 ```powershell
-. "$env:USERPROFILE\.claude\skills\child-claude\scripts\Invoke-ChildClaude.ps1"
+. "$env:USERPROFILE\.codex\skills\child-claude\scripts\Invoke-ChildClaude.ps1"
 
-# new session, scoped to a working directory
-Invoke-ChildClaude -Task "write X to Y" -Profile mimo -WorkingDirectory "E:\repo"
-
-# resume session (dependent task)
-Invoke-ChildClaude -Task "add Z" -Profile mimo -ResumeId $prev.SessionId -WorkingDirectory "E:\repo"
+$result = Invoke-ChildClaude `
+  -Task $dispatchSlip `
+  -Profile deepseek-v4-pro `
+  -WorkingDirectory "E:\repo"
 ```
 
-Always pass `-WorkingDirectory` for file tasks — it hard-fails if the path is invalid (prevents editing the wrong repo).
+Always pass an absolute `-WorkingDirectory` for file work. For a targeted read-only analysis, supply a manifest of no more than five files, use `-AllowedTools "Read,Glob,Grep"`, `-MaxTurns 3`, `-TimeoutSeconds 60`, and optionally `-DiagnosticsPath` for metadata-only timeout diagnostics. Broad inventories belong to the parent agent.
 
-## Returns
-`Success, Result, Cost, Turns, ModelUsed, SessionId, Profile, Resumed, WorkingDirectory, Stderr (cleaned), RawStderr (raw)`
+For a write task, explicitly include `Write` or `Edit` in `-AllowedTools`, state the destination paths, and independently review the resulting diff.
 
-On failure: read `$r.Stderr` (cleaned) for the cause. If it looks truncated, check `$r.RawStderr` (untouched original).
+## Failure handling
 
-## Pre-flight checks (hard-fail, no silent fallback)
-- profile json exists
-- claude CLI in PATH
-- WorkingDirectory is a valid directory
-
-## Switch models (-Profile)
-1. Copy `scripts/profiles/_template.json` -> `<name>.json`
-2. Fill `ANTHROPIC_AUTH_TOKEN` (or `$VAR_NAME` env ref), `ANTHROPIC_BASE_URL`, `ANTHROPIC_MODEL` (+ four `ANTHROPIC_DEFAULT_*_MODEL`)
-3. Call `-Profile <name>`
-
-Requirement: the model must expose an Anthropic-compatible endpoint. OpenAI-compatible only -> set up `claude-code-router` first as an adapter.
-
-## Token strategy
-- **Independent task -> new session** (default). Prompt caching bills the system prefix at ~0.25x; no history cost.
-- **Dependent task -> `-ResumeId`**. Reuses previous session to avoid re-explaining context.
-- **Failed task -> usually new session** to avoid inheriting bad context.
-
-## Known traps (solved in this skill)
-1. `~/.claude/settings.json` `env` field overrides process env vars -> use `--settings <file>` to override
-2. PS 5.1 reads UTF-8-without-BOM `.ps1` as GBK -> scripts are English-commented + BOM
-3. PS 5.1 `2>&1` wraps native stderr as NativeCommandError -> stderr captured to temp file; `Stderr` cleaned, `RawStderr` preserved
-4. Without `-WorkingDirectory`, child runs in parent's cwd -> hard-fail if invalid
+Inspect the complete result object before acting on a failure: `Success`, `TimedOut`, `Turns`, `Result`, `Stderr`, and `RawStderr`. A timeout does not supply usable partial evidence; narrow the package or complete it in the parent rather than blindly retrying.

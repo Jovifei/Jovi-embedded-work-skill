@@ -1,0 +1,4 @@
+interface:
+  display_name: "Child Claude"
+  short_description: "Delegate only when it saves parent-agent tokens"
+  default_prompt: "Evaluate whether delegating this task to child Claude will reduce total parent-agent token usage; delegate only when the expected net savings are positive."
