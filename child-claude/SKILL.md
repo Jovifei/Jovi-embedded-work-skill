@@ -51,6 +51,8 @@ Return: <compact result format, changed paths, test evidence>
 
 Always pass `-WorkingDirectory` for file work. Prefer one coherent package over many tiny dispatches; tiny packages often lose the token savings to orchestration overhead.
 
+For a file-write package, set `-WorkingDirectory` to the common parent directory of every target whenever possible. This makes the target boundary native to Claude CLI and avoids a cross-directory permission wait. If a bounded task genuinely must read or write outside that directory, pass only those existing directories through `-AdditionalDirectories`; the launcher forwards them as Claude CLI `--add-dir` permissions. Do not rely on a natural-language path boundary to authorize a directory outside `WorkingDirectory`.
+
 ## Dispatch
 
 ```powershell
@@ -66,9 +68,41 @@ Use a new session for independent work. Use `-ResumeId $previous.SessionId` only
 
 Keep the default tool set narrow. For read-only work, use `-AllowedTools "Read,Glob,Grep"`. Add command execution only when acceptance requires it.
 
+## 30-second liveness checks, 90-second completion boundary, and parent fallback
+
+For every package that passes the delegation gate, use a 30-second liveness check and a 90-second overall timeout for each child attempt. This is a bounded dispatch policy, not an excuse for repeated blind retries.
+
+1. Launch the child with `-WatchdogIntervalSeconds 30`, `-TimeoutSeconds 90`, and a distinct `-DiagnosticsPath` for the attempt.
+2. At every watchdog check, confirm that the process is still alive. Claude CLI commonly writes its JSON only on completion, so no stdout at 30 seconds is not by itself evidence of a hang.
+3. If it returns a successful, structured result inside the overall timeout, review and verify it normally.
+4. Classify diagnostics before retrying: a non-empty `launchError` is a launch failure; a completed process without valid JSON is a malformed-result failure; a process killed at the 90-second boundary is a completion timeout. An alive process with no output at a 30-second liveness check is only `running`, because final-only JSON output has no streaming completion signal.
+5. For a timeout or failed result, record `Success`, `TimedOut`, `Turns`, `Result`, `Stderr`, `RawStderr`, process id, launch error, elapsed time, and the diagnostics file. Treat it as one failed attempt and accept no partial output.
+6. Re-dispatch the same bounded package in a fresh session. Do not resume a failed session or silently broaden its scope.
+7. After three consecutive failed attempts for that package, stop delegating and execute it directly in the parent. Tell the user that the parent took over, then run the original acceptance checks.
+
+The synchronous caller must allow at least 100 seconds per attempt to accommodate the 90-second overall timeout and bounded cleanup grace period. A living process that has not produced an accepted structured result at a 30-second watchdog check remains in progress; it is not evidence of a hang, launch failure, or acceptable partial work.
+
+Run one child at a time per machine/profile. Do not fan out independent packages with `Start-Job`, `ForEach-Object -Parallel`, or simultaneous shells: upstream providers can rate-limit the burst, while Claude CLI may wait internally and appear as a misleading 90-second completion timeout. The launcher fails a second simultaneous request immediately with `child Claude dispatch busy`.
+
+If a fresh no-tool smoke that previously worked begins timing out, stop child retries and perform one minimal authenticated HTTP probe against the configured `/v1/messages` endpoint. A `429` means upstream rate limiting: do not retry, wait for the provider window or let the parent execute the work. A `401` means credentials must be repaired. Do not treat either response as an isolation fault.
+
 ## File-write contract
 
 Write tasks must explicitly include `Write` or `Edit` in `-AllowedTools`; a copied read-only whitelist guarantees that no file can be changed. State the exact destination file and path boundary, and require the child to return changed paths plus verification evidence. Do not ask a write task to produce an artifact while also restricting it to `Read,Glob,Grep`.
+
+An external write path needs two independent controls: include `Write` or `Edit` in `-AllowedTools`, and either make its common parent the `-WorkingDirectory` or grant its parent explicitly with `-AdditionalDirectories`. If either is absent, keep the edit in the parent rather than retrying a child that may wait for headless permission approval.
+
+Headless child sessions cannot reliably surface a Claude CLI approval prompt to the Codex user. Before enabling automatic child edits, obtain the user's approval for the exact destination directories and the exact write scope. Then, and only then, pass `-PermissionMode acceptEdits`. Keep the default permission mode for read-only work or unapproved writes. Never use `bypassPermissions`; `acceptEdits` is limited to the already-approved package and does not replace parent diff review.
+
+```powershell
+# User-approved write package: exact target scope and parent directory already stated.
+$result = Invoke-ChildClaude `
+  -Task $dispatchSlip `
+  -Profile deepseek-v4-pro `
+  -WorkingDirectory "E:\approved\target-parent" `
+  -PermissionMode acceptEdits `
+  -AllowedTools "Read,Edit,Write,Glob,Grep"
+```
 
 After every child call, inspect the launcher object before describing the outcome. Report `Success`, `TimedOut`, `Turns`, `Result`, `Stderr`, and `RawStderr` when a task fails. Do not reduce an unavailable diagnosis to "failed with no changes"; use the structured fields to decide whether to correct the dispatch, retry once, or complete the package directly.
 
@@ -86,12 +120,13 @@ $result = Invoke-ChildClaude `
   -Profile deepseek-v4-pro `
   -WorkingDirectory "E:\path\to\repo" `
   -MaxTurns 3 `
-  -TimeoutSeconds 60 `
-  -DiagnosticsPath "E:\path\to\repo\reports\child-claude-diagnostic.json" `
+  -WatchdogIntervalSeconds 30 `
+  -TimeoutSeconds 90 `
+  -DiagnosticsPath "E:\path\to\repo\reports\child-claude-diagnostic-attempt-1.json" `
   -AllowedTools "Read,Glob,Grep"
 ```
 
-The caller must allow at least 60 seconds for the synchronous launcher call. A successful no-tool request does not prove that tool-using work will finish in the same time. If no result returns within that budget, accept no partial result, record the elapsed time plus stderr/raw stderr, and complete the analysis directly instead of blindly retrying. When a task needs an audit trail, pass `-DiagnosticsPath`; it records only process metadata and byte counts, never the prompt, credentials, stdout, or stderr content.
+Use the three-attempt watchdog above rather than a blind retry. When a task needs an audit trail, pass `-DiagnosticsPath`; it records only process metadata and byte counts, never the prompt, credentials, stdout, or stderr content.
 
 ## Review before accepting
 
@@ -117,4 +152,4 @@ If dispatch fails, inspect `$result.Stderr`; use `$result.RawStderr` only when c
 
 Profiles live in `scripts/profiles/`. They require an Anthropic-compatible `/v1/messages` endpoint. Keep tokens in environment variables and reference them from profile JSON rather than storing plaintext credentials.
 
-The launcher deliberately overrides Claude settings, separates stderr from JSON stdout, and supports Windows PowerShell 5.1. Preserve those behaviors when modifying it.
+The launcher deliberately isolates the child from user/project/local Claude settings and external MCP configuration, then loads only its explicit profile. This prevents global hooks, plugins, and MCP startup from consuming the bounded completion window. It also separates stderr from JSON stdout and supports Windows PowerShell 5.1. Preserve those behaviors when modifying it.

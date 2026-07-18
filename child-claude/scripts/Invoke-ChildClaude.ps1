@@ -48,6 +48,12 @@ function Invoke-ChildClaude {
     .PARAMETER WorkingDirectory
         Directory to run child claude in. If set, must be a valid directory
         (hard-fails otherwise to prevent editing the wrong repo).
+    .PARAMETER AdditionalDirectories
+        Explicit external directories granted to Claude CLI via --add-dir.
+        Each must exist and is kept separate from WorkingDirectory.
+    .PARAMETER PermissionMode
+        Explicit child CLI permission mode. `acceptEdits` is allowed only for
+        a parent-approved, bounded write package; default preserves prompts.
     .PARAMETER MaxTurns
         Cap on tool-call turns. Default 5.
     .PARAMETER AllowedTools
@@ -57,6 +63,9 @@ function Invoke-ChildClaude {
     .PARAMETER TimeoutSeconds
         Hard wall-clock limit for the child process. On expiry, return a
         structured timeout result and terminate the child process tree.
+    .PARAMETER WatchdogIntervalSeconds
+        Liveness polling interval for a running child process. A poll records
+        that the process remains alive; only TimeoutSeconds triggers cleanup.
     .PARAMETER DiagnosticsPath
         Optional JSON path for process-level diagnostics. Never contains the
         task text, credentials, or child stdout/stderr content.
@@ -69,16 +78,26 @@ function Invoke-ChildClaude {
         [string]$Profile = "mimo",
         [string]$ResumeId = "",
         [string]$WorkingDirectory = "",
+        [string[]]$AdditionalDirectories = @(),
+        [ValidateSet("default", "acceptEdits")][string]$PermissionMode = "default",
         [int]$MaxTurns = 5,
         [string]$AllowedTools = "Read,Edit,Write,Glob,Grep",
         [string]$AppendSystemPrompt = "",
         [int]$TimeoutSeconds = 180,
+        [int]$WatchdogIntervalSeconds = 30,
         [string]$DiagnosticsPath = ""
     )
 
     if ($TimeoutSeconds -lt 1) {
         return [pscustomobject]@{
             Success = $false; Result = "TimeoutSeconds must be at least 1"
+            IsError = $true; TimedOut = $false; Profile = $Profile; Resumed = [bool]$ResumeId
+            WorkingDirectory = $WorkingDirectory; Stderr = ""; RawStderr = ""
+        }
+    }
+    if ($WatchdogIntervalSeconds -lt 1) {
+        return [pscustomobject]@{
+            Success = $false; Result = "WatchdogIntervalSeconds must be at least 1"
             IsError = $true; TimedOut = $false; Profile = $Profile; Resumed = [bool]$ResumeId
             WorkingDirectory = $WorkingDirectory; Stderr = ""; RawStderr = ""
         }
@@ -160,15 +179,39 @@ function Invoke-ChildClaude {
         }
     }
 
+    $resolvedAdditionalDirectories = @()
+    foreach ($directory in $AdditionalDirectories) {
+        if (-not $directory -or -not (Test-Path $directory -PathType Container)) {
+            return [pscustomobject]@{
+                Success = $false
+                Result = "AdditionalDirectories contains an invalid directory: $directory"
+                IsError = $true; Profile = $Profile; Resumed = [bool]$ResumeId
+                WorkingDirectory = $WorkingDirectory; Stderr = ""; RawStderr = ""
+            }
+        }
+        $resolvedAdditionalDirectories += (Resolve-Path -LiteralPath $directory).Path
+    }
+
     $claudeArgs = @(
         "-p", $Task,
         "--output-format", "json",
         "--max-turns", $MaxTurns,
         "--allowedTools", $AllowedTools,
-        "--settings", $effectiveSettingsPath
+        "--settings", $effectiveSettingsPath,
+        # The child profile is the only intended settings input.  Without this,
+        # Claude Code also loads user/project/local settings and can start global
+        # hooks, plugins, or MCP servers before producing final JSON.
+        "--setting-sources=",
+        "--strict-mcp-config"
     )
     if ($ResumeId) {
         $claudeArgs = @("--resume", $ResumeId) + $claudeArgs
+    }
+    foreach ($directory in $resolvedAdditionalDirectories) {
+        $claudeArgs += @("--add-dir", $directory)
+    }
+    if ($PermissionMode -ne "default") {
+        $claudeArgs += @("--permission-mode", $PermissionMode)
     }
     if ($AppendSystemPrompt) {
         $claudeArgs += @("--append-system-prompt", $AppendSystemPrompt)
@@ -186,6 +229,43 @@ function Invoke-ChildClaude {
     $exitCode = $null
     $stdoutBytes = 0
     $stderrBytes = 0
+    $watchdogChecks = 0
+    $dispatchMutex = New-Object System.Threading.Mutex($false, 'Local\CodexChildClaudeDispatch')
+    $dispatchLockAcquired = $false
+    try {
+        $dispatchLockAcquired = $dispatchMutex.WaitOne(0)
+    } catch [System.Threading.AbandonedMutexException] {
+        # The prior owner exited without releasing the lock; Windows grants it
+        # to this process, so the new single-flight dispatch is safe to run.
+        $dispatchLockAcquired = $true
+    }
+    if (-not $dispatchLockAcquired) {
+        $busyMessage = 'child Claude dispatch busy; run one child at a time and retry only after it completes'
+        Write-ChildClaudeDiagnostics -Path $DiagnosticsPath -Data @{
+            startedAtUtc = $startedAt.ToString('o')
+            completedAtUtc = [DateTime]::UtcNow.ToString('o')
+            elapsedMilliseconds = [int]([DateTime]::UtcNow - $startedAt).TotalMilliseconds
+            profile = $Profile
+            timeoutSeconds = $TimeoutSeconds
+            timedOut = $false
+            processId = $null
+            exitCode = $null
+            stdoutBytes = 0
+            stderrBytes = 0
+            watchdogIntervalSeconds = $WatchdogIntervalSeconds
+            watchdogChecks = 0
+            launchError = $busyMessage
+            terminationError = ''
+        }
+        if ($tempSettingsPath -and (Test-Path $tempSettingsPath)) { try { [System.IO.File]::Delete($tempSettingsPath) } catch {} }
+        try { $dispatchMutex.Dispose() } catch {}
+        return [pscustomobject]@{
+            Success = $false; Result = $busyMessage; Cost = $null; Turns = $null
+            ModelUsed = $null; IsError = $true; TimedOut = $false; SessionId = $null
+            Profile = $Profile; Resumed = [bool]$ResumeId; WorkingDirectory = $WorkingDirectory
+            Stderr = $busyMessage; RawStderr = ''
+        }
+    }
     try {
         $claudeCommand = Get-Command claude -ErrorAction Stop
         $claudeExecutable = $claudeCommand.Source
@@ -216,7 +296,16 @@ function Invoke-ChildClaude {
         $processId = $process.Id
         $stdoutReadTask = $process.StandardOutput.ReadToEndAsync()
         $stderrReadTask = $process.StandardError.ReadToEndAsync()
-        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+        while (-not $process.HasExited) {
+            $elapsedMilliseconds = ([DateTime]::UtcNow - $startedAt).TotalMilliseconds
+            $remainingMilliseconds = ($TimeoutSeconds * 1000) - $elapsedMilliseconds
+            if ($remainingMilliseconds -le 0) { break }
+            $waitMilliseconds = [Math]::Min($WatchdogIntervalSeconds * 1000, [Math]::Ceiling($remainingMilliseconds))
+            if ($process.WaitForExit([int]$waitMilliseconds)) { break }
+            $watchdogChecks++
+            Write-Verbose "child Claude watchdog check ${watchdogChecks}: process $($process.Id) is still running."
+        }
+        if (-not $process.HasExited) {
             $timedOut = $true
             try {
                 # Run taskkill under cmd.exe so its non-zero exit code cannot
@@ -243,6 +332,8 @@ function Invoke-ChildClaude {
             try { [System.IO.File]::Delete($tempSettingsPath) } catch {}
         }
         if ($process) { try { $process.Dispose() } catch {} }
+        if ($dispatchLockAcquired) { try { $dispatchMutex.ReleaseMutex() } catch {} }
+        try { $dispatchMutex.Dispose() } catch {}
     }
 
     Write-ChildClaudeDiagnostics -Path $DiagnosticsPath -Data @{
@@ -256,6 +347,8 @@ function Invoke-ChildClaude {
         exitCode = $exitCode
         stdoutBytes = $stdoutBytes
         stderrBytes = $stderrBytes
+        watchdogIntervalSeconds = $WatchdogIntervalSeconds
+        watchdogChecks = $watchdogChecks
         launchError = $launchError
         terminationError = $terminationError
     }
