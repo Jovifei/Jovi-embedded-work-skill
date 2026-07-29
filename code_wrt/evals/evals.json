@@ -1,0 +1,20 @@
+{
+  "skill_name": "code_wrt",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/code_wrt src/example.c",
+      "expected_behavior": "Must load ponytail and code_zl. First make only behavior-preserving simplifications, review that diff, then apply code_zl comments and formatting to the final code, and report both phases plus verification."
+    },
+    {
+      "id": 2,
+      "prompt": "/code_wrt 整理这个 UART ISR",
+      "expected_behavior": "Must preserve register read order, interrupt timing, concurrency, error handling, and observable behavior during ponytail simplification; then apply code_zl hardware and comment rules. If equivalence is uncertain, keep the code and continue formatting."
+    },
+    {
+      "id": 3,
+      "prompt": "只给 src/example.c 添加标准函数头注释",
+      "expected_behavior": "Should use code_zl directly rather than code_wrt because the request is comments-only."
+    }
+  ]
+}

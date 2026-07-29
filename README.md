@@ -11,6 +11,7 @@ jovi-embedded-work/
 ├── project-init/              # 一键初始化工程工具链
 ├── update-project-docs/       # 文档 bootstrap + 日常维护
 ├── code_zl/                   # C 代码注释标准化
+├── code_wrt/                  # Ponytail 简化 + code_zl 注释整理
 ├── day_sum/                   # 开发日报生成
 └── child-claude/              # 多模型派发编排（父规划+审核，子执行）
 ```
@@ -109,7 +110,22 @@ jovi-embedded-work/
 
 ---
 
-### 4. day_sum — 开发日报生成
+### 4. code_wrt — 代码简化与注释整理
+
+**触发词：** `/code_wrt`、`代码简化整理`、`简化并注释`、`简化并整理`
+
+**功能：** 固定按 `ponytail → code_zl` 执行。先做最小的行为保持式简化，再使用 `code_zl` 整理嵌入式 C 的注释、分节和格式。两阶段不可交换，也不可只执行其中一个阶段。
+
+**边界：** 保留公开接口、协议语义、硬件访问顺序、RTOS 时序、并发保护和错误处理；不确定简化是否等价时保留原代码并继续整理注释。
+
+**示例：**
+```
+/code_wrt src/modbus.c src/can.c
+```
+
+---
+
+### 5. day_sum — 开发日报生成
 
 **触发词：** `/day_sum`、`总结日报`、`daily summary`、`work summary`
 
@@ -137,7 +153,7 @@ jovi-embedded-work/
 
 ---
 
-### 5. child-claude — 多模型派发编排
+### 6. child-claude — 多模型派发编排
 
 **触发词：** `/child-claude`、`派给子claude`、`用mimo干`、`换便宜模型`、`delegate to child claude`
 
@@ -187,6 +203,7 @@ cd Jovi-embedded-work-skill
 xcopy /E /I project-init %USERPROFILE%\.claude\skills\project-init
 xcopy /E /I update-project-docs %USERPROFILE%\.claude\skills\update-project-docs
 xcopy /E /I code_zl %USERPROFILE%\.claude\skills\code_zl
+xcopy /E /I code_wrt %USERPROFILE%\.claude\skills\code_wrt
 xcopy /E /I day_sum %USERPROFILE%\.claude\skills\day_sum
 xcopy /E /I child-claude %USERPROFILE%\.claude\skills\child-claude
 
@@ -194,6 +211,7 @@ xcopy /E /I child-claude %USERPROFILE%\.claude\skills\child-claude
 cp -r project-init ~/.claude/skills/
 cp -r update-project-docs ~/.claude/skills/
 cp -r code_zl ~/.claude/skills/
+cp -r code_wrt ~/.claude/skills/
 cp -r day_sum ~/.claude/skills/
 cp -r child-claude ~/.claude/skills/
 ```
@@ -245,7 +263,17 @@ Claude：读取两个文件 → 添加标准函数头注释 → 添加行内注�
 → 输出汇总报告（+12 函数头, +35 行内注释）
 ```
 
-### 场景 4：日报生成
+### 场景 4：代码简化与注释整理
+
+```
+你：/code_wrt src/modbus.c src/can.c
+
+Claude：先用 ponytail 删除或内联行为等价的冗余代码
+→ 再用 code_zl 整理最终代码的函数头、行内注释和分节格式
+→ 输出两个阶段的变更与验证结果
+```
+
+### 场景 5：日报生成
 
 ```
 你：总结今天的开发记录
