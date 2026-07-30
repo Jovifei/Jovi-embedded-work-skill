@@ -1,6 +1,14 @@
 [CmdletBinding()]
-param([string]$SkillParent = 'C:\Users\Admin\.claude\skills', [string]$SkillName = 'codex-memory', [switch]$VerifyExisting)
+param([string]$SkillParent, [string]$SkillName = 'codex-memory', [switch]$VerifyExisting)
 . (Join-Path $PSScriptRoot 'common.ps1')
+
+if ([string]::IsNullOrWhiteSpace($SkillParent)) {
+    if ([string]::IsNullOrWhiteSpace($env:USERPROFILE)) {
+        (Get-CMResult -Status 'BLOCKED' -Message 'SkillParent was not supplied and USERPROFILE is unavailable.' -Data $null) | ConvertTo-Json -Depth 5
+        exit 1
+    }
+    $SkillParent = Join-Path $env:USERPROFILE '.claude\skills'
+}
 
 $target = Join-Path $SkillParent $SkillName
 $checks = [ordered]@{

@@ -47,6 +47,12 @@ Describe 'codex-memory safety gates' {
         (Test-Path -LiteralPath (Join-Path $env:CODEX_MEMORY_USER_ROOT 'config.yaml')) | Should Be $false
     }
 
+    It 'derives the default preflight skill parent from USERPROFILE' {
+        $preflight = Get-Content -LiteralPath (Join-Path $scripts 'preflight-install.ps1') -Raw -Encoding UTF8
+        $preflight | Should Match '\$env:USERPROFILE'
+        $preflight | Should Not Match 'C:\\Users\\Admin'
+    }
+
     It 'keeps manual content while replacing a managed block' {
         $memory = Join-Path $TestDrive 'memory'
         New-Item -ItemType Directory -Path (Join-Path $memory '03-项目记忆') -Force | Out-Null
