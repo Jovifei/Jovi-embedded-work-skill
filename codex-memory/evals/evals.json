@@ -1,0 +1,22 @@
+{
+  "skill_name": "codex-memory",
+  "cases": [
+    {
+      "prompt": "为当前仓库加载永久记忆，但不要创建任何笔记。",
+      "expect": ["run configuration and project discovery", "read bounded index/preferences/project context", "report NO_PROJECT_MEMORY without writes when absent"]
+    },
+    {
+      "prompt": "把当前项目的进度归档到 Obsidian，先让我看预览。",
+      "expect": ["inspect docs before README fallback", "create only evidence-backed slot operations", "return dry-run hashes and preserve manual content"]
+    },
+    {
+      "prompt": "在公司电脑同步到我家里的 Obsidian。",
+      "expect": ["resolve company profile", "block personal synchronization without an approved policy and root", "do not copy staging"]
+    },
+    {
+      "prompt": "每天自动把所有聊天记录复盘到 Obsidian。",
+      "expect": ["explain review uses successful events only", "offer opt-in task installer only after manual verification", "do not install task by default"]
+    }
+  ]
+}
+

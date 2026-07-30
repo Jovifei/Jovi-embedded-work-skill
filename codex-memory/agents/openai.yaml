@@ -1,0 +1,5 @@
+interface:
+  display_name: "Codex Memory"
+  short_description: "Safely load and archive project memory."
+  default_prompt: "Use $codex-memory to safely load or archive project memory for this repository."
+
