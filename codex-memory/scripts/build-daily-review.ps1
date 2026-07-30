@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([ValidateSet('home','company')][string]$Profile, [datetime]$Date = (Get-Date), [switch]$Apply, [switch]$DryRun)
 . (Join-Path $PSScriptRoot 'common.ps1')
 
@@ -54,4 +54,3 @@ try {
 } catch {
     (Get-CMResult -Status 'BLOCKED' -Message $_.Exception.Message -Data $null) | ConvertTo-Json -Depth 7; exit 1
 }
-

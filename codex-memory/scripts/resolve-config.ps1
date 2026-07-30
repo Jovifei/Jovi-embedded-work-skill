@@ -15,6 +15,7 @@ try {
         allow_source_excerpt = [bool]$entry.allow_source_excerpt
         allow_raw_logs = [bool]$entry.allow_raw_logs
         allow_snapshot = [bool]$entry.allow_snapshot
+        allow_document_mirror = [bool]$entry.allow_document_mirror
         allow_event_content = [bool]$entry.allow_event_content
         allow_staging_sync = [bool]$entry.allow_staging_sync
         allow_personal_sync = [bool]$entry.allow_personal_sync
@@ -31,4 +32,3 @@ try {
     (Get-CMResult -Status 'BLOCKED' -Message $_.Exception.Message -Data $null) | ConvertTo-Json -Depth 6
     exit 1
 }
-

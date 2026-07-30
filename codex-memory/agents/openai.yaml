@@ -1,5 +1,4 @@
 interface:
   display_name: "Codex Memory"
-  short_description: "Safely load and archive project memory."
-  default_prompt: "Use $codex-memory to safely load or archive project memory for this repository."
-
+  short_description: "Archive project memory and direct Markdown document copies."
+  default_prompt: "Use $codex-memory to archive source-backed project memory and its safe Markdown docs into the approved Obsidian vault."

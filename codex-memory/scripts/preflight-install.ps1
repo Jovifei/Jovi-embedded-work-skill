@@ -34,4 +34,3 @@ $baseOk = $checks.windows -and $checks.powershell_5_or_newer -and $checks.python
 $ok = if ($VerifyExisting) { $baseOk -and -not $checks.target_absent -and $checks.existing_static_structure } else { $baseOk -and $checks.target_absent }
 (Get-CMResult -Status $(if ($ok) { 'PASS' } else { 'BLOCKED' }) -Message $(if ($ok) { if ($VerifyExisting) { 'Existing Skill preflight passed.' } else { 'Install preflight passed.' } } else { 'Install preflight failed; do not create or repair the Skill.' }) -Data $checks) | ConvertTo-Json -Depth 6
 if (-not $ok) { exit 1 }
-

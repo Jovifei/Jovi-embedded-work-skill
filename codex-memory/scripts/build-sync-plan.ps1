@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([ValidateSet('home','company')][string]$Profile, [string]$ProjectRoot = (Get-Location).Path, [string]$ProjectId)
 . (Join-Path $PSScriptRoot 'common.ps1')
 
@@ -44,4 +44,3 @@ try {
     (Get-CMResult -Status 'BLOCKED' -Message $_.Exception.Message -Data $null) | ConvertTo-Json -Depth 6
     exit 1
 }
-

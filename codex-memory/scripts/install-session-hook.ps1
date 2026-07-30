@@ -42,4 +42,3 @@ try {
 } catch {
     (Get-CMResult -Status 'BLOCKED' -Message $_.Exception.Message -Data $null) | ConvertTo-Json -Depth 6; exit 1
 }
-

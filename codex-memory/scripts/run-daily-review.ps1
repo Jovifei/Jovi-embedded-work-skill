@@ -29,4 +29,3 @@ try {
     if ($acquired) { $mutex.ReleaseMutex() }
     $mutex.Dispose()
 }
-

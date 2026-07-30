@@ -1,4 +1,4 @@
-[CmdletBinding(DefaultParameterSetName = 'Archive')]
+﻿[CmdletBinding(DefaultParameterSetName = 'Archive')]
 param(
     [Parameter(Mandatory = $true, ParameterSetName = 'Archive')][string]$OperationPath,
     [Parameter(Mandatory = $true, ParameterSetName = 'Sync')][string]$SyncPlanPath,
@@ -129,4 +129,3 @@ try {
     (Get-CMResult -Status $(if ($_.Exception.Message -like 'CONFLICT*') { 'CONFLICT' } else { 'BLOCKED' }) -Message $_.Exception.Message -Data $null) | ConvertTo-Json -Depth 7
     exit 1
 }
-

@@ -1,4 +1,4 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 function Get-CMUserRoot {
@@ -56,7 +56,7 @@ function ConvertTo-CMNullableHash {
 
 function Get-CMCanonicalPath {
     param([Parameter(Mandatory = $true)][string]$Path)
-    return [System.IO.Path]::GetFullPath($Path).TrimEnd('\\')
+    return [System.IO.Path]::GetFullPath($Path).TrimEnd('\')
 }
 
 function Test-CMSamePath {
@@ -134,6 +134,21 @@ function Write-CMAtomicText {
     }
 }
 
+function Write-CMAtomicBytes {
+    param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)][AllowEmptyCollection()][byte[]]$Bytes)
+    $parent = Split-Path -Parent $Path
+    [System.IO.Directory]::CreateDirectory($parent) | Out-Null
+    $temp = Join-Path $parent ('.' + [System.IO.Path]::GetFileName($Path) + '.' + [guid]::NewGuid().ToString('N') + '.tmp')
+    [System.IO.File]::WriteAllBytes($temp, $Bytes)
+    if (Test-Path -LiteralPath $Path) {
+        $backup = Join-Path $parent ('.' + [System.IO.Path]::GetFileName($Path) + '.' + [guid]::NewGuid().ToString('N') + '.bak')
+        [System.IO.File]::Replace($temp, $Path, $backup)
+        if (Test-Path -LiteralPath $backup) { [System.IO.File]::Delete($backup) }
+    } else {
+        [System.IO.File]::Move($temp, $Path)
+    }
+}
+
 function Write-CMAtomicJson {
     param([Parameter(Mandatory = $true)][string]$Path, [Parameter(Mandatory = $true)]$Value)
     Write-CMAtomicText -Path $Path -Content ($Value | ConvertTo-Json -Depth 12)
@@ -167,4 +182,3 @@ function Get-CMResult {
     param([string]$Status, [string]$Message, $Data)
     return [pscustomobject]@{ status = $Status; message = $Message; data = $Data }
 }
-

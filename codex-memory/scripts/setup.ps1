@@ -13,7 +13,7 @@ if ($Profile -eq 'home') {
         (Get-CMResult -Status 'BLOCKED' -Message 'Home setup requires -VaultRoot or OBSIDIAN_VAULT_ROOT; no vault path is inferred.' -Data $null) | ConvertTo-Json -Depth 5
         exit 1
     }
-    try { $homeVault = (Resolve-Path -LiteralPath $VaultRoot -ErrorAction Stop).Path.TrimEnd('\\','/') }
+    try { $homeVault = (Resolve-Path -LiteralPath $VaultRoot -ErrorAction Stop).Path.TrimEnd('\','/') }
     catch {
         (Get-CMResult -Status 'BLOCKED' -Message 'The supplied home VaultRoot does not exist.' -Data @{ vault_root = $VaultRoot }) | ConvertTo-Json -Depth 5
         exit 1
@@ -27,12 +27,12 @@ else {
 $profiles = [ordered]@{
     home = [ordered]@{
         obsidian_vault_root = $homeVault; memory_root = $homeMemory; classification = 'personal'
-        allow_source_excerpt = $true; allow_raw_logs = $false; allow_snapshot = $false; allow_event_content = $true
+        allow_source_excerpt = $true; allow_raw_logs = $false; allow_snapshot = $false; allow_document_mirror = $true; allow_event_content = $true
         allow_staging_sync = $true; allow_personal_sync = $true; source_extensions = @('.md'); approved_memory_roots = @($homeMemory)
     }
     company = [ordered]@{
         obsidian_vault_root = ''; memory_root = ''; classification = 'internal'
-        allow_source_excerpt = $false; allow_raw_logs = $false; allow_snapshot = $false; allow_event_content = $true
+        allow_source_excerpt = $false; allow_raw_logs = $false; allow_snapshot = $false; allow_document_mirror = $false; allow_event_content = $true
         allow_staging_sync = $true; allow_personal_sync = $false; source_extensions = @('.md'); approved_memory_roots = @()
     }
 }
@@ -52,4 +52,3 @@ try {
 } catch {
     (Get-CMResult -Status 'BLOCKED' -Message $_.Exception.Message -Data $null) | ConvertTo-Json -Depth 6; exit 1
 }
-

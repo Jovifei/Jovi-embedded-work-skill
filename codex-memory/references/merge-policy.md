@@ -10,4 +10,3 @@ For staging sync, state lives at `%USERPROFILE%\.codex-memory\state\<project-id>
 - both changed and different: return `CONFLICT` and write nothing.
 
 Recheck hashes immediately before applying. A changed hash, escaped path, missing approved profile, lock contention, template incompatibility, or conflict stops the operation. Never resolve a conflict automatically.
-

@@ -1,4 +1,4 @@
-$skillRoot = Split-Path -Parent $PSScriptRoot
+﻿$skillRoot = Split-Path -Parent $PSScriptRoot
 $scripts = Join-Path $skillRoot 'scripts'
 
 function New-CMFixtureConfig {
@@ -7,7 +7,7 @@ function New-CMFixtureConfig {
     New-Item -ItemType Directory -Path (Join-Path $MemoryRoot '06-模板') -Force | Out-Null
     'index' | Set-Content -LiteralPath (Join-Path $MemoryRoot '00-总索引.md') -Encoding UTF8
     $companyRoot = if ($Profile -eq 'company') { $MemoryRoot } else { '' }
-    $config = @{ schema_version = 1; active_profile = $Profile; profiles = @{ home = @{ memory_root = $MemoryRoot; obsidian_vault_root = (Split-Path $MemoryRoot); allow_source_excerpt = $true; allow_raw_logs = $false; allow_snapshot = $false; allow_event_content = $true; allow_staging_sync = $true; allow_personal_sync = $true; source_extensions = @('.md'); approved_memory_roots = @($MemoryRoot) }; company = @{ memory_root = $companyRoot; obsidian_vault_root = if ($companyRoot) { (Split-Path $companyRoot) } else { '' }; allow_source_excerpt = $false; allow_raw_logs = $false; allow_snapshot = $false; allow_event_content = $true; allow_staging_sync = $true; allow_personal_sync = $false; source_extensions = @('.md'); approved_memory_roots = if ($companyRoot) { @($companyRoot) } else { @() } } } }
+    $config = @{ schema_version = 1; active_profile = $Profile; profiles = @{ home = @{ memory_root = $MemoryRoot; obsidian_vault_root = (Split-Path $MemoryRoot); allow_source_excerpt = $true; allow_raw_logs = $false; allow_snapshot = $false; allow_document_mirror = $true; allow_event_content = $true; allow_staging_sync = $true; allow_personal_sync = $true; source_extensions = @('.md'); approved_memory_roots = @($MemoryRoot) }; company = @{ memory_root = $companyRoot; obsidian_vault_root = if ($companyRoot) { (Split-Path $companyRoot) } else { '' }; allow_source_excerpt = $false; allow_raw_logs = $false; allow_snapshot = $false; allow_document_mirror = $false; allow_event_content = $true; allow_staging_sync = $true; allow_personal_sync = $false; source_extensions = @('.md'); approved_memory_roots = if ($companyRoot) { @($companyRoot) } else { @() } } } }
     New-Item -ItemType Directory -Path $env:CODEX_MEMORY_USER_ROOT -Force | Out-Null
     ($config | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath (Join-Path $env:CODEX_MEMORY_USER_ROOT 'config.yaml') -Encoding UTF8
 }
@@ -58,7 +58,7 @@ Describe 'codex-memory safety gates' {
         New-Item -ItemType Directory -Path (Join-Path $memory '03-项目记忆') -Force | Out-Null
         New-Item -ItemType Directory -Path (Join-Path $memory '06-模板') -Force | Out-Null
         'index' | Set-Content -LiteralPath (Join-Path $memory '00-总索引.md') -Encoding UTF8
-        $config = @{ schema_version = 1; active_profile = 'home'; profiles = @{ home = @{ memory_root = $memory; obsidian_vault_root = (Split-Path $memory); allow_source_excerpt = $true; allow_raw_logs = $false; allow_snapshot = $false; allow_event_content = $true; allow_staging_sync = $true; allow_personal_sync = $true; source_extensions = @('.md') }; company = @{ memory_root = ''; obsidian_vault_root = ''; allow_source_excerpt = $false; allow_raw_logs = $false; allow_snapshot = $false; allow_event_content = $true; allow_staging_sync = $true; allow_personal_sync = $false; source_extensions = @('.md') } } }
+        $config = @{ schema_version = 1; active_profile = 'home'; profiles = @{ home = @{ memory_root = $memory; obsidian_vault_root = (Split-Path $memory); allow_source_excerpt = $true; allow_raw_logs = $false; allow_snapshot = $false; allow_document_mirror = $true; allow_event_content = $true; allow_staging_sync = $true; allow_personal_sync = $true; source_extensions = @('.md') }; company = @{ memory_root = ''; obsidian_vault_root = ''; allow_source_excerpt = $false; allow_raw_logs = $false; allow_snapshot = $false; allow_document_mirror = $false; allow_event_content = $true; allow_staging_sync = $true; allow_personal_sync = $false; source_extensions = @('.md') } } }
         New-Item -ItemType Directory -Path $env:CODEX_MEMORY_USER_ROOT -Force | Out-Null
         ($config | ConvertTo-Json -Depth 8) | Set-Content -LiteralPath (Join-Path $env:CODEX_MEMORY_USER_ROOT 'config.yaml') -Encoding UTF8
         $operation = @{ profile = 'home'; project_id = 'fixture'; target = 'vault'; operations = @(@{ slot = 'overview'; content = '## Purpose`n- Verified memory content with enough substance.' }) }
@@ -111,6 +111,39 @@ Describe 'codex-memory safety gates' {
         $result = & (Join-Path $scripts 'create-snapshot.ps1') -Profile company -SourcePath $source -ProjectId repo -DryRun | ConvertFrom-Json
         $result.status | Should Be 'BLOCKED'
         $result.message | Should Match 'does not permit snapshots'
+    }
+
+    It 'copies safe project documentation and records skipped sensitive documents' {
+        $memory = Join-Path $TestDrive 'memory'; New-CMFixtureConfig -MemoryRoot $memory
+        $docs = Join-Path $global:fixtureRoot 'docs'; New-Item -ItemType Directory -Path $docs -Force | Out-Null
+        $nestedDocs = Join-Path $global:fixtureRoot 'module\docs'; New-Item -ItemType Directory -Path $nestedDocs -Force | Out-Null
+        'root readme' | Set-Content -LiteralPath (Join-Path $global:fixtureRoot 'README.md') -Encoding UTF8
+        'guide content' | Set-Content -LiteralPath (Join-Path $docs 'GUIDE.md') -Encoding UTF8
+        'nested content' | Set-Content -LiteralPath (Join-Path $nestedDocs 'README.md') -Encoding UTF8
+        [System.IO.File]::WriteAllBytes((Join-Path $docs 'empty.md'), [byte[]]@())
+        'api_key=not-for-memory' | Set-Content -LiteralPath (Join-Path $docs 'private.md') -Encoding UTF8
+        $script = Join-Path $scripts 'sync-project-docs.ps1'
+        $preview = & $script -ProjectRoot $global:fixtureRoot -ProjectId repo -DryRun | ConvertFrom-Json
+        $preview.status | Should Be 'DRY_RUN'
+        $preview.data.copy_count | Should Be 4
+        $preview.data.skip_count | Should Be 1
+        (Test-Path -LiteralPath (Join-Path $memory '03-项目记忆\repo\05-工程文档\README.md')) | Should Be $false
+        $result = & $script -ProjectRoot $global:fixtureRoot -ProjectId repo -Apply | ConvertFrom-Json
+        $result.status | Should Be 'PASS'
+        (Get-Content -LiteralPath (Join-Path $memory '03-项目记忆\repo\05-工程文档\README.md') -Raw) | Should Match 'root readme'
+        (Get-Content -LiteralPath (Join-Path $memory '03-项目记忆\repo\05-工程文档\docs\GUIDE.md') -Raw) | Should Match 'guide content'
+        (Get-Content -LiteralPath (Join-Path $memory '03-项目记忆\repo\05-工程文档\module\docs\README.md') -Raw) | Should Match 'nested content'
+        (Get-Item -LiteralPath (Join-Path $memory '03-项目记忆\repo\05-工程文档\docs\empty.md')).Length | Should Be 0
+        (Test-Path -LiteralPath (Join-Path $memory '03-项目记忆\repo\05-工程文档\docs\private.md')) | Should Be $false
+        (Get-Content -LiteralPath (Join-Path $memory '03-项目记忆\repo\05-工程文档\00-同步清单.md') -Raw) | Should Match 'private.md'
+    }
+
+    It 'blocks project document mirroring for the company profile' {
+        $memory = Join-Path $TestDrive 'memory'; New-CMFixtureConfig -MemoryRoot $memory -Profile company
+        'safe markdown' | Set-Content -LiteralPath (Join-Path $global:fixtureRoot 'README.md') -Encoding UTF8
+        $result = & (Join-Path $scripts 'sync-project-docs.ps1') -Profile company -ProjectRoot $global:fixtureRoot -ProjectId repo -DryRun | ConvertFrom-Json
+        $result.status | Should Be 'BLOCKED'
+        $result.message | Should Match 'does not permit project document mirrors'
     }
 
     It 'rejects event writes that did not follow a successful archive' {
@@ -181,4 +214,3 @@ Describe 'codex-memory safety gates' {
         $review.data.draft | Should Match 'review-repo'
     }
 }
-

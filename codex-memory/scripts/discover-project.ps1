@@ -39,11 +39,10 @@ try {
     $hasDocsRoot = $config -and ($config.value.PSObject.Properties.Name -contains 'docs_root') -and -not [string]::IsNullOrWhiteSpace([string]$config.value.docs_root)
     $docsRoot = if ($hasDocsRoot) { Join-Path $root ([string]$config.value.docs_root) } else { Join-Path $root 'docs' }
     $docs = @()
-    foreach ($path in @((Join-Path $docsRoot 'README.md'), (Join-Path $docsRoot 'GUIDE.md'), (Join-Path $root 'README.md'))) { if (Test-Path -LiteralPath $path -PathType Leaf) { $docs += $path.Substring($root.Length).TrimStart('\\','/') } }
+    foreach ($path in @((Join-Path $docsRoot 'README.md'), (Join-Path $docsRoot 'GUIDE.md'), (Join-Path $root 'README.md'))) { if (Test-Path -LiteralPath $path -PathType Leaf) { $docs += $path.Substring($root.Length).TrimStart('\','/') } }
     $scopeId = if ($config -and ($config.value.PSObject.Properties.Name -contains 'scope')) { ConvertTo-CMSafeId ([string]$config.value.scope) } else { $null }
     $memoryId = if ($scopeId) { ConvertTo-CMSafeId ($id + '--' + $scopeId) } else { $id }
     (Get-CMResult -Status 'PASS' -Message 'Project identity resolved.' -Data @{ project_root = $root; project_id = $id; scope_id = $scopeId; memory_id = $memoryId; identity_source = $source; project_config = if ($config) { $config.path } else { $null }; docs_root = $docsRoot; preferred_docs = $docs }) | ConvertTo-Json -Depth 6
 } catch {
     (Get-CMResult -Status 'BLOCKED' -Message $_.Exception.Message -Data $null) | ConvertTo-Json -Depth 6; exit 1
 }
-
