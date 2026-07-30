@@ -13,7 +13,8 @@ jovi-embedded-work/
 ├── code_zl/                   # C 代码注释标准化
 ├── code_wrt/                  # Ponytail 简化 + code_zl 注释整理
 ├── day_sum/                   # 开发日报生成
-└── child-claude/              # 多模型派发编排（父规划+审核，子执行）
+├── child-claude/              # 多模型派发编排（父规划+审核，子执行）
+└── codex-memory/              # 安全项目永久记忆（Obsidian / staging）
 ```
 
 ---
@@ -188,6 +189,34 @@ Constraint: <约束，如只创建文件不跑命令>
 - 依赖任务 → `-ResumeId` 复用
 - 失败重做 → 通常新会话（避免继承错误上下文）
 
+
+---
+
+### 7. codex-memory — 安全项目永久记忆
+
+**触发词：** `/codex-memory`、`加载项目记忆`、`归档项目记忆`、`Obsidian memory`、`project memory`
+
+**功能：** 提供“读取 → 工作 → 归档 → 复盘”的项目记忆闭环：任务前加载受限的项目上下文；任务后把已验证的计划、进度、决策与工作流投影到受管 Obsidian 笔记；每日复盘仅聚合脱敏的成功归档事件。
+
+**安全边界：**
+
+- 项目与验证证据是事实源；Obsidian 只接收投影，绝不反向改写项目。
+- 首次 `home` setup 必须显式提供 Vault 根目录，仓库不携带、推断或读取个人路径。
+- `company` profile 默认 fail-closed：没有获批准的 memory root 时，仅允许策略许可的本地 staging。
+- 写入先 `--dry-run`，使用哈希与受管区块保留手写内容；双侧变更时报告 `CONFLICT`，不覆盖。
+- Obsidian MCP 是可选增强，文件系统路径不可用时也不会绕过策略。
+
+**快速开始：**
+
+```
+/codex-memory setup --profile home（同时提供你的 Obsidian Vault 根目录）
+/codex-memory load
+/codex-memory --dry-run
+/codex-memory review
+```
+
+> 当前自动化脚本面向 Windows PowerShell 5.1+；Hook 与每日计划任务安装器默认只预览，必须完成对应人工验证后再显式启用。
+
 ---
 
 ## 安装
@@ -206,6 +235,7 @@ xcopy /E /I code_zl %USERPROFILE%\.claude\skills\code_zl
 xcopy /E /I code_wrt %USERPROFILE%\.claude\skills\code_wrt
 xcopy /E /I day_sum %USERPROFILE%\.claude\skills\day_sum
 xcopy /E /I child-claude %USERPROFILE%\.claude\skills\child-claude
+xcopy /E /I codex-memory %USERPROFILE%\.claude\skills\codex-memory
 
 # macOS / Linux
 cp -r project-init ~/.claude/skills/
@@ -214,6 +244,7 @@ cp -r code_zl ~/.claude/skills/
 cp -r code_wrt ~/.claude/skills/
 cp -r day_sum ~/.claude/skills/
 cp -r child-claude ~/.claude/skills/
+cp -r codex-memory ~/.claude/skills/
 ```
 
 ### 方式二：直接下载
@@ -229,8 +260,11 @@ cp -r child-claude ~/.claude/skills/
 | comet | [rpamis/comet](https://github.com/rpamis/comet) | `npm install -g @rpamis/comet` | OpenSpec + Superpowers 五阶段工作流 |
 | OpenSpec | [Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec) | `openspec init`（comet 已包含） | 需求/设计/任务结构化管理 |
 | Superpowers | [obra/superpowers](https://github.com/obra/superpowers) | 随 comet 安装 | TDD、brainstorming、计划执行等 skill 体系 |
+| codex-memory | — | Windows PowerShell 5.1+、Python 3、PyYAML、Claude CLI | 安全 setup / preflight；Obsidian MCP 可选 |
 
 > `project-init` 会自动检测未安装的工具并提示。`update-project-docs` 和 `code_zl` 无额外依赖。
+>
+> `codex-memory` 的核心路径不依赖 Obsidian MCP；MCP 只是可选增强。
 >
 > **推荐安装顺序：** Superpowers → comet（含 OpenSpec）→ CodeGraph → code-review-graph
 
@@ -280,6 +314,20 @@ Claude：先用 ponytail 删除或内联行为等价的冗余代码
 
 Claude：读取 git log 或开发记录文件 → 按"发现问题/分析/解决"组织
 → 输出结构化日报
+```
+
+### 场景 6：跨会话项目记忆
+
+```
+你：/codex-memory load
+
+Claude：解析 profile 与项目 ID → 读取最小全局偏好及当前项目概览/计划/进度
+→ 输出带来源、长度受限且已脱敏的上下文摘要
+
+你：完成任务后 /codex-memory --dry-run
+
+Claude：优先审计 docs/README.md、docs/GUIDE.md、Git 与验证证据
+→ 预览受管区块更新；确认后才归档并写入成功事件
 ```
 
 ## 文档命名规范
