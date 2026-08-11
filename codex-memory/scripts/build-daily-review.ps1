@@ -20,7 +20,7 @@ try {
     $lines = @()
     $lines += "# 每日复盘 — $day"
     $lines += ''
-    $lines += '<!-- codex-memory:auto:start -->'
+    $lines += '<!-- codex-memory:live:start -->'
     $lines += '## 已归档项目'
     foreach ($group in $projects) {
         $lines += "### $($group.Name)"
@@ -32,7 +32,7 @@ try {
         }
         $lines += ''
     }
-    $lines += '<!-- codex-memory:auto:end -->'
+    $lines += '<!-- codex-memory:live:end -->'
     $draft = $lines -join "`r`n"
     if (Test-CMSensitiveText $draft) { throw 'Review draft failed sensitive-content scan.' }
     if ($DryRun -or -not $Apply) {
@@ -45,8 +45,8 @@ try {
     if ($config.status -ne 'PASS') { throw $config.message }
     $path = Join-Path (Join-Path ([string]$config.data.memory_root) '05-每日复盘') ($day + '.md')
     $existing = if (Test-Path -LiteralPath $path) { Get-Content -LiteralPath $path -Raw -Encoding UTF8 } else { '' }
-    $managed = [regex]::Replace($draft, '(?s)^.*?<!-- codex-memory:auto:start -->\s*', '')
-    $managed = [regex]::Replace($managed, '\s*<!-- codex-memory:auto:end -->.*$', '')
+    $managed = [regex]::Replace($draft, '(?s)^.*?<!-- codex-memory:live:start -->\s*', '')
+    $managed = [regex]::Replace($managed, '\s*<!-- codex-memory:live:end -->.*$', '')
     $final = if ($existing) { Get-CMManagedContent -Existing $existing -Managed $managed } else { $draft + "`r`n" }
     $lock = Enter-CMLock -Name ('daily-review-' + $day)
     try { Write-CMAtomicText -Path $path -Content $final } finally { $lock.Dispose() }

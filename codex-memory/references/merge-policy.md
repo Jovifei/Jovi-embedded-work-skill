@@ -1,12 +1,9 @@
-# Merge and Sync Policy
+# Merge Policy v2
 
-For normal archive, project evidence is authoritative. Merge only the managed block; retain manual prose before and after it. Before writes, show a dry-run plan with target paths and hashes. Apply through a same-directory temporary file and atomic replacement under a per-project lock.
+Current project evidence is authoritative. Before every write, build and inspect a DryRun with target paths, before/after hashes, evidence level, and filtered document list.
 
-For staging sync, state lives at `%USERPROFILE%\.codex-memory\state\<project-id>\_sync-state.json`. Compare staging and vault hashes to the last synced hash for each logical file:
+Generated summary text may replace only the managed `<!-- codex-memory:live:start -->` … `<!-- codex-memory:live:end -->` block. Preserve manual prose, `<!-- knowledge-curated:start -->` … `<!-- knowledge-curated:end -->`, and historical `<details>` blocks. If a managed or curated block is incomplete, stop.
 
-- staging changed, vault unchanged: copy staging to vault;
-- staging unchanged, vault changed: preserve vault and refresh baseline;
-- both changed but equal: refresh baseline;
-- both changed and different: return `CONFLICT` and write nothing.
+Apply through a same-directory temporary file and atomic replacement under a per-project lock. Recheck configuration, project mapping, source/Vault hashes, approved root, sensitive-content scan, and lock immediately before Apply. Never resolve divergent changes automatically.
 
-Recheck hashes immediately before applying. A changed hash, escaped path, missing approved profile, lock contention, template incompatibility, or conflict stops the operation. Never resolve a conflict automatically.
+Document mirrors copy source bytes and record hashes in local machine state. They never create a Vault sync manifest and never delete an existing note during normal refresh. Explicit migration may move process notes to the Windows Recycle Bin only after a complete DryRun and link verification.

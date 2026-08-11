@@ -1,4 +1,4 @@
 interface:
   display_name: "Codex Memory"
-  short_description: "Archive project memory and direct Markdown document copies."
-  default_prompt: "Use $codex-memory to archive source-backed project memory and its safe Markdown docs into the approved Obsidian vault."
+  short_description: "Load, search, checkpoint, and mirror mapped project memory."
+  default_prompt: "Use $codex-memory to load/search mapped Obsidian project memory and checkpoint verified durable results with filtered Markdown docs."

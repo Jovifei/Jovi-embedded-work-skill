@@ -92,7 +92,7 @@ Describe 'codex-memory safety gates' {
         $vault = Join-Path $memory '03-项目记忆\repo'
         New-Item -ItemType Directory -Path $staging,$vault -Force | Out-Null
         'stage' | Set-Content -LiteralPath (Join-Path $staging '00-项目概览.md') -Encoding UTF8
-        'vault-only' | Set-Content -LiteralPath (Join-Path $vault '01-总体计划.md') -Encoding UTF8
+        'vault-only' | Set-Content -LiteralPath (Join-Path $vault '01-工程关系与学习地图.md') -Encoding UTF8
         'same' | Set-Content -LiteralPath (Join-Path $staging '02-当前进度.md') -Encoding UTF8
         'same' | Set-Content -LiteralPath (Join-Path $vault '02-当前进度.md') -Encoding UTF8
         'left' | Set-Content -LiteralPath (Join-Path $staging '03-关键决策.md') -Encoding UTF8
@@ -100,7 +100,7 @@ Describe 'codex-memory safety gates' {
         $plan = & (Join-Path $scripts 'build-sync-plan.ps1') -ProjectRoot $global:fixtureRoot -ProjectId repo | ConvertFrom-Json
         $plan.status | Should Be 'CONFLICT'
         (@($plan.data.operations | Where-Object { $_.slot -eq '00-项目概览.md' })[0].action) | Should Be 'COPY_TO_VAULT'
-        (@($plan.data.operations | Where-Object { $_.slot -eq '01-总体计划.md' })[0].action) | Should Be 'BASELINE_VAULT'
+        (@($plan.data.operations | Where-Object { $_.slot -eq '01-工程关系与学习地图.md' })[0].action) | Should Be 'BASELINE_VAULT'
         (@($plan.data.operations | Where-Object { $_.slot -eq '02-当前进度.md' })[0].action) | Should Be 'BASELINE_EQUAL'
         (@($plan.data.operations | Where-Object { $_.slot -eq '03-关键决策.md' })[0].action) | Should Be 'CONFLICT'
     }
@@ -135,7 +135,8 @@ Describe 'codex-memory safety gates' {
         (Get-Content -LiteralPath (Join-Path $memory '03-项目记忆\repo\05-工程文档\module\docs\README.md') -Raw) | Should Match 'nested content'
         (Get-Item -LiteralPath (Join-Path $memory '03-项目记忆\repo\05-工程文档\docs\empty.md')).Length | Should Be 0
         (Test-Path -LiteralPath (Join-Path $memory '03-项目记忆\repo\05-工程文档\docs\private.md')) | Should Be $false
-        (Get-Content -LiteralPath (Join-Path $memory '03-项目记忆\repo\05-工程文档\00-同步清单.md') -Raw) | Should Match 'private.md'
+        (Test-Path -LiteralPath (Join-Path $memory '03-项目记忆\repo\05-工程文档\00-同步清单.md')) | Should Be $false
+        (Test-Path -LiteralPath (Join-Path $env:CODEX_MEMORY_LOCAL_ROOT 'state\documents\repo--main\mirror.json')) | Should Be $true
     }
 
     It 'blocks project document mirroring for the company profile' {

@@ -2,6 +2,7 @@
 param(
     [Parameter(Mandatory = $true, ParameterSetName = 'Archive')][string]$OperationPath,
     [Parameter(Mandatory = $true, ParameterSetName = 'Sync')][string]$SyncPlanPath,
+    [Parameter(ParameterSetName = 'Archive')][string]$ExpectedPlanJson,
     [switch]$Apply,
     [switch]$DryRun
 )
@@ -43,7 +44,7 @@ try {
             if (-not [bool]$entry.allow_staging_sync) { throw 'Active profile forbids local staging.' }
             $targetRoot = Join-Path (Join-Path (Get-CMLocalRoot) 'staging') $projectId
         }
-        $slotFiles = @{ overview = '00-项目概览.md'; plan = '01-总体计划.md'; progress = '02-当前进度.md'; decisions = '03-关键决策.md'; workflow = '04-工作流与知识.md' }
+        $slotFiles = @{ overview = '00-项目概览.md'; relations = '01-工程关系与学习地图.md'; progress = '02-当前进度.md'; decisions = '03-关键决策.md'; workflow = '04-工作流与知识.md' }
         $planned = @()
         foreach ($operation in @($request.operations)) {
             $slot = [string]$operation.slot
@@ -59,10 +60,33 @@ try {
             $merged = if ($existing) { Get-CMManagedContent -Existing $existing -Managed $content } else { $heading + (Get-CMManagedContent -Existing '' -Managed $content) }
             $planned += [pscustomobject]@{ slot = $slot; path = $path; before_hash = Get-CMHash $path; after_hash = (Get-FileHash -InputStream ([System.IO.MemoryStream]::new([System.Text.Encoding]::UTF8.GetBytes($merged))) -Algorithm SHA256).Hash.ToLowerInvariant(); content = $merged }
         }
+        if ($ExpectedPlanJson) {
+            $expectedPlan = @($ExpectedPlanJson | ConvertFrom-Json)
+            if ($expectedPlan.Count -ne $planned.Count) { throw 'CONFLICT: expected archive plan does not match the current operation.' }
+            foreach ($item in $planned) {
+                $expected = @($expectedPlan | Where-Object { [string]$_.slot -eq [string]$item.slot })
+                if ($expected.Count -ne 1 -or (ConvertTo-CMNullableHash $expected[0].before_hash) -ne (ConvertTo-CMNullableHash $item.before_hash) -or (ConvertTo-CMNullableHash $expected[0].after_hash) -ne (ConvertTo-CMNullableHash $item.after_hash)) {
+                    throw "CONFLICT: expected archive plan changed for $($item.slot)."
+                }
+            }
+        }
         if (-not (@($planned | Where-Object { $_.slot -eq 'overview' }).Count) -and -not (Test-Path -LiteralPath (Join-Path $targetRoot $slotFiles.overview))) { throw 'A new project archive must include the overview slot.' }
         if ($DryRun -or -not $Apply) { (Get-CMResult -Status 'DRY_RUN' -Message 'Archive plan validated; no files were written.' -Data @{ project_id = $projectId; target = $target; operations = @($planned | Select-Object slot,path,before_hash,after_hash) }) | ConvertTo-Json -Depth 10; exit 0 }
         $lock = Enter-CMLock -Name ("archive-" + $projectId)
-        try { foreach ($item in $planned) { Write-CMAtomicText -Path $item.path -Content $item.content } }
+        $original = @{}
+        try {
+            foreach ($item in $planned) {
+                $currentHash = Get-CMHash $item.path
+                if ($currentHash -ne $item.before_hash) { throw "CONFLICT: archive target changed after DryRun for $($item.slot)." }
+                $original[$item.path] = Get-CMFileSnapshot -Path $item.path
+            }
+            foreach ($item in $planned) { Write-CMAtomicText -Path $item.path -Content $item.content }
+        } catch {
+            foreach ($path in @($original.Keys)) {
+                try { Restore-CMFileSnapshot -Path $path -Snapshot $original[$path] } catch { }
+            }
+            throw
+        }
         finally { $lock.Dispose() }
         (Get-CMResult -Status 'PASS' -Message 'Archive operations applied through managed blocks.' -Data @{ project_id = $projectId; target = $target; files = @($planned | ForEach-Object { @{ path = $_.path; sha256 = Get-CMHash $_.path } }) }) | ConvertTo-Json -Depth 10
     } else {
@@ -77,7 +101,7 @@ try {
         $stagingRoot = Join-Path (Join-Path (Get-CMLocalRoot) 'staging') $projectId
         $vaultRoot = Get-CMProjectMemoryPath -MemoryRoot ([string]$config.data.memory_root) -ProjectId $projectId
         $statePath = Get-CMStatePath -ProjectId $projectId
-        $slotFiles = @('00-项目概览.md','01-总体计划.md','02-当前进度.md','03-关键决策.md','04-工作流与知识.md')
+        $slotFiles = @('00-项目概览.md','01-工程关系与学习地图.md','02-当前进度.md','03-关键决策.md','04-工作流与知识.md')
         $provided = @($plan.operations)
         if ($provided.Count -ne $slotFiles.Count -or @($provided.slot | Select-Object -Unique).Count -ne $slotFiles.Count) { throw 'Sync plan does not contain exactly one operation for each logical slot.' }
         $state = if (Test-Path -LiteralPath $statePath) { ConvertTo-CMObject -Path $statePath } else { $null }

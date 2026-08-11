@@ -15,7 +15,7 @@ try {
     $vault = Get-CMProjectMemoryPath -MemoryRoot ([string]$config.data.memory_root) -ProjectId $id
     $statePath = Get-CMStatePath -ProjectId $id
     $state = if (Test-Path -LiteralPath $statePath) { ConvertTo-CMObject -Path $statePath } else { $null }
-    $slots = @('00-项目概览.md','01-总体计划.md','02-当前进度.md','03-关键决策.md','04-工作流与知识.md')
+    $slots = @('00-项目概览.md','01-工程关系与学习地图.md','02-当前进度.md','03-关键决策.md','04-工作流与知识.md')
     $operations = @()
     foreach ($slot in $slots) {
         $sp = Join-Path $staging $slot; $vp = Join-Path $vault $slot

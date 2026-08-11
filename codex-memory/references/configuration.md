@@ -1,29 +1,35 @@
-# Configuration
+# Configuration v2
 
-Store machine-specific configuration only in `%USERPROFILE%\.codex-memory\config.yaml`. This first version deliberately accepts JSON-compatible YAML so PowerShell 5.1 can parse it without a third-party runtime. Do not put personal vault paths in project configuration.
+Store machine-specific configuration only in `%USERPROFILE%\.codex-memory\config.yaml`. The file is JSON-compatible YAML so Windows PowerShell can parse it without a third-party runtime.
+
+Each active profile may contain:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "active_profile": "home",
   "profiles": {
     "home": {
-      "obsidian_vault_root": "D:\\Notes\\my-obsidian-vault",
-      "memory_root": "D:\\Notes\\my-obsidian-vault\\codex_memory",
-      "allow_source_excerpt": true,
-      "allow_raw_logs": false,
-      "allow_snapshot": false,
-      "allow_event_content": true,
-      "allow_staging_sync": true,
-      "allow_personal_sync": true,
-      "source_extensions": [".md"]
+      "memory_root": "D:\\Notes\\my-vault\\codex_memory",
+      "approved_memory_roots": ["D:\\Notes\\my-vault\\codex_memory"],
+      "allow_document_mirror": true,
+      "source_extensions": [".md"],
+      "automation": {
+        "read_on_session_start": true,
+        "remind_on_user_prompt": true,
+        "auto_apply_verified_checkpoint": true,
+        "auto_apply_document_mirror": true,
+        "dry_run_required": true
+      },
+      "project_mappings": [
+        { "memory_id": "main-project", "source_root": "D:\\work\\main-project", "component": "main" },
+        { "memory_id": "main-project", "source_root": "D:\\work\\main-project\\bootloader", "component": "bootloader", "mirror_prefix": "bootloader" }
+      ]
     }
   }
 }
 ```
 
-Create the `home` profile with `scripts/setup.ps1 -Profile home -VaultRoot <your-vault> -Apply` after the target `codex_memory` directory has its required markers. `OBSIDIAN_VAULT_ROOT` is an optional machine-local alternative to the parameter. The Skill never ships, infers, or reads a personal vault path from a repository.
+`source_root` matching is canonical, case-insensitive, path-boundary aware, and longest-match wins. A child Boot/BL mapping may use the same `memory_id` as its parent. Never store a Vault path, credential, or company-classification exception in a project repository.
 
-`CODEX_MEMORY_ROOT`, if supplied, is the `memory_root` itself, never the Obsidian vault parent. It must contain `00-总索引.md`, `03-项目记忆/`, and `06-模板/`; otherwise write-capable modes are blocked. Configuration discovery never scans arbitrary disks or selects the first plausible vault.
-
-Project identifiers resolve in this order: explicit argument, `.project-memory.local.yaml`, safe-to-commit `.project-memory.yaml`, sanitized Git remote leaf, then repository directory name. Project config may contain only `project_id`, `scope`, and `docs_root`; never a vault location, credential, or company classification exception.
+`CODEX_MEMORY_ROOT`, when allowed, is the exact approved `memory_root`, not its Vault parent. The root must contain the index, project-memory directory, and template directory markers. Configuration discovery never scans arbitrary disks or selects the first plausible Vault.

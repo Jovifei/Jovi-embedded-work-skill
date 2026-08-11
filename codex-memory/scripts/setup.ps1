@@ -29,17 +29,21 @@ $profiles = [ordered]@{
         obsidian_vault_root = $homeVault; memory_root = $homeMemory; classification = 'personal'
         allow_source_excerpt = $true; allow_raw_logs = $false; allow_snapshot = $false; allow_document_mirror = $true; allow_event_content = $true
         allow_staging_sync = $true; allow_personal_sync = $true; source_extensions = @('.md'); approved_memory_roots = @($homeMemory)
+        automation = [ordered]@{ read_on_session_start = $true; remind_on_user_prompt = $true; auto_apply_verified_checkpoint = $true; auto_apply_document_mirror = $true; dry_run_required = $true }
+        project_mappings = @()
     }
     company = [ordered]@{
         obsidian_vault_root = ''; memory_root = ''; classification = 'internal'
         allow_source_excerpt = $false; allow_raw_logs = $false; allow_snapshot = $false; allow_document_mirror = $false; allow_event_content = $true
         allow_staging_sync = $true; allow_personal_sync = $false; source_extensions = @('.md'); approved_memory_roots = @()
+        automation = [ordered]@{ read_on_session_start = $false; remind_on_user_prompt = $false; auto_apply_verified_checkpoint = $false; auto_apply_document_mirror = $false; dry_run_required = $true }
+        project_mappings = @()
     }
 }
 if ($Profile -eq 'home' -and -not (Test-CMMemoryRoot -MemoryRoot $homeMemory)) {
     (Get-CMResult -Status 'BLOCKED' -Message 'Home Vault does not satisfy codex_memory markers.' -Data @{ memory_root = $homeMemory }) | ConvertTo-Json -Depth 5; exit 1
 }
-$preview = [ordered]@{ schema_version = 1; active_profile = $Profile; profiles = $profiles }
+$preview = [ordered]@{ schema_version = 2; active_profile = $Profile; profiles = $profiles }
 if (-not $Apply) {
     (Get-CMResult -Status 'READY_FOR_APPLY' -Message 'No configuration was written. Re-run with -Apply after reviewing this preview.' -Data @{ config_path = $configPath; preview = $preview }) | ConvertTo-Json -Depth 10
     exit 0

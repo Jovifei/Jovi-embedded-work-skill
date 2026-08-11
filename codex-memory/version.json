@@ -1,0 +1,7 @@
+{
+  "name": "codex-memory",
+  "version": "2.0.0",
+  "minimum_codex_version": "26.803.81509",
+  "schema_version": 2,
+  "release_channel": "local"
+}

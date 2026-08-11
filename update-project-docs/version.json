@@ -1,0 +1,7 @@
+{
+  "name": "update-project-docs",
+  "version": "1.1.0",
+  "minimum_codex_version": "26.803.81509",
+  "memory_integration": "codex-memory>=2.0.0",
+  "release_channel": "local"
+}

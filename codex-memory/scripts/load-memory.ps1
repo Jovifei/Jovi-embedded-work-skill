@@ -22,8 +22,10 @@ try {
     if (Test-Path -LiteralPath $preferences) { $candidates += @(Get-ChildItem -LiteralPath $preferences -Filter '*.md' -File | Select-Object -First 3 | ForEach-Object { [pscustomobject]@{ path = $_.FullName; limit = 900 } }) }
     $candidates += @(
         [pscustomobject]@{ path = (Join-Path $projectPath '00-项目概览.md'); limit = 3000 },
-        [pscustomobject]@{ path = (Join-Path $projectPath '01-总体计划.md'); limit = 2200 },
-        [pscustomobject]@{ path = (Join-Path $projectPath '02-当前进度.md'); limit = 2200 }
+        [pscustomobject]@{ path = (Join-Path $projectPath '01-工程关系与学习地图.md'); limit = 2600 },
+        [pscustomobject]@{ path = (Join-Path $projectPath '02-当前进度.md'); limit = 2200 },
+        [pscustomobject]@{ path = (Join-Path $projectPath '03-关键决策.md'); limit = 1600 },
+        [pscustomobject]@{ path = (Join-Path $projectPath '04-工作流与知识.md'); limit = 1800 }
     )
     $parts = @(); $used = 0
     foreach ($candidate in $candidates) {
