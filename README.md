@@ -1,6 +1,6 @@
 # Jovi Embedded Work Skills
 
-> 嵌入式工程开发与 Windows 工作环境维护 Claude Code Skills 集合 — 新工程一键初始化、文档自动化、代码注释标准化、日报生成与 C 盘数据整理。
+> 嵌入式工程开发与 Windows 工作环境维护 Claude Code Skills 集合 — 新工程一键初始化、文档自动化、clangd 跳转与格式化、代码注释标准化、日报生成与 C 盘数据整理。
 
 专为嵌入式 C 工程（GD32/STM32/ESP32 + FreeRTOS + Modbus/CAN/UART）设计，开箱即用。
 
@@ -10,6 +10,7 @@
 jovi-embedded-work/
 ├── project-init/              # 一键初始化工程工具链
 ├── update-project-docs/       # 文档 bootstrap + 日常维护
+├── clangd_init/               # clangd 函数跳转 + 保存格式化
 ├── code_zl/                   # C 代码注释标准化
 ├── code_wrt/                  # Ponytail 简化 + code_zl 注释整理
 ├── day_sum/                   # 开发日报生成
@@ -69,7 +70,7 @@ docs/
 ├── GUIDE.md
 ├── 00-REF-参考/     # 手册、原理图、协议表、参数表
 ├── 01-ARC-架构/     # 当前固件怎么工作
-├── 02-SOP-操作/     # 编译、烧录、clangd、台架
+├── 02-SOP-操作/     # 编译、烧录、台架；IDE 跳转见 /clangd_init
 ├── 03-DBG-问题/     # 一篇一个故障
 └── 04-LOG-记录/     # 开发日志、审计、交接
 ```
@@ -96,7 +97,37 @@ docs/
 
 ---
 
-### 3. code_zl — 代码注释标准化
+### 3. clangd_init — clangd 跳转与保存格式化
+
+**版本：** V1.0.0
+
+**触发词：** `/clangd_init`
+
+**功能：** 为当前嵌入式 C/C++ 工作区配置可验证的 clangd 函数跳转、查找引用和保存格式化。只读探查后按当前工程生成最小配置；不改生产固件逻辑，不全仓格式化。
+
+**验收：**
+
+- 跨文件**调用点** F12 返回实际 Location（C 可能先到 `.h` 声明，索引后再到 `.c` 实现）
+- 保存一个手工维护的源文件时，格式遵循已有 `.clang-format`，且没有无关文件被改写
+- `clangd --check` 只证明解析，不能单独当作跳转成功
+
+**规则摘要：**
+
+- `compile_commands.json` 与 `compile_flags.txt` 二选一或共存，不无条件生成两份
+- 多 Target 必须先选定一个，禁止混合 AP/IAP 的宏和源文件
+- 保留现有 `.clang-format`；没有时先问用户，不把 Allman 强加给已有工程
+- `compile_commands.json` 本地生成并 gitignore；受版本控制的 flags 不得含本机绝对路径
+
+**示例：**
+```
+/clangd_init
+```
+
+完成后执行 `Clangd: Restart language server`，再在调用点按 F12。
+
+---
+
+### 4. code_zl — 代码注释标准化
 
 **触发词：** `/code_zl`、`代码整理`、`注释整理`、`添加注释`、`批量注释`
 
@@ -129,7 +160,7 @@ docs/
 
 ---
 
-### 4. code_wrt — 代码简化与注释整理
+### 5. code_wrt — 代码简化与注释整理
 
 **触发词：** `/code_wrt`、`代码简化整理`、`简化并注释`、`简化并整理`
 
@@ -144,7 +175,7 @@ docs/
 
 ---
 
-### 5. day_sum — 开发日报生成
+### 6. day_sum — 开发日报生成
 
 **触发词：** `/day_sum`、`总结日报`、`daily summary`、`work summary`
 
@@ -172,7 +203,7 @@ docs/
 
 ---
 
-### 6. child-claude — 多模型派发编排
+### 7. child-claude — 多模型派发编排
 
 **触发词：** `/child-claude`、`派给子claude`、`用mimo干`、`换便宜模型`、`delegate to child claude`
 
@@ -210,7 +241,7 @@ Constraint: <约束，如只创建文件不跑命令>
 
 ---
 
-### 7. codex-memory — 安全项目永久记忆
+### 8. codex-memory — 安全项目永久记忆
 
 **触发词：** `/codex-memory`、`加载项目记忆`、`归档项目记忆`、`Obsidian memory`、`project memory`
 
@@ -237,7 +268,7 @@ Constraint: <约束，如只创建文件不跑命令>
 
 ---
 
-### 8. c-pan-reorganize — C 盘数据整理
+### 9. c-pan-reorganize — C 盘数据整理
 
 **触发词：** `C盘清理`、`C盘空间不足`、`迁移应用数据到D盘`、`清理更新包`、`清理安全缓存`
 
@@ -268,6 +299,7 @@ cd Jovi-embedded-work-skill
 # Windows
 xcopy /E /I project-init %USERPROFILE%\.claude\skills\project-init
 xcopy /E /I update-project-docs %USERPROFILE%\.claude\skills\update-project-docs
+xcopy /E /I clangd_init %USERPROFILE%\.claude\skills\clangd_init
 xcopy /E /I code_zl %USERPROFILE%\.claude\skills\code_zl
 xcopy /E /I code_wrt %USERPROFILE%\.claude\skills\code_wrt
 xcopy /E /I day_sum %USERPROFILE%\.claude\skills\day_sum
@@ -278,6 +310,7 @@ xcopy /E /I c-pan-reorganize %USERPROFILE%\.claude\skills\c-pan-reorganize
 # macOS / Linux
 cp -r project-init ~/.claude/skills/
 cp -r update-project-docs ~/.claude/skills/
+cp -r clangd_init ~/.claude/skills/
 cp -r code_zl ~/.claude/skills/
 cp -r code_wrt ~/.claude/skills/
 cp -r day_sum ~/.claude/skills/
@@ -301,7 +334,7 @@ cp -r c-pan-reorganize ~/.claude/skills/
 | Superpowers | [obra/superpowers](https://github.com/obra/superpowers) | 随 comet 安装 | TDD、brainstorming、计划执行等 skill 体系 |
 | codex-memory | — | Windows PowerShell 5.1+、Python 3、PyYAML、Claude CLI | 安全 setup / preflight；Obsidian MCP 可选 |
 
-> `project-init` 会自动检测未安装的工具并提示。`update-project-docs` 和 `code_zl` 无额外依赖。
+> `project-init` 会自动检测未安装的工具并提示。`update-project-docs`、`clangd_init` 和 `code_zl` 无额外依赖（`clangd_init` 需要 Cursor/VS Code 的 clangd 扩展）。
 >
 > `codex-memory` 的核心路径不依赖 Obsidian MCP；MCP 只是可选增强。
 >
@@ -329,7 +362,18 @@ Claude：检测 docs/README.md 不存在 → 进入 Bootstrap 模式
 → 有 AGENTS.md 时不覆盖写 CLAUDE.md
 ```
 
-### 场景 3：代码注释整理
+### 场景 3：clangd 跳转与保存格式化
+
+```
+你：/clangd_init
+
+Claude：探查 uvprojx 与现有 compile_flags/compile_commands
+→ 单 Target 生成或复用编译配置，不全仓格式化
+→ clangd --check 证明解析；调用点 F12 返回 Location 才算跳转成功
+→ 提示 Restart language server
+```
+
+### 场景 4：代码注释整理
 
 ```
 你：/code_zl src/modbus.c src/can.c
@@ -338,7 +382,7 @@ Claude：读取两个文件 → 添加标准函数头注释 → 添加行内注�
 → 输出汇总报告（+12 函数头, +35 行内注释）
 ```
 
-### 场景 4：代码简化与注释整理
+### 场景 5：代码简化与注释整理
 
 ```
 你：/code_wrt src/modbus.c src/can.c
@@ -348,7 +392,7 @@ Claude：先用 ponytail 删除或内联行为等价的冗余代码
 → 输出两个阶段的变更与验证结果
 ```
 
-### 场景 5：日报生成
+### 场景 6：日报生成
 
 ```
 你：总结今天的开发记录
@@ -357,7 +401,7 @@ Claude：读取 git log 或开发记录文件 → 按"发现问题/分析/解决
 → 输出结构化日报
 ```
 
-### 场景 6：跨会话项目记忆
+### 场景 7：跨会话项目记忆
 
 ```
 你：/codex-memory load
@@ -371,7 +415,7 @@ Claude：优先审计 docs/README.md、docs/GUIDE.md、Git 与验证证据
 → 预览受管区块更新；确认后才归档并写入成功事件
 ```
 
-### 场景 7：C 盘数据迁移与安全清理
+### 场景 8：C 盘数据迁移与安全清理
 
 ```
 你：/c-pan-reorganize 审核 C 盘空间，将已关闭的飞书和钉钉数据迁移到 D:\Document
