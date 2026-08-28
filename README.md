@@ -55,18 +55,35 @@ jovi-embedded-work/
 
 ### 2. update-project-docs — 文档管理
 
+**版本：** V1.0.0
+
 **触发词：** `/update-project-docs`、`更新文档`、`初始化文档`、`setup docs`
 
-**功能：** 嵌入式工程文档全生命周期管理。首次运行自动 bootstrap 全套文档脚手架，后续进入 6 阶段文档维护工作流。
+**功能：** 嵌入式工程文档全生命周期管理。首次运行只搭 **5 个默认目录**，禁止生成 11 个空类型文件夹。后续进入 6 阶段文档维护工作流。
 
-**Bootstrap（首次运行）：** 自动扫描工程结构，生成：
+**默认目录：**
+
+```text
+docs/
+├── README.md
+├── GUIDE.md
+├── 00-REF-参考/     # 手册、原理图、协议表、参数表
+├── 01-ARC-架构/     # 当前固件怎么工作
+├── 02-SOP-操作/     # 编译、烧录、clangd、台架
+├── 03-DBG-问题/     # 一篇一个故障
+└── 04-LOG-记录/     # 开发日志、审计、交接
+```
+
+不预建：REQ / COM / PLN / WORK / TST / RPT / TOD / STUD。空目录不写 `00-阅读指引.md`。
+
+**Bootstrap（首次运行）：** 扫描工程结构后，用户确认再写盘：
 
 | 文件 | 内容 |
 |------|------|
-| `docs/GUIDE.md` | 命名规范 `{NN}-{TYPE}-{title}.md`、类型码、模板、质量检查 |
-| `docs/README.md` | 文档入口、目录索引、信任规则（✅已验证/⚠️待验证/📋参考/🎯目标） |
-| `CLAUDE.md` | 项目概述、构建系统、代码架构、FreeRTOS 任务、硬件资源 |
-| `docs/01-ARC-系统架构.md` | 模块关系图、任务架构、数据流、CAN/Modbus 协议、硬件分配 |
+| `docs/GUIDE.md` | 命名 `{NN}-{TYPE}-{title}.md`、5 目录规则、信任标记、质量检查 |
+| `docs/README.md` | 文档入口、5 目录索引、信任规则 |
+| `docs/01-ARC-架构/01-ARC-系统架构.md` | 模块关系、任务/主循环、数据流、硬件分配 |
+| `CLAUDE.md` | 仅当根目录没有 `CLAUDE.md`/`AGENTS.md` 时创建，不覆盖已有 `AGENTS.md` |
 
 **日常维护（6 阶段工作流）：**
 1. 读取入口文档 → 2. 提取工程元素 → 3. 收集代码证据 → 4. 设计变更 → 5. 写入文档 → 6. 验证
@@ -74,7 +91,7 @@ jovi-embedded-work/
 **示例：**
 ```
 /update-project-docs 初始化文档
-/update-project-docs 总结 Modbus 协议变更，更新 docs/03-REF-Modbus协议.md
+/update-project-docs 总结 Modbus 协议变更，更新 docs/00-REF-参考/01-REF-Modbus协议.md
 ```
 
 ---
@@ -307,7 +324,9 @@ Claude：自动检测 → CodeGraph/cr/comet 未初始化 → 依次执行 init
 你：/update-project-docs 初始化文档
 
 Claude：检测 docs/README.md 不存在 → 进入 Bootstrap 模式
-→ 扫描 src/inc 目录 → 识别 MCU/RTOS/外设 → 生成 4 个文档
+→ 扫描源码与构建文件 → 识别 MCU/RTOS/外设
+→ 只建 5 目录（REF/ARC/SOP/DBG/LOG），生成 README + GUIDE + 01-ARC-系统架构.md
+→ 有 AGENTS.md 时不覆盖写 CLAUDE.md
 ```
 
 ### 场景 3：代码注释整理
@@ -369,13 +388,13 @@ Claude：先只读统计 C 盘数据和进程 → 确认目标目录与用户授
 {NN}-{TYPE}-{中文文档名}.md
 ```
 
-| 代码 | 类型 | 示例 |
-|------|------|------|
-| ARC | 架构 | `01-ARC-系统架构.md` |
-| REF | 参考 | `03-REF-Modbus协议.md` |
-| SOP | 流程 | `05-SOP-OTA升级流程.md` |
-| DBG | 调试 | `07-DBG-CAN通信排查.md` |
-| TST | 测试 | `09-TST-热泵测试报告.md` |
+| 代码 | 类型 | 目录 | 示例 |
+|------|------|------|------|
+| REF | 参考 | `00-REF-参考/` | `01-REF-Modbus协议.md` |
+| ARC | 架构 | `01-ARC-架构/` | `01-ARC-系统架构.md` |
+| SOP | 操作 | `02-SOP-操作/` | `01-SOP-固件烧录.md` |
+| DBG | 问题 | `03-DBG-问题/` | `01-DBG-CAN通信排查.md` |
+| LOG | 记录 | `04-LOG-记录/` | `01-LOG-开发记录202608.md` |
 
 ## 规范
 

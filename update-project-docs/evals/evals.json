@@ -29,7 +29,7 @@
     {
       "id": 4,
       "prompt": "I have a new embedded project at D:\\work\\my-new-board with no documentation. Initialize the docs.",
-      "expected_output": "Should detect missing docs/README.md, enter Bootstrap mode, scan project structure (src/, inc/, build files), identify MCU/RTOS/peripherals, generate docs/GUIDE.md + docs/README.md + CLAUDE.md + docs/01-ARC-系统架构.md, then confirm with user before writing.",
+      "expected_output": "Should detect missing docs/README.md, enter Bootstrap mode, scan project structure, identify MCU/RTOS/peripherals, generate docs/GUIDE.md + docs/README.md + docs/01-ARC-架构/01-ARC-系统架构.md and the five default directories (REF/ARC/SOP/DBG/LOG). Do not create the old 11 empty type folders or empty 00-阅读指引.md. Create CLAUDE.md only if AGENTS.md/CLAUDE.md are absent. Confirm with user before writing.",
       "files": []
     },
     {

@@ -5,522 +5,279 @@ description: "Use when project documentation is missing, outdated, or needs reor
 
 # Update Embedded Project Docs
 
+**Version: V1.0.0**
+
+目录分类以「以后会不会每周往里扔文件」为准，不按文档类型学铺空格子。依据：`4G-module-ml307r`（11 格几乎全空）、`external-4G-module-gd32f303`（5 格持续在用）、`smart-controller-gd32f4`（ARC/REF/DBG/RPT 有货，SOP/TST/PORT/SER 空或错位）。
+
 ## Goal
 
-Turn conversation context, existing documents, code facts, logs, protocol traces, and hardware validation evidence into maintainable embedded software project documentation.
-
-The goal is not to create more documents. The goal is to put verified, reusable engineering knowledge in the right place, with clear boundaries between current implementation, target capability, reference-project behavior, and unverified assumptions.
+把对话、现有文档、代码、日志、协议抓包和硬件证据，写成可维护的嵌入式工程文档。目标不是多写文件，而是把已核实的知识放到正确位置，并分清：当前实现、目标能力、参考工程行为、未验证假设。
 
 ## Default Entry Points
 
-The project documentation is maintained under `docs/`. Always start there.
+文档根默认是 `docs/`。先读该目录。
 
 ### Bootstrap Detection
 
-Before Phase 1, check if `docs/README.md` exists in the project root.
+Phase 1 之前检查 `docs/README.md`：
 
-- **If it does not exist:** Enter Bootstrap mode (see Phase 0 below). Generate the full documentation scaffold, then proceed to Phase 1.
-- **If it exists:** Skip Bootstrap and proceed directly to Phase 1.
+- **不存在：** 进入 Phase 0。只搭 5 个默认目录，禁止生成 11 个空类型目录。
+- **已存在：** 跳过 Bootstrap，直接 Phase 1。若现有结构仍是 11 格空目录或根目录平铺编号，更新文档时应逐步迁到 5 目录，不要再补空文件夹。
 
-The user can also explicitly trigger Bootstrap by saying "初始化文档", "setup docs", or "init docs".
+用户说「初始化文档」「setup docs」「init docs」时也可触发 Bootstrap。
 
-For this documentation package, read:
+必读：
 
-1. `docs/README.md`: confirm the documentation entry point, document types, and trust rules.
-2. `docs/GUIDE.md`: confirm the `{NN}-{TYPE}-{title}.md` naming rule, templates, and quality checks.
-3. The user-specified target documents.
-4. Relevant firmware code, logs, tests, protocol traces, or reference-project files when implementation facts are involved.
+1. `docs/README.md`：入口、类型、信任规则。
+2. `docs/GUIDE.md`：`{NN}-{TYPE}-{title}.md` 命名与质量检查。
+3. 用户指定的目标文档。
+4. 涉及实现时：源码、日志、测试、抓包或参考工程。
 
-New or updated documents should be written to the appropriate type directory under `docs/` by default.
-
-If the user specifies a different project documentation root, use that root's README/GUIDE first, then apply this skill's embedded documentation workflow.
+用户指定了别的文档根，先读那个根的 README/GUIDE，再按本 skill 流程做。
 
 ## Core Principles
 
 ### 1. Verify Before Writing Implementation Claims
 
-Do not describe target behavior as current behavior. For embedded projects, implementation claims should be backed by at least one of:
+不要把目标行为写成当前行为。实现声明至少要有一项证据：源码路径/函数/结构体/宏、构建或测试输出、板级日志、协议抓包、示波器/逻辑分析仪、明确的参考工程对照。
 
-- Current source code path, function, struct, enum, macro, or config.
-- Build or test output.
-- Board runtime logs.
-- UART/Modbus/MQTT/AT/protocol trace.
-- Logic analyzer, oscilloscope, or other hardware evidence.
-- Explicit reference-project comparison.
-
-If only static code review was performed, state that clearly. If no board validation was performed, write "待上板验证" or "not board-verified".
+仅静态阅读代码时写清楚。未上板写「待上板验证」。
 
 ### 2. Prefer Updating Existing Docs
 
-Do not default to creating a new document.
-
-| Situation | Action |
-|-----------|--------|
-| Existing doc has the right topic but stale facts | Update the existing doc |
-| Multiple docs duplicate the same topic | Merge or demote duplicate content |
-| One doc mixes unrelated hardware/software topics | Split only when it improves navigation |
-| A major topic is missing | Explain the gap and suggest the target file |
-| The user only asks for a summary | Return a structured summary unless they ask to write files |
-| The user asks to update project docs | Locate the target via README/GUIDE, then edit files |
+默认不新建文档。用户只要摘要时只给结构化摘要，除非要求写文件。
 
 ### 3. Search Reference Projects Broadly
 
-When the user says "参考某工程" or asks for parity with another firmware project, search all related call sites before editing.
-
-Check:
-
-- Same-named files.
-- Initialization entry points.
-- RTOS tasks or main loops.
-- ISR/callback paths.
-- Parameter persistence paths.
-- UI or business trigger paths.
-- Tests, scripts, and logging helpers.
-
-Do not assume the same-named file contains the whole behavior.
+用户说「参考某工程」时，按符号和调用链搜全，不要只看同名文件。覆盖：初始化入口、主循环/任务、ISR、参数保存、UI/业务触发、测试与脚本。
 
 ### 4. Preserve Embedded Context Boundaries
 
-Mark execution context whenever it matters:
-
-- ISR: keep work short, avoid blocking, avoid long logging, avoid dynamic allocation.
-- RTOS task: state machine, protocol handling, deferred work.
-- Driver layer: hardware access and hardware abstraction.
-- Business/application layer: policy, parameters, linkage, reporting.
-- UI layer: presentation and user interaction.
-
-Keep driver facts out of business-policy docs unless the connection is essential.
+ISR / RTOS 任务 / Driver / 应用 / UI 分开写。驱动细节不要写进业务策略文档，除非二者必须连在一起。
 
 ### 5. Follow Naming Convention
-
-New or renamed Markdown documents should follow:
 
 ```text
 {NN}-{TYPE}-{中文文档名}.md
 ```
 
-Each document lives in its type directory (`{NN}-{TYPE}-{名称}/`). NN is the sequence number within that directory (00 reserved for 阅读指引 and templates, 01+ for content).
+- `NN`：该目录内序号，从 `01` 起。`00` 仅用于该目录**已有正文之后**的阅读指引或模板。
+- `TYPE` 必须与所在目录一致（`ARC` 目录里不要出现 `01-REQ-...`）。
+- 禁止为了格式先建空目录，再只放一份讲目录格式的 `00-阅读指引.md`。
 
-Use the type codes defined in `GUIDE.md`: `REF`, `ARC`, `REQ`, `COM`, `PLN`, `WORK`, `TST`, `DBG`, `RPT`, `TOD`, `STUD`.
+默认类型码只有：`REF` `ARC` `SOP` `DBG` `LOG`。
+
+可选（有连续正文再创建目录）：`PLN` `EXP`。过期文档进 `archive/`，不要预建。
+
+旧 11 格类型码不再作为默认结构。归并：
+
+| 旧类型 | 落到 |
+|--------|------|
+| REQ | ARC 文首或 LOG 待办；没有正式需求就不建 |
+| COM | 寄存器/帧格式表 → REF；时序/状态机 → ARC |
+| PLN / TOD / WORK | 短清单 → README 或 LOG 末尾；多份计划才建 PLN |
+| TST / RPT | 操作步骤 → SOP；流水账 → LOG |
+| STUD / SER / PORT | 不预建；同一专题满 3 篇再开子目录 |
 
 ### 6. Use Mermaid `flowchart TB`
 
-For flows, state machines, module relationships, and validation paths, prefer:
+流程、状态机、模块关系、验证路径用 `flowchart TB`。能用表就不要长文。
 
-```mermaid
-flowchart TB
-    A[Input] --> B[Process]
-    B --> C[Result]
+## Default Directories (V1.0.0)
+
+Bootstrap **只创建这 5 个目录**（可空目录本身，但不要放空阅读指引）：
+
+```text
+docs/
+├── README.md              # 入口
+├── GUIDE.md               # 命名、模板、质量检查
+├── 00-REF-参考/           # 长期查阅，很少改正文逻辑
+├── 01-ARC-架构/           # 当前固件怎么工作（随代码改）
+├── 02-SOP-操作/           # 照着做：编译、烧录、clangd、台架
+├── 03-DBG-问题/           # 一篇一个故障；没有故障可以一直空
+└── 04-LOG-记录/           # 按时间的开发日志、审计、交接
 ```
 
-Avoid long prose where a compact diagram and a table would be clearer.
+| 目录 | 放 | 不放 |
+|------|----|------|
+| REF | 数据手册、原理图、PinMap、协议表、参数表、错误码 | 当前状态机解释 |
+| ARC | 分层、主循环/ISR、外设用法、充电/保护/OTA 等现在代码在干什么 | 厂商 PDF、按日期流水账 |
+| SOP | Keil 编译、烧录、clangd、台架步骤、验收清单 | 「为什么这样设计」 |
+| DBG | 现象 → 证据 → 根因 → 修复 → 回归 | 普通功能说明 |
+| LOG | 开发日志、提交审计、周报、版本交接 | 仍有效的架构正文（应回写 ARC） |
 
-## Phase 0: Bootstrap (Documentation Scaffold)
+可选：`05-EXP-经验/`（能带到下一工程的避坑/复用）；`archive/`（过期文档）。有内容再建。
 
-Triggered when `docs/README.md` does not exist, or user explicitly requests "初始化文档"/"setup docs".
+## Phase 0: Bootstrap
+
+`docs/README.md` 不存在，或用户明确要求初始化文档时触发。
 
 ### Step 0.1: Scan Project Structure
 
-1. **Discover source directories:** Glob for `**/*.c` and `**/*.h`, group by directory prefix. Common patterns:
-   - `src/`, `inc/`, `app/`, `drivers/`, `bsp/`, `components/`, `user/`, `main/`, `include/`, `config/`
-   - Nested: `Project/src/`, `Project/inc/`
-   - Exclude vendor directories: `Library/`, `Firmware/`, `HAL/`, `CMSIS/`, `freertos/`, `lvgl/`
-
-2. **Identify build system:**
-   - Keil `.uvprojx` → extract target name, device, preprocessor defines, include paths
-   - IAR `.ewp` → same
-   - CMakeLists.txt / Makefile → extract defines, include paths, linker scripts
-
-3. **Extract from code:**
-   - MCU model: from `#include` headers and device macros (e.g., `GD32F427`, `STM32F103`)
-   - Peripherals: from init functions (`xxx_init`, `gpio_init`, `usart_init`, `spi_init`, `i2c_init`)
-   - RTOS tasks: from `xTaskCreate` / `osThreadNew` calls (task name, function, stack size, priority)
-   - Interrupts: from `xxx_IRQHandler` functions
-   - Global structs: from `typedef struct` in main header files
-   - Communication protocols: from UART/SPI/I2C/CAN init + data frame handling
-   - Sync primitives: from mutex/semaphore/queue creation calls
+1. Glob `**/*.c` / `**/*.h`，按目录前缀分组。排除 `Library/`、`Firmware/`、`HAL/`、`CMSIS/`、`freertos/`、`lvgl/`、`vendor/`、`thirdparty/`。
+2. 构建系统：Keil `.uvprojx`、IAR `.ewp`、CMake/Makefile → target、器件、宏、include、链接脚本。
+3. 从代码提取：MCU、外设 init、RTOS 任务、IRQHandler、核心 struct、协议、同步原语。
 
 ### Step 0.2: Generate `docs/GUIDE.md`
 
-Create `docs/GUIDE.md` with this template, filling in the project name from build system:
+填入项目名。模板：
 
 ```markdown
 # 文档编写指南 — {项目名}
 
+## 版本
+文档体系 V1.0.0。默认 5 目录，禁止预建空类型目录。
+
 ## 目录结构
-```
 docs/
-├── README.md                    # 文档索引入口
-├── GUIDE.md                     # 本文件：编写规范
-├── 00-REF-参考/                 # 参考资料（数据手册、用户手册）
-├── 01-ARC-架构/                 # 系统架构、模块设计
-├── 02-REQ-需求/                 # 产品需求、功能规格
-├── 03-COM-协议/                 # 通信协议定义（Modbus、MQTT、AT）
-├── 04-PLN-计划/                 # 总体计划、阶段规划
-├── 05-WORK-执行/                # 构建步骤、调试步骤、移植记录
-├── 06-TST-测试/                 # 测试计划、测试报告
-├── 07-DBG-调试/                 # 问题排查记录
-├── 08-RPT-报告/                 # 开发记录、工作周报、分析报告、评审记录
-├── 09-TOD-待完成/               # 待完成事项跟踪、技术债务
-└── 10-STUD-学习/                # 学习笔记、技术调研
-```
+├── README.md
+├── GUIDE.md
+├── 00-REF-参考/
+├── 01-ARC-架构/
+├── 02-SOP-操作/
+├── 03-DBG-问题/
+└── 04-LOG-记录/
 
-每个目录内含 `00-阅读指引.md`，描述该类型文档的用途、模板、关系。
+`00-阅读指引.md` 仅在该目录已有至少一篇正文后才写。
 
-## 命名规范
-- 文档: `{NN}-{TYPE}-{中文文档名}.md`
-- NN 为目录内序号，从 01 开始（00 保留给阅读指引和模板）
-- TYPE 与目录类型码一致
-
-## 类型码
-| 序号 | 代码 | 类型 | 目录 | 说明 |
-|------|------|------|------|------|
-| 00 | REF | 参考 | `00-REF-参考/` | 数据手册、用户手册、芯片资料 |
-| 01 | ARC | 架构 | `01-ARC-架构/` | 系统架构、模块设计、设计背景 |
-| 02 | REQ | 需求 | `02-REQ-需求/` | 产品需求、功能规格、验收标准 |
-| 03 | COM | 协议 | `03-COM-协议/` | 通信协议：Modbus 寄存器表、MQTT 规范 |
-| 04 | PLN | 计划 | `04-PLN-计划/` | 总体计划、阶段规划、待实现跟踪 |
-| 05 | WORK | 执行 | `05-WORK-执行/` | 构建步骤、调试步骤、移植记录、操作流程 |
-| 06 | TST | 测试 | `06-TST-测试/` | 测试计划、测试报告、测试模板 |
-| 07 | DBG | 调试 | `07-DBG-调试/` | 问题排查记录、Bug 分析 |
-| 08 | RPT | 报告 | `08-RPT-报告/` | 开发记录、工作周报、分析报告、评审记录 |
-| 09 | TOD | 待完成 | `09-TOD-待完成/` | 待完成事项、技术债务、已知问题 |
-| 10 | STUD | 学习 | `10-STUD-学习/` | 学习笔记、技术调研过程 |
+## 命名
+`{NN}-{TYPE}-{中文文档名}.md`。TYPE 与目录一致：REF / ARC / SOP / DBG / LOG。
 
 ## 信任规则
 | 标记 | 含义 |
 |------|------|
-| ✅ 已验证 | 有板级测试/日志/示波器证据 |
-| ⚠️ 待上板验证 | 仅静态代码分析，未实际运行 |
+| ✅ 已验证 | 板级测试/日志/示波器 |
+| ⚠️ 待上板验证 | 仅静态代码分析 |
 | 📋 参考工程 | 来自参考项目，未在本工程验证 |
-| 🎯 目标能力 | 设计目标，尚未实现 |
+| 🎯 目标能力 | 尚未实现 |
+
+## DBG 模板要点
+现象、证据、假设、验证、根因、修复、回归。
+
+## LOG 模板要点
+日期、改了什么、证据（构建/测试/上板）、未完成项、回写 ARC/SOP 的入口。
 
 ## 质量检查
-- [ ] 读过对应目录的 `00-阅读指引.md`
-- [ ] 提取了硬件/固件/协议/持久化/验证/文档元素
+- [ ] 落在 5 个默认目录之一（或已证实需要的可选目录）
 - [ ] 实现声明有代码/日志/测试证据
-- [ ] 区分了当前实现、目标能力、参考行为、待验证
-- [ ] 优先更新现有文档而非创建新文档
-- [ ] 新文档遵循 `{NN}-{TYPE}-{title}.md` 命名
-- [ ] 流程图使用 `flowchart TB`
-- [ ] 报告了验证证据
+- [ ] 区分当前实现、目标能力、参考行为、待验证
+- [ ] 优先更新现有文档
+- [ ] `{NN}-{TYPE}-{title}.md` 且 TYPE 匹配目录
+- [ ] 流程图 `flowchart TB`
 ```
 
-### Step 0.2b: Create All Type Directories with Reading Guides
+不要在 GUIDE 里再列出 REQ/COM/PLN/WORK/TST/RPT/TOD/STUD 为默认目录。
 
-Create all 11 directories under `docs/`:
+### Step 0.2b: Create Default Directories
 
-```
-00-REF-参考/  01-ARC-架构/  02-REQ-需求/  03-COM-协议/
-04-PLN-计划/  05-WORK-执行/  06-TST-测试/  07-DBG-调试/
-08-RPT-报告/  09-TOD-待完成/  10-STUD-学习/
-```
+只 mkdir 这 5 个：`00-REF-参考` `01-ARC-架构` `02-SOP-操作` `03-DBG-问题` `04-LOG-记录`。
 
-Each directory gets a `00-阅读指引.md` with: 用途, 文档结构, 文档模板, 与其他文档的关系.
+不要创建：`02-REQ-需求` `03-COM-协议` `04-PLN-计划` `05-WORK-执行` `06-TST-测试` `08-RPT-报告` `09-TOD-待完成` `10-STUD-学习`。
 
-Additional templates to create:
-- `06-TST-测试/00-模板-测试记录.md` — test record template
-- `07-DBG-调试/00-模板-调试记录.md` — debug record template
-- `08-RPT-报告/00-模板-开发记录.md` — daily development record template (调试型 6 点 / 功能型 / 文档型)
-- `08-RPT-报告/00-模板-工作周报.md` — weekly report template
-- `08-RPT-报告/00-模板-报告.md` — general report template
-
-Key cross-references between directories:
-- `02-REQ` → `04-PLN` (需求分解为计划), → `01-ARC` (需求映射到架构), → `06-TST` (验收标准对应测试)
-- `04-PLN` ← `02-REQ` (计划由需求分解), → `05-WORK` (计划指导执行), → `06-TST` (验证环节)
-- `01-ARC` → `03-COM` (架构定义通信角色), → `00-REF` (引用技术参数)
-- `05-WORK` → `07-DBG` (执行中问题进入调试), ← `04-PLN` (执行是计划的落地)
-- `07-DBG` ← `06-TST` (测试失败触发调试), ← `05-WORK` (执行中遇到的问题)
-- `08-RPT` ← `07-DBG` (调试结论汇总为报告), ← `05-WORK` (执行过程产出开发记录)
-- `09-TOD` ← `04-PLN` (计划未完成项), ← `07-DBG` (暂不修复的问题)
+不要在空目录里写 `00-阅读指引.md` 或空模板文件。DBG/LOG 写作要点放在 `GUIDE.md`。
 
 ### Step 0.3: Generate `docs/README.md`
-
-Create `docs/README.md` with this template:
 
 ```markdown
 # {项目名} 文档索引
 
+文档体系 V1.0.0。
+
 ## 文档入口
-- [编写指南](GUIDE.md) — 目录结构、命名规范、类型码、信任规则
+- [编写指南](GUIDE.md)
 
 ## 目录结构
-| 序号 | 目录 | 类型 | 说明 |
-|------|------|------|------|
-| 00 | [00-REF-参考](00-REF-参考/00-阅读指引.md) | 参考 | 数据手册、用户手册、芯片资料 |
-| 01 | [01-ARC-架构](01-ARC-架构/00-阅读指引.md) | 架构 | 系统架构、模块设计、设计背景 |
-| 02 | [02-REQ-需求](02-REQ-需求/00-阅读指引.md) | 需求 | 产品需求、功能规格、验收标准 |
-| 03 | [03-COM-协议](03-COM-协议/00-阅读指引.md) | 协议 | 通信协议：Modbus 寄存器表、MQTT 规范 |
-| 04 | [04-PLN-计划](04-PLN-计划/00-阅读指引.md) | 计划 | 总体计划、阶段规划、待实现跟踪 |
-| 05 | [05-WORK-执行](05-WORK-执行/00-阅读指引.md) | 执行 | 构建步骤、调试步骤、移植记录 |
-| 06 | [06-TST-测试](06-TST-测试/00-阅读指引.md) | 测试 | 测试计划、测试报告、测试模板 |
-| 07 | [07-DBG-调试](07-DBG-调试/00-阅读指引.md) | 调试 | 问题排查记录、Bug 分析 |
-| 08 | [08-RPT-报告](08-RPT-报告/00-阅读指引.md) | 报告 | 开发记录、工作周报、分析报告、评审记录 |
-| 09 | [09-TOD-待完成](09-TOD-待完成/00-阅读指引.md) | 待完成 | 待完成事项、技术债务 |
-| 10 | [10-STUD-学习](10-STUD-学习/00-阅读指引.md) | 学习 | 学习笔记、技术调研 |
+| 目录 | 类型 | 说明 |
+|------|------|------|
+| [00-REF-参考](00-REF-参考/) | 参考 | 手册、原理图、协议表、参数表 |
+| [01-ARC-架构](01-ARC-架构/) | 架构 | 当前固件如何工作 |
+| [02-SOP-操作](02-SOP-操作/) | 操作 | 编译、烧录、台架步骤 |
+| [03-DBG-问题](03-DBG-问题/) | 问题 | 一篇一个故障 |
+| [04-LOG-记录](04-LOG-记录/) | 记录 | 开发日志、审计、交接 |
 
 ## 现有文档
-{扫描各目录生成索引，首次各目录仅有 00-阅读指引.md}
+{扫描已有正文列出；没有则写「尚无，见 GUIDE」}
 
 ## 信任规则
-- ✅ 已验证：有板级测试/日志/示波器证据
-- ⚠️ 待上板验证：仅静态代码分析
-- 📋 参考工程：来自参考项目
-- 🎯 目标能力：设计目标，尚未实现
+- ✅ 已验证
+- ⚠️ 待上板验证
+- 📋 参考工程
+- 🎯 目标能力
 ```
 
 ### Step 0.4: Generate `CLAUDE.md`
 
-Create `CLAUDE.md` in project root using scan results:
+仅当仓库根还没有面向 Agent 的约束文件（`CLAUDE.md` / `AGENTS.md`）时创建，不要覆盖已有 `AGENTS.md`。内容用扫描结果：项目概述、构建系统、include、模块表、任务、同步原语、核心 struct、引脚、第三方库。
 
-```markdown
-# CLAUDE.md
+### Step 0.5: Generate `docs/01-ARC-架构/01-ARC-系统架构.md`
 
-## 项目概述
-{从构建文件和代码推断的产品描述，1-2 句话}
-
-## 构建系统
-- **IDE**: {Keil MDK-ARM / IAR / CMake}
-- **项目文件**: {相对路径}
-- **Target**: {target name}
-- **Device**: {MCU 型号}
-- **Preprocessor defines**: {宏定义列表}
-
-## 包含路径
-{从构建文件提取的 include paths 表格}
-
-## 代码架构
-### 模块总览
-| 模块 | 文件 | 用途 |
-|------|------|------|
-{从源码扫描生成，每行一个模块}
-
-### FreeRTOS 任务（如适用）
-| 任务 | 函数 | 栈(words) | 优先级 |
-|------|------|-----------|--------|
-{从 xTaskCreate 提取}
-
-### 同步原语（如适用）
-| 名称 | 类型 | 用途 |
-|------|------|------|
-{从代码提取 mutex/semaphore/queue}
-
-### 全局数据结构
-| 结构体 | 文件 | 用途 |
-|--------|------|------|
-{从 typedef struct 提取核心结构}
-
-## 硬件资源
-| 外设 | 引脚 | 用途 |
-|------|------|------|
-{从初始化代码提取}
-
-## 第三方库
-| 库 | 位置 | 版本 | 用途 |
-|----|------|------|------|
-{从目录结构和头文件提取}
-```
-
-### Step 0.5: Generate `docs/01-ARC-架构/02-ARC-系统架构.md`
-
-Create the initial architecture doc in the ARC directory:
-
-```markdown
-# 系统架构
-
-## 概述
-{MCU 型号}，{时钟频率}，{Flash/SRAM}，运行 {RTOS 名称}。
-
-## 模块关系
-```mermaid
-flowchart TB
-    {从代码调用关系生成模块关系图}
-```
-
-## 任务架构
-{任务列表、优先级、栈大小、功能描述}
-
-## 数据流
-```mermaid
-flowchart TB
-    {核心数据流向：输入→处理→输出}
-```
-
-## 同步机制
-{互斥锁、信号量、队列的使用场景}
-
-## 硬件资源分配
-{外设、引脚、中断分配表}
-```
+这是 Bootstrap 唯一必须生成的正文（有扫描结果）。含：概述、模块关系 `flowchart TB`、任务/主循环、数据流、同步、硬件资源。未上板的结论标 ⚠️。
 
 ### Step 0.6: Confirm with User
 
-Present the generated file list to the user and ask for confirmation before proceeding. Show:
-- List of files to create
-- Key findings (MCU, RTOS, peripherals, protocols)
-- Any assumptions that need verification
-
-After user confirms, write all files and proceed to Phase 1.
+先列出将创建的文件、MCU/RTOS/外设/协议要点、待核实假设，用户确认后再写盘，然后进入 Phase 1。
 
 ## Standard Workflow
 
 ### Phase 1: Read Entries and Scope
 
-1. Read `README.md`.
-2. Read `GUIDE.md`.
-3. Read the user-specified docs or likely target docs.
-4. If summarizing prior conversation, extract user goals, confirmed facts, corrections, changed files, validation evidence, and open tasks.
-5. Decide whether the operation is update, add, merge, split, delete suggestion, reorder, or summary-only.
-
-Tell the user the target scope before substantial edits.
+读 README、GUIDE、用户指定文档。从对话提取目标、已确认事实、改动、证据、待办。大范围改目录先征得同意。
 
 ### Phase 2: Extract Engineering Elements
 
-**Dynamic source discovery:** Before building the element model, Glob for `**/*.c` and `**/*.h` to discover actual source file locations. Group by directory prefix to identify module boundaries. Exclude vendor/library directories (Library/, Firmware/, HAL/, CMSIS/, freertos/, lvgl/, thirdparty/). Use the discovered structure rather than assuming fixed paths.
-
-Build a concise element model:
-
-- Hardware: MCU, board, pins, buses, peripherals, modules, sensors, actuators.
-- Firmware: startup path, drivers, tasks, state machines, queues, semaphores, timers, interrupts.
-- Protocols: UART, Modbus, MQTT, AT, Wi-Fi/4G, cloud properties, registers, frames.
-- Persistence: EEPROM/Flash layout, defaults, migration, read-write-read verification.
-- Validation: build, unit tests, runtime logs, board tests, protocol traces, instruments.
-- Documentation: topic, audience, target file, doc type, evidence level.
-
-Keep high-cohesion content together and move weakly related material out.
+动态发现源码路径，不要假设固定目录。元素：硬件、固件、协议、持久化、验证、文档落点。
 
 ### Phase 3: Gather Evidence
 
-Read only files related to the documentation topic.
-
-**Build system parsing:** Before reading source files, parse the build system to extract:
-- Preprocessor defines (device model, feature flags)
-- Include paths (to find headers efficiently)
-- Linker scripts (memory layout: Flash/SRAM sizes and regions)
-- Device/target name
-
-Supported build systems: Keil `.uvprojx`, IAR `.ewp`, CMakeLists.txt, Makefile.
-
-Typical sources:
-
-- Source directories discovered by dynamic scanning (see Phase 2).
-- Common patterns: `src/`, `inc/`, `user/`, `main/`, `components/`, `drivers/`, `bsp/`, `app/`, `include/`, `config/`.
-- Build system files: `.uvprojx`, `.ewp`, `CMakeLists.txt`, `Makefile`, linker scripts (`.ld`, `.sct`, `.icf`).
-- `tests/`, scripts, CI configs.
-- Runtime logs and issue/debug notes.
-- Reference project files, searched by symbol and behavior.
-
-Use code facts to correct old docs. If code and historical docs conflict, trust current code unless the user explicitly asks for target design docs.
+先解析构建系统，再读相关源码。代码与旧文档冲突时，以当前代码为准，除非用户明确要写目标设计。
 
 ### Phase 4: Design the Doc Change
 
-Before editing, determine:
-
-- Target file list.
-- Action per file: add, update, merge, split, delete suggestion, reorder.
-- Key content to keep.
-- Low-relevance content to delete, demote, or move.
-- Mermaid diagrams, tables, and verification sections to add.
-- Any facts that remain unverified.
-
-For large multi-file reorganizations, confirm with the user first. For small scoped edits, proceed.
+列出目标文件与 add/update/merge/split/archive。新文件必须落在 5 默认目录（或已有内容的可选目录）。
 
 ### Phase 5: Write or Update Docs
 
-Writing requirements:
+结论先行；表优先；`flowchart TB`；写清路径/函数/宏/寄存器。区分当前实现与目标能力。
 
-- Put conclusions first.
-- Use tables for dense facts.
-- Use `flowchart TB` for flows.
-- Use exact paths, function names, macros, register names, property IDs, and command strings.
-- Distinguish current implementation, target capability, reference behavior, and pending validation.
-- Include verification commands or evidence whenever available.
-- Keep documents useful to an embedded engineer performing a real task.
-
-Do not add decorative background content.
-
-**待实现增量规则：**
-
-执行过程中（Phase 3 证据收集或代码审查时），若发现功能点未被现有需求或计划覆盖：
-
-1. 追加到最相关的计划文档"待实现清单"表格，格式：
-   `| 序号 | 功能点 | 来源需求 | 状态:待实现 | 发现场景 |`
-2. 若无对应计划文档，在 `04-PLN-计划/` 创建新计划文档
-3. 若该功能点属于全新需求，在 `02-REQ-需求/` 追加需求条目
-4. 完成实现后，将状态更新为"已完成"并移入文档末尾"已完成"章节
+发现未覆盖的功能点：追加到 `04-LOG-记录` 最近一篇或 README 待办表。不要为一条待办去创建 `04-PLN-计划/` 或 `02-REQ-需求/`。同一计划连续多篇时再开 PLN。
 
 ### Phase 6: Verify
 
-At minimum, verify:
+- 新 Markdown 符合 `{NN}-{TYPE}-{title}.md`，TYPE 匹配目录。
+- 没有新建空的 11 格类型目录或空阅读指引。
+- README 链接有效。
+- 实现有证据；目标能力未写成当前能力。
+- 有 CodeGraph 且本次改了较多源码时：`codegraph index`。
 
-- Target files exist.
-- New project Markdown filenames follow `{NN}-{TYPE}-{title}.md` convention.
-- Links from README or topic entries are valid when touched.
-- Headings and templates match `GUIDE.md`.
-- Mermaid uses `flowchart TB` unless there is an explicit reason.
-- Code facts have evidence.
-- Target capability is not written as current capability.
-
-Report:
-
-- Modified files.
-- Main additions or adjustments.
-- Verification evidence.
-- Remaining gaps or facts needing hardware validation.
-
-After documentation updates involving significant code changes, refresh the CodeGraph index:
-
-```bash
-codegraph index
-```
-
-This keeps the code structure graph in sync with the latest source for future analysis and navigation.
+报告：修改/新增文件、核心调整、证据、仍需上板的缺口。
 
 ## Output Formats
 
-### When the user asks to summarize prior conversation
+用户要求总结对话、总结指定文档、或更新项目文档时，分别使用：
 
 ```markdown
 ## 对话总结
-
 ### 1. 用户目标
-
 ### 2. 已确认事实
-
 ### 3. 已完成文档/代码改动
-
 ### 4. 用户明确纠正和偏好
-
 ### 5. 待办事项
-
 ### 6. 建议写入的文档位置
 ```
 
-### When the user asks to summarize specified documents
-
 ```markdown
 ## 文档总结
-
 ### 1. 文档主题和受众
-
 ### 2. 核心工程元素
-
 ### 3. 主要结论
-
 ### 4. 与当前代码/文档体系的关系
-
 ### 5. 可保留内容
-
 ### 6. 应删除、合并或重写内容
-
 ### 7. 建议落点
 ```
 
-### When the user asks to update project docs
-
 ```markdown
 ## 更新结果
-
 - 修改文件：
 - 新增文件：
 - 合并/删除建议：
@@ -531,12 +288,10 @@ This keeps the code structure graph in sync with the latest source for future an
 
 ## Quality Checklist
 
-- [ ] Read `README.md` and `GUIDE.md`.
-- [ ] Extracted hardware, firmware, protocol, persistence, validation, and documentation elements.
-- [ ] Used current code/log/test evidence for implementation claims.
-- [ ] Distinguished current implementation, target capability, reference behavior, and pending validation.
-- [ ] Preferred updating existing docs over unnecessary new docs.
-- [ ] Followed `{NN}-{TYPE}-{title}.md` naming convention for new project Markdown docs.
-- [ ] Used `flowchart TB` for flows.
-- [ ] Reported verification evidence.
-- [ ] Ran `codegraph index` after significant code changes.
+- [ ] 读过 README 和 GUIDE
+- [ ] 新内容落在 REF/ARC/SOP/DBG/LOG（或已证实需要的可选目录）
+- [ ] 未创建空类型目录、空 `00-阅读指引.md`
+- [ ] 实现声明有证据；目标能力未写成当前能力
+- [ ] `{NN}-{TYPE}-{title}.md` 且 TYPE 匹配目录
+- [ ] 流程图 `flowchart TB`
+- [ ] 回复里报告了证据与剩余缺口

@@ -73,8 +73,11 @@ cd <project-root> && code-review-graph init --yes && code-review-graph build
 调用 `/update-project-docs` skill，传入"初始化文档"指令。skill 会自动进入 bootstrap 模式（Phase 0），扫描工程结构并生成：
 - `docs/GUIDE.md`
 - `docs/README.md`
-- `CLAUDE.md`
-- `docs/01-ARC-系统架构.md`
+- `docs/00-REF-参考/` `docs/01-ARC-架构/` `docs/02-SOP-操作/` `docs/03-DBG-问题/` `docs/04-LOG-记录/`
+- `docs/01-ARC-架构/01-ARC-系统架构.md`
+- `CLAUDE.md`（仅当根目录没有 `CLAUDE.md`/`AGENTS.md` 时）
+
+禁止创建 11 个空类型目录或空的 `00-阅读指引.md`。
 
 **#4 comet**
 ```bash
@@ -99,14 +102,14 @@ cd <project-root> && openspec init
 |---|------|------|------|
 | 1 | CodeGraph | ✅ 完成 | N 文件, M 节点, K 边 |
 | 2 | code-review-graph | ✅ 完成 | N 文件, M 节点, K 边 |
-| 3 | update-project-docs | ✅ 完成 | 生成 4 个文档 |
+| 3 | update-project-docs | ✅ 完成 | 5 目录 + README/GUIDE/ARC |
 | 4 | comet | ✅ 完成 | project scope, 英文 |
 | 5 | openspec | ⏭️ 用户跳过 | — |
 
 生成的文件：
 - .codegraph/codegraph.db
 - .code-review-graph/graph.db
-- docs/README.md, docs/GUIDE.md, CLAUDE.md, docs/01-ARC-系统架构.md
+- docs/README.md, docs/GUIDE.md, docs/01-ARC-架构/01-ARC-系统架构.md
 - .comet/config.yaml + .claude/skills/ + .claude/rules/
 ```
 
