@@ -1,0 +1,3 @@
+interface:
+  display_name: "C-pan-reorganize"
+  short_description: "Safely migrate C drive app data and clean caches"

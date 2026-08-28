@@ -1,6 +1,6 @@
 # Jovi Embedded Work Skills
 
-> 嵌入式工程开发 Claude Code Skills 集合 — 新工程一键初始化、文档自动化、代码注释标准化、日报生成。
+> 嵌入式工程开发与 Windows 工作环境维护 Claude Code Skills 集合 — 新工程一键初始化、文档自动化、代码注释标准化、日报生成与 C 盘数据整理。
 
 专为嵌入式 C 工程（GD32/STM32/ESP32 + FreeRTOS + Modbus/CAN/UART）设计，开箱即用。
 
@@ -14,7 +14,8 @@ jovi-embedded-work/
 ├── code_wrt/                  # Ponytail 简化 + code_zl 注释整理
 ├── day_sum/                   # 开发日报生成
 ├── child-claude/              # 多模型派发编排（父规划+审核，子执行）
-└── codex-memory/              # 安全项目永久记忆（Obsidian / staging）
+├── codex-memory/              # 安全项目永久记忆（Obsidian / staging）
+└── c-pan-reorganize/          # C 盘应用数据迁移 + 更新包/缓存安全清理
 ```
 
 ---
@@ -219,6 +220,25 @@ Constraint: <约束，如只创建文件不跑命令>
 
 ---
 
+### 8. c-pan-reorganize — C 盘数据整理
+
+**触发词：** `C盘清理`、`C盘空间不足`、`迁移应用数据到D盘`、`清理更新包`、`清理安全缓存`
+
+**功能：** 审核 C 盘应用数据，将已授权且不在运行的数据迁移到 `D:\Document` 或 `D:\Documents` 的独立目录，并保留原路径 junction；同时区分可清理更新包、可重建缓存和必须保护的聊天数据库、项目数据、凭据及系统文件。
+
+**安全边界：**
+
+- 清理更新包或缓存不等于卸载软件；卸载/重装必须单独明确授权。
+- 迁移前确认应用已退出、目标目录不冲突，迁移后核对 junction、文件数、字节数与 C/D 盘空间。
+- 不手动删除 `pagefile.sys`、`hiberfil.sys`、`$WinREAgent`、活动数据库或当前聊天记录。
+
+**示例：**
+```
+/c-pan-reorganize 审核 C 盘可清理缓存，并将飞书和钉钉数据迁移到 D:\Document
+```
+
+---
+
 ## 安装
 
 ### 方式一：git clone（推荐）
@@ -236,6 +256,7 @@ xcopy /E /I code_wrt %USERPROFILE%\.claude\skills\code_wrt
 xcopy /E /I day_sum %USERPROFILE%\.claude\skills\day_sum
 xcopy /E /I child-claude %USERPROFILE%\.claude\skills\child-claude
 xcopy /E /I codex-memory %USERPROFILE%\.claude\skills\codex-memory
+xcopy /E /I c-pan-reorganize %USERPROFILE%\.claude\skills\c-pan-reorganize
 
 # macOS / Linux
 cp -r project-init ~/.claude/skills/
@@ -245,6 +266,7 @@ cp -r code_wrt ~/.claude/skills/
 cp -r day_sum ~/.claude/skills/
 cp -r child-claude ~/.claude/skills/
 cp -r codex-memory ~/.claude/skills/
+cp -r c-pan-reorganize ~/.claude/skills/
 ```
 
 ### 方式二：直接下载
@@ -328,6 +350,15 @@ Claude：解析 profile 与项目 ID → 读取最小全局偏好及当前项目
 
 Claude：优先审计 docs/README.md、docs/GUIDE.md、Git 与验证证据
 → 预览受管区块更新；确认后才归档并写入成功事件
+```
+
+### 场景 7：C 盘数据迁移与安全清理
+
+```
+你：/c-pan-reorganize 审核 C 盘空间，将已关闭的飞书和钉钉数据迁移到 D:\Document
+
+Claude：先只读统计 C 盘数据和进程 → 确认目标目录与用户授权
+→ 移动精确数据目录并建立 junction → 核对文件数、字节数和 C/D 盘空间
 ```
 
 ## 文档命名规范
