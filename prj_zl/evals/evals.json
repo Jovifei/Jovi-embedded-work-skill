@@ -1,0 +1,26 @@
+{
+  "skill_name": "prj_zl",
+  "version": "V0.1.0",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/prj_zl Application Bootloader",
+      "expected_behavior": "Should inventory .c/.h/.s and Keil uvprojx, plan app/driver mapping, git mv files into app/inc app/src driver/inc driver/src, update IncludePath and FilePath in each uvprojx/uvoptx, remove empty Config/Include/Source, and report a summary table. Must not change #include strings or code logic."
+    },
+    {
+      "id": 2,
+      "prompt": "把 IAP_Application1 改成 IAP_Application，并修正 Keil 路径",
+      "expected_behavior": "Should git mv IAP_Application1.uvprojx to IAP_Application.uvprojx, sync uvoptx and OutputName, and fix any stale FilePath after folder moves without committing unless asked."
+    },
+    {
+      "id": 3,
+      "prompt": "工程整理后帮我加注释",
+      "expected_behavior": "Directory work is prj_zl; comments-only work should use code_zl after prj_zl completes. Must not mix directory moves with comment rewrites in one undifferentiated step."
+    },
+    {
+      "id": 4,
+      "prompt": "/prj_zl Application",
+      "expected_behavior": "Should only reorganize Application when Bootloader is omitted, still update .gitignore for MDK Objects/Listings if missing, and grep for leftover Config/Include/Source paths in project XML."
+    }
+  ]
+}

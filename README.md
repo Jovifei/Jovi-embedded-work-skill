@@ -13,6 +13,7 @@ jovi-embedded-work/
 ├── clangd_init/               # clangd 函数跳转 + 保存格式化
 ├── code_zl/                   # C 代码注释标准化
 ├── code_wrt/                  # Ponytail 简化 + code_zl 注释整理
+├── prj_zl/                    # Keil 工程 app/driver 目录重组
 ├── day_sum/                   # 开发日报生成
 ├── child-claude/              # 多模型派发编排（父规划+审核，子执行）
 ├── codex-memory/              # 安全项目永久记忆（Obsidian / staging）
@@ -182,7 +183,31 @@ docs/
 
 ---
 
-### 6. day_sum — 开发日报生成
+### 6. prj_zl — Keil 工程 app/driver 目录重组
+
+**版本：** V0.1.0
+
+**触发词：** `/prj_zl`、`工程整理`、`目录整理`、`应用驱动分离`、`app/driver 分层`
+
+**功能：** 将 `Application` / `Bootloader` 从 `Config/`、`Include/`、`Source/` 整理为 `app/inc`、`app/src`、`driver/inc`、`driver/src`、`Project/MDK` 标准结构。用 `git mv` 保留历史，同步 Keil `IncludePath`、`FilePath`、分组；支持 `IAP_Application1` → `IAP_Application` 重命名。**不改代码逻辑**，目录整理后与 **code_zl** 配对做注释。
+
+**目标结构：**
+```
+<FirmwareRoot>/
+├─ app/inc、app/src      # 业务层
+├─ driver/inc、driver/src # BSP/板级驱动
+└─ Project/MDK/          # Keil 工程与 startup
+```
+
+**示例：**
+```
+/prj_zl Application Bootloader
+/prj_zl Application
+```
+
+---
+
+### 7. day_sum — 开发日报生成
 
 **触发词：** `/day_sum`、`总结日报`、`daily summary`、`work summary`
 
@@ -210,7 +235,7 @@ docs/
 
 ---
 
-### 7. child-claude — 多模型派发编排
+### 8. child-claude — 多模型派发编排
 
 **触发词：** `/child-claude`、`派给子claude`、`用mimo干`、`换便宜模型`、`delegate to child claude`
 
@@ -248,7 +273,7 @@ Constraint: <约束，如只创建文件不跑命令>
 
 ---
 
-### 8. codex-memory — 安全项目永久记忆
+### 9. codex-memory — 安全项目永久记忆
 
 **触发词：** `/codex-memory`、`加载项目记忆`、`归档项目记忆`、`Obsidian memory`、`project memory`
 
@@ -275,7 +300,7 @@ Constraint: <约束，如只创建文件不跑命令>
 
 ---
 
-### 9. c-pan-reorganize — C 盘数据整理
+### 10. c-pan-reorganize — C 盘数据整理
 
 **触发词：** `C盘清理`、`C盘空间不足`、`迁移应用数据到D盘`、`清理更新包`、`清理安全缓存`
 
@@ -309,6 +334,7 @@ xcopy /E /I update-project-docs %USERPROFILE%\.claude\skills\update-project-docs
 xcopy /E /I clangd_init %USERPROFILE%\.claude\skills\clangd_init
 xcopy /E /I code_zl %USERPROFILE%\.claude\skills\code_zl
 xcopy /E /I code_wrt %USERPROFILE%\.claude\skills\code_wrt
+xcopy /E /I prj_zl %USERPROFILE%\.claude\skills\prj_zl
 xcopy /E /I day_sum %USERPROFILE%\.claude\skills\day_sum
 xcopy /E /I child-claude %USERPROFILE%\.claude\skills\child-claude
 xcopy /E /I codex-memory %USERPROFILE%\.claude\skills\codex-memory
@@ -320,6 +346,7 @@ cp -r update-project-docs ~/.claude/skills/
 cp -r clangd_init ~/.claude/skills/
 cp -r code_zl ~/.claude/skills/
 cp -r code_wrt ~/.claude/skills/
+cp -r prj_zl ~/.claude/skills/
 cp -r day_sum ~/.claude/skills/
 cp -r child-claude ~/.claude/skills/
 cp -r codex-memory ~/.claude/skills/
@@ -401,7 +428,17 @@ Claude：先用 ponytail 删除或内联行为等价的冗余代码
 → 输出两个阶段的变更与验证结果
 ```
 
-### 场景 6：日报生成
+### 场景 6：Keil 工程目录重组
+
+```
+你：/prj_zl Application Bootloader
+
+Claude：列出旧路径清单 → git mv 到 app/driver 四层目录
+→ 更新 uvprojx/uvoptx 的 IncludePath 与 FilePath
+→ 删除空 Config/Include/Source → 输出整理报告，提示 Keil Rebuild
+```
+
+### 场景 7：日报生成
 
 ```
 你：总结今天的开发记录
@@ -410,7 +447,7 @@ Claude：读取 git log 或开发记录文件 → 按"发现问题/分析/解决
 → 输出结构化日报
 ```
 
-### 场景 7：跨会话项目记忆
+### 场景 8：跨会话项目记忆
 
 ```
 你：/codex-memory load
@@ -424,7 +461,7 @@ Claude：优先审计 docs/README.md、docs/GUIDE.md、Git 与验证证据
 → 预览受管区块更新；确认后才归档并写入成功事件
 ```
 
-### 场景 8：C 盘数据迁移与安全清理
+### 场景 9：C 盘数据迁移与安全清理
 
 ```
 你：/c-pan-reorganize 审核 C 盘空间，将已关闭的飞书和钉钉数据迁移到 D:\Document
