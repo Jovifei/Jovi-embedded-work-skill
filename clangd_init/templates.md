@@ -90,7 +90,18 @@ int fputc(int character, FILE *stream);
 
 ## `.clang-format`
 
-已有文件即为准。仅在文件不存在且用户明确选择 Allman 时，可以使用：
+已有文件即为准，不覆盖。
+
+**文件不存在且用户确认 Jovi / code_zl 规范**时，复制 `code_zl/references/clang-format` 全文（不要用下面的精简片段代替）。要点：
+
+| 规则 | 作用 |
+|------|------|
+| `ColumnLimit: 0` | `.h` 函数声明 + 行尾 `//` 保持单行，不拆参数 |
+| `AlignConsecutiveMacros` + `AlignTrailingComments` | 连续 `#define` 数值列与 `//` 对齐 |
+| `BraceWrapping.AfterControlStatement: Always` | `if`/`while`/`for`/`else` 的 `{` 单独换行 |
+| `SortIncludes: false` | 不重排 include |
+
+仅当用户明确选择「最小 Allman、不要 Jovi 模板」时，才可用：
 
 ```yaml
 BasedOnStyle: LLVM
@@ -100,7 +111,7 @@ BreakBeforeBraces: Allman
 SortIncludes: false
 ```
 
-先保存一个手工维护文件并检查 diff；禁止以格式化为目的批量改写仓库。
+先保存一个手工维护 `.c` 和 `.h` 并检查 diff：`.h` 声明不得被拆行；禁止以格式化为目的批量改写仓库。配置后提示 **Reload Window**。
 
 ## 诊断对照
 

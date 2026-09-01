@@ -5,13 +5,19 @@ description: "Use when the user invokes /code_wrt or asks to simplify embedded C
 
 # Code WRT
 
+**Version: V0.1.0**
+
 执行固定组合：`ponytail → code_zl`。前者负责最小化代码，后者负责按 Jovi 规范整理注释和格式。
+
+## 版本记录
+
+- **V0.1.0**：首次版本化。第二阶段必须加载 **code_zl V0.1.0**（`.c` 短分节、`.h` 等号分节、Init 注释粒度、clangd 保存格式化）。不得凭记忆模拟旧的 `/* ==================== */` `.c` 分节。
 
 ## 必需子技能
 
 **REQUIRED SUB-SKILL:** 修改前完整加载并应用 `ponytail`，默认使用 `full` 强度。
 
-**REQUIRED SUB-SKILL:** 完整加载并应用 `code_zl`。
+**REQUIRED SUB-SKILL:** 完整加载并应用 `code_zl`（当前 **V0.1.0**）。
 
 任一技能不可用时停止修改并说明原因，不得凭记忆模拟其规则。
 
@@ -21,7 +27,11 @@ description: "Use when the user invokes /code_wrt or asks to simplify embedded C
 2. 先执行 `ponytail`：删除或内联冗余代码，复用现有能力，做最小的行为保持式简化。
 3. 检查第一阶段 diff；不得改变公开接口、协议语义、硬件访问顺序、RTOS 时序、并发保护、错误处理或外部可观察行为。
 4. 再执行 `code_zl`：基于简化后的最终代码整理文件结构、注释、分节和对齐。`code_zl` 的“不修改代码逻辑”约束只作用于本阶段。
-5. 复核最终 diff，并运行最小相关构建或测试。无法验证时明确说明。
+5. 注释质量门禁：函数头必须写清数据流、条件、状态/硬件副作用和失败路径；函数体只在关键分支、循环、寄存器顺序、保护与恢复路径写 `//`，禁止把函数头 Description 复制到函数体。
+6. **Init 粒度门禁**（code_zl 二点六）：驱动 Init / SysClk 用 `/* 分节：一句话说明配了什么 */`，不要逐行注释 DDL 字段，也不要写大段原理。
+7. **分节格式门禁**：`.c` 用 `/* 标题 */`；`.h` 用 `//=================== 标题 ===========================`。禁止在 `.c` 使用 `====` 装饰。
+8. 配置门禁：触碰 `config.h` 或 `fun_*Config()` 时，每个有效宏必须写明具体用途、单位/枚举语义和当前值/表达式；配置初始化函数前必须有“分组/字段/当前宏值/单位/下游用途”表格，赋值行逐行标注宏来源。
+9. 编码和行为门禁：保持原文件编码，批量注释前建快照，最终用去注释令牌流对比证明代码逻辑、宏值、函数签名和硬件访问顺序未变；再运行最小相关构建或测试。无法验证时明确说明。
 
 ## 边界
 
@@ -29,6 +39,7 @@ description: "Use when the user invokes /code_wrt or asks to simplify embedded C
 - 用户只要求纯注释整理时使用 `/code_zl`，不要触发本技能。
 - 不确定简化是否等价时保留原代码，并继续执行 `code_zl`。
 - 发现疑似 bug 时先报告；只有用户明确要求修复时才改变行为。
+- 禁止用“MPPT/PWM 控制参数”、“电压阈值”、“模块功能接口”等泛化文字作为最终注释；必须写出参数/状态的实际作用。
 - 不扩大文件范围，不执行 git commit 或 push。
 
 ## 报告
@@ -36,5 +47,5 @@ description: "Use when the user invokes /code_wrt or asks to simplify embedded C
 简要列出：
 
 - Ponytail：删除、内联、复用或明确保留的内容
-- Code_ZL：注释、分节、声明顺序和对齐调整
+- Code_ZL：注释、分节、声明顺序和对齐调整（须符合 V0.1.0 粒度）
 - Verification：实际运行的检查及结果

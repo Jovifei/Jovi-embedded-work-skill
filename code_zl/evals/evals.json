@@ -1,10 +1,11 @@
 {
   "skill_name": "code_zl",
+  "version": "V0.1.0",
   "evals": [
     {
       "id": 1,
       "prompt": "/code_zl src/modbus.c src/host_comm.c",
-      "expected_behavior": "Should read both files, add standard function header comments (Name/Input/Output/Description format), add inline comments for key logic, use // style not /* */, add section separators with // ====================. Report summary table at end."
+      "expected_behavior": "Should read both files, add standard function header comments (Name/Input/Output/Description), add // inline comments for key if/while/switch logic, and use short .c section comments like /* 静态函数声明 */ without equal-sign decoration. Must not use /* ==================== */ in .c. Report summary table at end."
     },
     {
       "id": 2,
@@ -14,12 +15,17 @@
     {
       "id": 3,
       "prompt": "/code_zl inc/main.h",
-      "expected_behavior": "Should add // comments to every macro, enum value, struct field, and function declaration. Should NOT add file header comment to .h file. Should NOT add /* GUARD */ to #endif. Struct fields should have aligned inline comments."
+      "expected_behavior": "Should add // comments to every macro, enum value, struct field, and function declaration. Header sections must use //=================== 标题 ===========================. Should NOT add file header comment to .h file. Should NOT add /* GUARD */ to #endif. Struct fields should have aligned inline comments. Function declarations stay on one line with trailing //."
     },
     {
       "id": 4,
       "prompt": "给 can.c 添加注释，参照 docs/协议表.md",
       "expected_behavior": "Should first read docs/协议表.md for protocol details, then add comments referencing protocol field meanings, register addresses, bit definitions. Comments should cite the protocol document path."
+    },
+    {
+      "id": 5,
+      "prompt": "/code_zl Application/driver/src/bsp_pwm.c",
+      "expected_behavior": "Init functions must use short /* 分节：配了什么 */ titles (clock, GPIO pins, timer base, complementary PWM, Break protection) plus only non-obvious trailing //. Must not annotate every DDL field, and must not write long principle paragraphs inside Init."
     }
   ]
 }

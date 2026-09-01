@@ -1,11 +1,17 @@
 ---
 name: code_zl
-description: "Use when adding or fixing code comments in embedded C files, when functions lack standard header comments, when inline comments are missing or inconsistent, or when the user says 代码整理、注释整理、添加注释. Triggers: code_zl, 代码整理, 注释整理, 添加注释, 代码注释, 批量注释."
+description: "Use when adding or fixing code comments in embedded C files, syncing clang-format/clangd save rules across projects, aligning #define and trailing // comments, or when the user says code_zl, 代码整理, 注释整理, 添加注释, 格式化, 对齐, clang-format. Triggers: code_zl, 代码整理, 注释整理, 添加注释, 代码注释, 批量注释, 格式化规则, 宏对齐."
 ---
 
 # Code_ZL 代码注释整理技能
 
+**Version: V0.1.0**
+
 为嵌入式C工程添加标准化代码注释，遵循 `docs/代码规范.md` 和 Jovi 实际代码风格。支持单文件处理和多文件并行子Agent批量处理。
+
+## 版本记录
+
+- **V0.1.0**：首次版本化。`.c` 分节用 `/* 标题 */`（禁止 `====`）；`.h` 分节用 `//=================== 标题 ===`；驱动 Init 采用「分节标题 + 少量关键行尾 `//`」粒度；Ctrl+S 格式化与 `clangd_init` 共用 `.clang-format` 模板。
 
 ## 触发条件
 
@@ -130,9 +136,22 @@ nodeRepl.write(new TextDecoder('gbk').decode(buf));
 
 ### 二、行内注释格式
 
+**`.c` 与 `.h` 分工**：
+- **`.h`**：以 API 行尾 `//` 为主，一般不在函数体外写块内注释
+- **`.c`**：**必须**有函数头 + 分节块注释 + 控制流块内 `//`（见下文「.c 源文件注释要求」）
+
 ```c
 // 中文注释内容，说明"为什么这样做"或"这个分支代表什么"
 ```
+
+**`/* */` 与 `//` 分工**：
+
+| 形式 | 用途 |
+|------|------|
+| `/*--- ... ---*/` 函数头 | 函数签名、入参、返回值、意图（`.c`） |
+| `/* 分节标题 */` | **`.c` 内**功能分区（初始化、主循环、静态变量区）——**短标题，不加 `=` 装饰** |
+| `//=================== 标题 ===...` | **仅 `.h`** 文件级分节（API 区、宏区、结构体区） |
+| `//` | **行级/块内**说明：if/while/for/switch 内关键语句、`.h` API 行尾 |
 
 **规则**：
 - 使用 `//` 中文注释，必要时保留英文缩写、寄存器名、协议字段名
@@ -140,7 +159,8 @@ nodeRepl.write(new TextDecoder('gbk').decode(buf));
   - 文件头注释块（多行）
   - 函数头注释块（多行 `/*--- ... ---*/`）
   - 大段说明性的多行注释
-  - `/* ==================== xxx ==================== */` 段落分隔器
+  - **`.c` 内分节**：`/* 分节标题 */`（一行短块注释，**禁止** `/* ===...=== */`）
+  - **`.h` 内分节**：`//=================== 标题 ===========================`（见第四节）
 - **禁止**在 `/* xxx */` 包裹的单行紧贴代码后面（行尾）作为短注释——这种应统一为 `//`
 - **禁止**写 `/* ---------- function_name() — 完整实现 ---------- */` 之类**重复函数名**的小标题，函数头注释块本身已经包含了 Name 字段
 - 注释解释**意图**、**协议依据**、**硬件事实**、**单位**、**边界**和**异常路径**
@@ -199,19 +219,132 @@ if ((processed & 0x0F) == 0)
 }
 ```
 
-### 三、文件内分节注释
+### 二点五、.c 源文件注释要求（必须）
 
-使用 `/* ==================== 分节标题 ==================== */` 格式对 `.c` 文件内进行逻辑分区：
+整理 **`.c`** 时，除函数头外，必须在**必要处**补充块内注释；**不能只改 `.h` 而放过 `.c`**。
+
+**必须写 `//` 的控制流块内**（if / while / for / switch）：
+- 每个分支/ case 的**业务意图**（`// 当前 SYSCLK 来自 HSI`）
+- **关键赋值**（改 ARR、写 Flash 标志、清 NVIC）
+- **关键外设/库调用**（`DDL_*`、`NVIC_*`、跳转 Bootloader）
+- **等待类 while**（`// 轮询 HSI 就绪`）
+- **switch** 每个 `case` / `default` 一行说明，不要只注释 switch 本身
+
+**必须写 `/* */` 分节块**的场合（**.c 仅用短格式**）：
+- 静态变量区、静态函数声明区：`/* 静态函数声明 */`
+- 函数体内逻辑段：`/* 板级与外设初始化 */`、`/* 主循环 */`
+- 同一 `.c` 内独立模块：`/* Cortex-M 异常 Handler */`、`/* 外设 IRQ 桥接 */`
+- **禁止**在 `.c` 使用 `/* ==================== xxx ==================== */`
+
+**可省略块内 `//` 的场合**：
+- 空函数体（无 NMI 源、模板 Fault Handler 仅 `while(1)` 空转）
+- 函数头已充分说明且函数体仅一行转发（如 `BSP_ADC_IRQHandler()` 包装）
+- **Init/配置函数**内已由分节标题说明意图的连续 DDL 赋值（见二点六）
+
+**`.c` 控制流示例**：
 
 ```c
-/* ==================== 环形接收缓冲区 ==================== */
-/* ==================== 行解析器 ==================== */
-/* ==================== 非阻塞 AT 命令状态机 ==================== */
-/* ==================== AT 结果与提示符标志 ==================== */
-/* ==================== URC 注册表 ==================== */
-/* ==================== 信号量（用于 at_mqtt_publish 事件驱动） ==================== */
-/* ==================== AT 会话互斥量 ==================== */
-/* ==================== 静态函数声明 ==================== */
+switch (sysClock)
+{
+case 0x00: // HSI 作为 SYSCLK
+    SystemCoreClock = HSI_VALUE >> HSIPrescTable[...];
+    break;
+
+case 0x01: // LSI 作为 SYSCLK
+    SystemCoreClock = LSI_VALUE;
+    break;
+
+default: // 未知源，按 HSI 回退
+    SystemCoreClock = HSI_VALUE >> HSIPrescTable[...];
+    break;
+}
+
+if (RCC->CFG & RCC_CFG_SWSTS)
+{
+    // 当前非 HSI 运行，先切回 HSI 再复位外设
+    if (!(RCC->CR & RCC_CR_HSIRDY))
+    {
+        RegValue = RCC->CR;
+        RegValue |= RCC_CR_HSIEN;
+        RCC->CR = RegValue;
+
+        while ((RCC->CR & RCC_CR_HSIRDY) != RCC_CR_HSIRDY)
+        {
+            // 等待 HSI 稳定
+        }
+    }
+}
+```
+
+### 二点六、Init / 配置函数注释粒度（驱动层标准）
+
+外设 **Init、SysClk_Config** 等配置型函数，注释目标是「一眼看出配了什么」，**不要逐行解释寄存器**，也**不要大段原理说明**。
+
+**做法**：
+1. 函数头 `Description` 写总体能力（互补 PWM、GTMR 触发 ADC 等）
+2. 函数体内按配置阶段加 **`/* 分节：一句话 */`**，标题含关键事实（引脚、频率、模式、保护）
+3. 分节内代码保持干净；仅在**非显而易见**处加单行 `//`（如 Break 自动恢复、Flash 擦除序列、状态机失配重同步）
+4. 控制流（if/while/switch）仍按二点五补 `//`，但 Init 内纯等待 while 可只写一行
+
+**参考实现**：`Application/driver/src/bsp_pwm.c::BSP_PWM_Init`
+
+```c
+void BSP_PWM_Init(void)
+{
+    /* 时钟使能 */
+    ...
+
+    /* GPIO：PA15=CH0 / PA14=CH0N 互补输出 */
+    ...
+
+    /* 时基：50kHz 载波（APP_PWM_PERIOD_TICKS） */
+    ...
+
+    /* 通道：互补 PWM，默认 50% 占空比 */
+    ...
+
+    /* 死区 + COMP0 Break 硬件保护 */
+    bdt.AutomaticOutput = DDL_ATMR_AUTOMATICOUTPUT_ENABLE; // Break 解除后自动恢复输出
+    ...
+}
+```
+
+**粒度对照**：
+
+| 级别 | 做法 | 适用 |
+|------|------|------|
+| 过简 | 仅函数头，Init 内无分节 | ❌ 驱动 Init 不够 |
+| **标准** | 分节标题 + 少量关键行尾 `//` | ✅ 驱动 Init、SysClk |
+| 过详 | 每个字段、每行 DDL 都注释 | ❌ 噪音大，维护成本高 |
+
+### 三、.c 文件内分节注释
+
+**.c 使用一行短块注释**，不加等号装饰：
+
+```c
+/* 时钟常量 */
+
+/* CMSIS 系统变量 */
+
+/* 静态函数声明 */
+
+int main(void)
+{
+    /* 板级与外设初始化 */
+    Device_Config();
+
+    /* 主循环 */
+    while (1)
+    {
+        ...
+    }
+}
+```
+
+**`.c` 分节反例（禁止）**：
+
+```c
+/* ==================== 主循环 ==================== */  // ← 等号装饰仅用于 .h
 ```
 
 **分区原则**：
@@ -221,7 +354,7 @@ if ((processed & 0x0F) == 0)
 
 ### 四、头文件注释规范
 
-**头文件分节**（使用 `//=================== 标题 ===========================`，`=` 填充至行尾）：
+**`.h` 分节**（使用 `//=================== 标题 ===========================`，`=` 填充至行尾）——**仅头文件**：
 ```c
 //=================== 各维度数据有效标志（1=有效，0=无匹配从机） ===========================
 typedef struct { ... } wh_center_valid_t;
@@ -362,19 +495,19 @@ void f303_4g_init(void)
 #### 7.2 任务栈大小、优先级、句柄集中在 main.h
 
 ```c
-/* ==================== 任务栈大小（words） ==================== */
+//=================== 任务栈大小（words） ===========================
 #define TASK_STACK_ML307R 1024U // 4G 模块联网任务
 #define TASK_STACK_4GCTL  256U  // 4G 控制任务（订阅管理 + LED 刷新）
 #define TASK_STACK_MB4G   256U  // Modbus 从机任务
 #define TASK_STACK_DEBUG  256U  // 调试串口任务
 
-/* ==================== 任务优先级 ==================== */
+//=================== 任务优先级 ===========================
 #define TASK_PRIO_ML307R 5U
 #define TASK_PRIO_4GCTL  4U
 #define TASK_PRIO_MB4G   3U
 #define TASK_PRIO_DEBUG  4U
 
-/* ==================== 任务句柄 ==================== */
+//=================== 任务句柄 ===========================
 extern TaskHandle_t g_hdl_ml307r; // 4G 模块联网任务句柄
 extern TaskHandle_t g_hdl_4gctl;  // 4G 控制任务句柄
 extern TaskHandle_t g_hdl_mb4g;   // Modbus 从机任务句柄
@@ -528,15 +661,17 @@ void modbus_slave4g_task(void *arg)
 ### 单文件处理
 
 ```
+0. 若工程无 .clang-format → 同步 references/clang-format（见「工程格式化规则」）
 1. 读取目标文件完整内容
 2. 分析当前注释状态（已有哪些注释、格式是否规范）
-3. 按 .c 文件组织顺序检查分区：
+3. .c 文件：检查分节块、函数头、if/while/for/switch 块内 // 是否齐全
+4. 按 .c 文件组织顺序检查分区：
    - include → 私有宏 → 私有 typedef/enum → static 变量 → static 声明 → 公开函数 → 私有函数
-4. 为缺少函数头注释的函数添加标准注释
-5. 替换不规范的旧注释格式（如 /** @brief */、旧式 /*---...---*/）
-6. 在关键逻辑处添加行内注释
-7. 确保分节注释清晰
-8. 报告：添加/替换了多少个函数头注释，多少个行内注释
+5. 为缺少函数头注释的函数添加标准注释
+6. 替换不规范的旧注释格式（如 /** @brief */、旧式 /*---...---*/）
+7. 在控制流块内关键赋值/调用处添加 // 注释
+8. 确保分节注释清晰
+9. 报告：添加/替换了多少个函数头注释，多少个行内/块内注释
 ```
 
 ### 多文件并行处理
@@ -638,6 +773,58 @@ bool              uart_ready;    // 端口已初始化标志，幂等保护
 
 只在 1 处加注释会让其他 5 处显得"无依据"。
 
+## 工程格式化规则（clang-format，所有工程统一）
+
+注释整理与 **Ctrl+S 保存格式** 共用同一套规则。技能内置模板，执行 `/code_zl` 时**先同步到当前工程**，再改注释。
+
+### 同步步骤（每个工程首次或用户要求「同步格式化规则」时必做）
+
+1. 读取工程根目录是否已有 `.clang-format`、`.vscode/settings.json`
+2. 若**不存在**或与技能模板不一致 → 从本技能复制：
+   - `references/clang-format` → `<工程根>/.clang-format`
+   - `references/vscode-settings.json` → `<工程根>/.vscode/settings.json`（与已有 settings **合并**，勿覆盖无关项）
+3. 告知用户：**Reload Window** 后 Ctrl+S 生效；格式化器须为 **clangd**（不是 Microsoft C/C++）。F12 跳转与保存格式化的工程级配置见 `/clangd_init`。
+
+### 规则要点（与注释风格一致）
+
+| 场景 | 规则 |
+|------|------|
+| `.h` 函数声明 + 行尾 `//` | **单行**，禁止把参数拆到下一行（`ColumnLimit: 0`） |
+| 连续 `#define` | 宏名后**数值列对齐**，`//` **列对齐**（`AlignConsecutiveMacros` + `AlignTrailingComments`） |
+| `.h` API 声明 | 行尾 `//` 中文说明，不用函数头块注释 |
+| `if` / `while` / `for` / `else` | 条件行结尾，`{` **单独下一行**；`else` 单独一行 |
+| 简单保护分支 | 允许 `if (x) return;` 单行无大括号 |
+
+**`.h` 函数声明示例**：
+
+```c
+void BSP_PWM_SetDuty(uint16_t permille);            // 设置 CH0 占空比（0~1000 千分比）
+void BSP_PWM_SetFrequency(uint32_t frequency_hz);   // 改载波频率并保持当前占空比例
+```
+
+**`#define` 对齐示例**：
+
+```c
+#define APP_PWM_FREQUENCY_HZ       50000U                               // PWM 载波频率（Hz）
+#define APP_PWM_PERIOD_TICKS       (64000000U / APP_PWM_FREQUENCY_HZ)   // ATMR 计数周期（tick）
+#define APP_ADC_CHANNEL_COUNT      5U                                   // 规则组扫描通道数
+```
+
+**`.c` 大括号示例**：
+
+```c
+if (permille > 1000U)
+{
+    permille = 1000U;
+}
+```
+
+### 整理注释时的格式配合
+
+- 宏块、结构体字段、`.h` API：按上表**手动对齐**列宽，保存后 clang-format 会维持
+- **禁止**为对齐去改逻辑；仅空格与注释
+- 完整模板见 [references/clang-format](references/clang-format)
+
 ## 代码规范速查（来自 docs/代码规范.md）
 
 ### 命名规范
@@ -661,7 +848,7 @@ bool              uart_ready;    // 端口已初始化标志，幂等保护
 - 当 static 函数较多时，按调用层次分组，每组前加一行 `/* —— 分组名 —— */`：
 
 ```c
-/* ==================== 静态函数声明（按调用层次分组） ==================== */
+/* 静态函数声明 */
 /* —— UART ISR 与底层收发 —— */
 static void ss_isr_handler(ss_port_t port);
 static bool ss_tx_start(ss_port_t port, const uint8_t *data, size_t len);

@@ -1,0 +1,38 @@
+# 嵌入式 C 工程 clang-format（code_zl 标准模板）
+#
+# .h：函数声明 + 行尾中文注释保持单行（ColumnLimit: 0，不拆参数）
+# .h/.c：连续 #define 宏名/数值列对齐，行尾 // 注释对齐
+# .c：if / while / for / else 后左大括号换行并缩进
+---
+BasedOnStyle: LLVM
+ColumnLimit: 0
+IndentWidth: 4
+UseTab: Never
+TabWidth: 4
+
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllArgumentsOnNextLine: false
+BinPackParameters: true
+BinPackArguments: true
+AlwaysBreakAfterReturnType: None
+PenaltyBreakBeforeFirstCallParameter: 1000000
+
+AlignTrailingComments: true
+AlignConsecutiveMacros: Consecutive
+ReflowComments: false
+
+SortIncludes: false
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterControlStatement: Always
+  AfterFunction: true
+  BeforeElse: true
+  AfterStruct: false
+  AfterUnion: false
+  AfterEnum: false
+  SplitEmptyFunction: false
+
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortBlocksOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: WithoutElse

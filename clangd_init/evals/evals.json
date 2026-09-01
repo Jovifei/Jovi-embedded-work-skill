@@ -1,15 +1,16 @@
 {
   "skill_name": "clangd_init",
+  "version": "V1.1.0",
   "evals": [
     {
       "id": 1,
       "prompt": "/clangd_init 这个 Keil 工程 F12 跳不到驱动实现，保存也不格式化。",
-      "expected_behavior": "Should probe uvprojx, existing compile_flags/compile_commands/.clangd/.clang-format, pick one activity Target if multiple exist, generate or reuse a local compilation database without mixing AP/IAP macros, enable clangd format-on-save using [c] not [h], then require a call-site F12 Location and a single-file save diff. Must not format the whole repo or change firmware PWM/watchdog logic."
+      "expected_behavior": "Should probe uvprojx, existing compile_flags/compile_commands/.clangd/.clang-format, pick one activity Target if multiple exist, generate or reuse a local compilation database without mixing AP/IAP macros, enable clangd format-on-save using [c] not [h] and files.associations *.h=c, then require a call-site F12 Location and a single-file save diff. Must not format the whole repo or change firmware PWM/watchdog logic. Formatter must be clangd, not Microsoft C/C++."
     },
     {
       "id": 2,
       "prompt": "工程里已有 compile_commands.json 和 .clang-format，只要修跳转。",
-      "expected_behavior": "Should reuse the existing compilation database and .clang-format, not rewrite them, not force Allman, and verify with clangd --check plus a real call-site definition Location."
+      "expected_behavior": "Should reuse the existing compilation database and .clang-format, not rewrite them, not force Allman or the Jovi template, and verify with clangd --check plus a real call-site definition Location."
     },
     {
       "id": 3,
@@ -20,6 +21,11 @@
       "id": 4,
       "prompt": "clangd --check 报找不到 stdio.h，请补齐所有标准库头。",
       "expected_behavior": "Should add only the missing header shim under .clangd-support/include after the diagnostic, not a pile of unused stdlib headers, and must not edit production includes."
+    },
+    {
+      "id": 5,
+      "prompt": "新工程没有 .clang-format，按 Jovi 规范配置 Ctrl+S 格式化。",
+      "expected_behavior": "Should copy code_zl/references/clang-format (ColumnLimit 0, AlignConsecutiveMacros, AfterControlStatement Always), merge vscode settings so clangd is the [c] formatter, associate *.h as c, tell the user to Reload Window, and verify a .h declaration+trailing comment stays on one line after save."
     }
   ]
 }
