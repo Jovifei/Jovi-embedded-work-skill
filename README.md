@@ -1,6 +1,6 @@
 # Jovi Embedded Work Skills
 
-> 嵌入式工程开发与 Windows 工作环境维护 Claude Code Skills 集合 — 新工程一键初始化、文档自动化、clangd 跳转与格式化、代码注释标准化、日报生成与 C 盘数据整理。
+> 嵌入式工程开发、Android 交付与 Windows 工作环境维护 Claude Code Skills 集合 — 新工程一键初始化、文档自动化、代码质量、Android 构建安装调试、日报生成与 C 盘数据整理。
 
 专为嵌入式 C 工程（GD32/STM32/ESP32 + FreeRTOS + Modbus/CAN/UART）设计，开箱即用。
 
@@ -17,7 +17,10 @@ jovi-embedded-work/
 ├── day_sum/                   # 开发日报生成
 ├── child-claude/              # 多模型派发编排（父规划+审核，子执行）
 ├── codex-memory/              # 安全项目永久记忆（Obsidian / staging）
-└── c-pan-reorganize/          # C 盘应用数据迁移 + 更新包/缓存安全清理
+├── c-pan-reorganize/          # C 盘应用数据迁移 + 更新包/缓存安全清理
+├── android-app-delivery/      # Android 制作、构建、安装与调试总控
+├── android-build-release/     # Android 测试、构建、签名与 APK 校验
+└── android-device-verify/     # ADB 预检、保留数据安装与设备调试
 ```
 
 ---
@@ -319,6 +322,22 @@ Constraint: <约束，如只创建文件不跑命令>
 
 ---
 
+### 11. Android App Skill Suite — Android 制作、安装与调试
+
+**版本：** v0.1.0（首次发布）
+
+这组三层 skill 面向 Windows PowerShell，支持 Gradle/Compose、Flutter、React Native：
+
+| Skill | 用途 |
+|------|------|
+| `android-app-delivery` | 接收项目路径和主题，协调识别、环境、构建、签名、安装、调试和结构化报告 |
+| `android-build-release` | 独立完成工具链、测试、lint、APK 构建及 `aapt2`/`apksigner` 校验 |
+| `android-device-verify` | 独立完成 ADB serial 预检、同签名 `adb install -r` 覆盖安装和限定日志采集 |
+
+实体设备只允许保留数据的同签名 Release 覆盖安装；解锁、登录、验证码、Tesla 授权、虚拟钥匙和系统权限由用户人工完成。缺少系统级工具、包名或签名证据时，skill 会暂停并报告阻断原因。
+
+---
+
 ## 安装
 
 ### 方式一：git clone（推荐）
@@ -339,6 +358,9 @@ xcopy /E /I day_sum %USERPROFILE%\.claude\skills\day_sum
 xcopy /E /I child-claude %USERPROFILE%\.claude\skills\child-claude
 xcopy /E /I codex-memory %USERPROFILE%\.claude\skills\codex-memory
 xcopy /E /I c-pan-reorganize %USERPROFILE%\.claude\skills\c-pan-reorganize
+xcopy /E /I android-app-delivery %USERPROFILE%\.claude\skills\android-app-delivery
+xcopy /E /I android-build-release %USERPROFILE%\.claude\skills\android-build-release
+xcopy /E /I android-device-verify %USERPROFILE%\.claude\skills\android-device-verify
 
 # macOS / Linux
 cp -r project-init ~/.claude/skills/
@@ -351,6 +373,9 @@ cp -r day_sum ~/.claude/skills/
 cp -r child-claude ~/.claude/skills/
 cp -r codex-memory ~/.claude/skills/
 cp -r c-pan-reorganize ~/.claude/skills/
+cp -r android-app-delivery ~/.claude/skills/
+cp -r android-build-release ~/.claude/skills/
+cp -r android-device-verify ~/.claude/skills/
 ```
 
 ### 方式二：直接下载
