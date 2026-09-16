@@ -1,0 +1,11 @@
+digraph function_flow {
+  graph [rankdir=TB, bgcolor="white", label="{{FUNCTION_TITLE}}", labelloc=t, fontname="sans-serif", fontsize=18, pad=0.25, nodesep=0.35, ranksep=0.5];
+  node [shape=box, style="rounded,filled", fillcolor="#eef5f6", color="#37606c", fontname="sans-serif", fontsize=12, margin="0.16,0.1"];
+  edge [fontname="sans-serif", fontsize=11, color="#4c6770", arrowsize=0.7];
+  start [shape=oval, label="{{ENTRY}}"];
+  check [shape=diamond, label="{{CONDITION}}"];
+  fail [label="{{FALSE_ACTION}}"];
+  work [label="{{TRUE_ACTION}}"];
+  end [shape=oval, label="{{RETURN}}"];
+  start -> check; check -> fail [label="否"]; check -> work [label="是"]; fail -> end; work -> end;
+}

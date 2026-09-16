@@ -1,0 +1,19 @@
+{
+  "status": "NOT_RUN",
+  "reviewer": "",
+  "content_digest": "",
+  "checks": [
+    {"id":"original_function_body_fidelity","status":"NOT_RUN","notes":"核对函数页第1节是否完整原样展示函数体与原注释。"},
+    {"id":"scope","status":"NOT_RUN","notes":""},
+    {"id":"code_explanation","status":"NOT_RUN","notes":""},
+    {"id":"annotated_source_fidelity","status":"NOT_RUN","notes":""},
+    {"id":"control_flow","status":"NOT_RUN","notes":""},
+    {"id":"calls_and_events","status":"NOT_RUN","notes":""},
+    {"id":"parameters_units","status":"NOT_RUN","notes":""},
+    {"id":"source_fidelity","status":"NOT_RUN","notes":""},
+    {"id":"learning_and_deep_dive","status":"NOT_RUN","notes":""},
+    {"id":"visual_and_readability","status":"NOT_RUN","notes":""},
+    {"id":"evidence_limits","status":"NOT_RUN","notes":""}
+  ],
+  "limitations": []
+}

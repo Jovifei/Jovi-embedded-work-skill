@@ -1,0 +1,14 @@
+{
+  "project": "请填写真实工程名",
+  "book_id": "worktree-study-001",
+  "baseline_label": "请填写实际基线：提交/ZIP/工作区与版本，不预设最新main",
+  "language": "zh-CN",
+  "include": ["src/**/*.c", "include/**/*.h"],
+  "exclude": ["**/vendor/**", "**/generated/**"],
+  "encoding_overrides": {},
+  "snapshot_mode": "selected",
+  "max_file_bytes": 2097152,
+  "max_total_bytes": 33554432,
+  "delivery_mode": "project-directory",
+  "generate_archive": false
+}

@@ -1,0 +1,7 @@
+digraph module_calls {
+  graph [rankdir=TB, label="{{MODULE_TITLE}}", labelloc=t, fontname="sans-serif", fontsize=18];
+  node [shape=box, style=rounded, fontname="sans-serif", fontsize=12];
+  edge [fontname="sans-serif", fontsize=11];
+  caller [label="{{CALLER}}"]; api [label="{{API}}"]; helper [label="{{HELPER}}"]; callback [label="{{CALLBACK}}"]; event [shape=ellipse, label="{{EVENT}}"];
+  caller -> api [label="直接调用"]; api -> helper [label="直接调用"]; api -> callback [style=dashed, label="注册（写明条件）"]; event -> callback [style=dotted, label="分发/事件（另列证据）"];
+}

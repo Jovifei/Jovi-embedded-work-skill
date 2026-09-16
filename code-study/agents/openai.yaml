@@ -1,0 +1,6 @@
+interface:
+  display_name: "Code Study｜源码学习资料"
+  short_description: "在项目docs内生成逐模块逐函数Markdown、SVG、阶段学习与搜索"
+  default_prompt: "使用 $code-study，每函数先在第1节完整展示原函数体与原注释，第5节再采用真实代码加中文学习注释解释作用与为什么，不输出语句清单；直接在当前项目 docs/code-study/<本次源码基线>/ 生成并维护完整Markdown文章、SVG、核心专题、阶段学习和唯一离线全文搜索页；不打包ZIP，不修改业务代码，完成后报告本地路径及验证状态。"
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Code Study · 全文搜索</title><link rel="stylesheet" href="assets/style.css"></head>
+<body>
+<header><div class="eyebrow">CODE STUDY / SOURCE-BACKED LEARNING</div><h1>源码学习 · 全文搜索</h1><p>文章保留为 Markdown，图保留为 SVG。这里仅搜索正文与定位路径，不复制生成文章网页。</p><p id="baseline" class="baseline"></p><nav><a href="README.md">阅读指南</a></nav></header>
+<main>
+<section class="notice"><strong>在 Obsidian、VS Code 或 GitHub 中阅读 .md。</strong><p>本地浏览器可能直接显示或下载 Markdown。使用“复制路径”定位文章；源码跳行以文中函数名与行号为准。此页面完全离线。</p></section>
+<form id="search-form"><label class="query-label" for="query">函数、参数或中文关键词<input id="query" type="search" placeholder="例如：初始化 状态机　或完整函数名" autocomplete="off"></label><label for="kind">范围<select id="kind"><option value="">全部</option><option>阶段</option><option>模块</option><option>函数</option><option>专题</option><option>说明</option><option>源码</option></select></label><button class="primary" type="submit">搜索</button><button id="reset" type="button">重置</button></form>
+<p id="status" role="status" aria-live="polite">正在读取本地索引…</p><section id="results" aria-label="搜索结果"></section><p id="empty" hidden>没有匹配结果。减少关键词，或使用源码标识符。</p><button id="more" type="button" hidden>继续显示</button>
+<noscript>JavaScript已关闭，请打开README.md或使用编辑器搜索。</noscript>
+<footer>搜索命中不代表实现经过验证；文档检查、编译测试和实物验收分别记录。没有服务器、CDN、遥测或在线字体。</footer>
+</main><script src="assets/search-index.js"></script><script src="assets/search.js"></script></body></html>
