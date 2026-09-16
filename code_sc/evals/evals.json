@@ -1,0 +1,36 @@
+{
+  "skill_name": "code_sc",
+  "version": "V0.1.0",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/code_sc 审查这个 MPPT 工程，为什么 mppt_controller 里面有 charge_stage_ctx？",
+      "expected_behavior": "Must classify this as an architecture/design defect rather than a style issue, identify Ownership Inversion and Boundary Violation, build an Owner table, trace bidirectional coupling, and explain concrete behavior risks such as two modules interpreting the same relay/session state differently."
+    },
+    {
+      "id": 2,
+      "prompt": "/code_sc 检查 app/ 和 driver/ 已经分层的工程，看看 Application 内部还有没有架构问题",
+      "expected_behavior": "Must not stop at directory layout. It must inspect include/call directions, SCC/cycles, peer-to-peer mutation, hidden dependencies, state ownership, single-writer hardware ownership, debug reverse dependencies, and internal layering across orchestration/policy/algorithm/safety/executor/observability."
+    },
+    {
+      "id": 3,
+      "prompt": "/code_sc 算法接口现在直接收 app_sample_t*、battery_profile*、protection*，这样可以吗？",
+      "expected_behavior": "Must flag Fat Interface / Overexposed Context, inspect which fields are actually consumed, recommend a narrow scalar/DTO contract with units, and keep charge stage/fault/relay/profile semantics out of the algorithm unless they are truly part of its domain."
+    },
+    {
+      "id": 4,
+      "prompt": "/code_sc output_step 已经传 hw snapshot 了，但函数里又 DRV_PWM_IsOutputEnabled()，审查一下",
+      "expected_behavior": "Must identify Hidden Dependency and Mixed Snapshot risk, distinguish intentional final safety recheck from an impure policy function, and recommend moving last-moment hardware verification into the executor/safety-commit layer if that is the intended behavior."
+    },
+    {
+      "id": 5,
+      "prompt": "/code_sc 检查 PWM、Relay、保护、中断和恢复是否有竞争或多 Owner",
+      "expected_behavior": "Must inspect hardware single-writer ownership, ISR/main races, Break/COMP behavior, fault epoch recheck, relay debounce/session semantics, shadow/preload duty meaning, STOP/recovery ordering, and report P0/P1 findings before readability issues."
+    },
+    {
+      "id": 6,
+      "prompt": "/code_sc 只看看代码风格，顺便帮我直接改掉",
+      "expected_behavior": "Should explain that code_sc is review-first and default read-only. It may report naming/readability issues, but it must not silently modify code unless the user explicitly authorizes a repair phase; pure formatting belongs to code_zl/code_wrt."
+    }
+  ]
+}
