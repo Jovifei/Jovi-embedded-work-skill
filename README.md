@@ -6,14 +6,13 @@
 
 ## 当前版本（2026-09-16）
 
-本次新增 `code_sc`，并把 `code_wrt` 升级为带架构写入门禁的 V0.2.0。
+本次推送只更新下面四项；其余 skill 版本不变。
 
 | Skill | 版本 | 相对 GitHub 上一版 |
 |---|---|---|
-| `code_sc` | **V0.1.0** | 新增：Owner/边界/依赖环/调用关系/DTO/API/并发/硬件安全深度审查 |
-| `code_wrt` | **V0.2.0** | V0.1.5 → 强制 code_sc 前后双门禁，防止写出 Owner 倒置、Fat Interface、peer mutation 等结构缺陷 |
 | `update-project-docs` | **V1.1.0** | V1.0.0 → 全树清单、代码 diff 驱动、介绍面完成门 |
 | `code_zl` | **V0.1.8** | V0.1.0 → 白话注释、先定义再使用、`// todo:`、任务目录注释 |
+| `code_wrt` | **V0.1.5** | V0.1.0 → 结构/节拍门禁、固件版本门禁；第二阶段对齐 **code_zl V0.1.8** |
 | `prj_zl` | **V0.1.0** | 号未升；与本地核对后同步（Keil `app/driver` 四层） |
 | `clangd_init` | V1.1.0 | 本次未改 |
 
@@ -21,14 +20,13 @@
 
 ## Skills 总览
 
-```text
+```
 jovi-embedded-work/
 ├── project-init/              # 一键初始化工程工具链
 ├── update-project-docs/       # 文档 bootstrap + 日常维护
 ├── clangd_init/               # clangd 函数跳转 + 保存格式化
 ├── code_zl/                   # C 代码注释标准化
-├── code_sc/                   # 嵌入式架构/调用/并发/硬件安全深度审查
-├── code_wrt/                  # code_sc 门禁 + Ponytail + code_zl + code_sc 复审
+├── code_wrt/                  # Ponytail 简化 + code_zl 注释整理
 ├── prj_zl/                    # Keil 工程 app/driver 目录重组
 ├── day_sum/                   # 开发日报生成
 ├── child-claude/              # 多模型派发编排（父规划+审核，子执行）
@@ -56,8 +54,20 @@ jovi-embedded-work/
 | openspec（可选） | `openspec init` | `.openspec/` 目录 |
 
 **示例：**
-```text
+```
 /project-init D:\work\my-new-embedded-project
+```
+
+**输出：**
+```
+## 项目初始化检测
+
+| # | 工具 | 状态 | 将执行 |
+|---|------|------|--------|
+| 1 | CodeGraph | ❌ 未初始化 | codegraph init |
+| 2 | code-review-graph | ❌ 未初始化 | code-review-graph init --yes + build |
+| 3 | update-project-docs | ❌ 未初始化 | bootstrap 文档脚手架 |
+| 4 | comet | ❌ 未初始化 | comet init --yes |
 ```
 
 ---
@@ -68,19 +78,41 @@ jovi-embedded-work/
 
 **触发词：** `/update-project-docs`、`更新文档`、`初始化文档`、`setup docs`、`文件介绍`、`文档过期`
 
-**功能：** 嵌入式工程文档全生命周期管理。首次运行只搭 5 个默认目录，后续按代码证据做 Full Refresh。
+**功能：** 嵌入式工程文档全生命周期管理。首次运行只搭 **5 个默认目录**，禁止生成 11 个空类型文件夹。后续进入 6 阶段文档维护工作流。
 
-默认目录：
+V1.1.0：裸 `/update-project-docs` 或代码刚改完走 **Full Refresh**——`docs/` 下每个 `.md` 都要有结论；先读 `SOFT_VERSION` 和关键宏，再回写 README/GUIDE/`00-阅读指引` 的文件介绍。禁止只改几篇专题就声称全部完成。
+
+**默认目录：**
 
 ```text
 docs/
 ├── README.md
 ├── GUIDE.md
-├── 00-REF-参考/
-├── 01-ARC-架构/
-├── 02-SOP-操作/
-├── 03-DBG-问题/
-└── 04-LOG-记录/
+├── 00-REF-参考/     # 手册、原理图、协议表、参数表
+├── 01-ARC-架构/     # 当前固件怎么工作
+├── 02-SOP-操作/     # 编译、烧录、台架；IDE 跳转见 /clangd_init
+├── 03-DBG-问题/     # 一篇一个故障
+└── 04-LOG-记录/     # 开发日志、审计、交接
+```
+
+不预建：REQ / COM / PLN / WORK / TST / RPT / TOD / STUD。空目录不写 `00-阅读指引.md`。
+
+**Bootstrap（首次运行）：** 扫描工程结构后，用户确认再写盘：
+
+| 文件 | 内容 |
+|------|------|
+| `docs/GUIDE.md` | 命名 `{NN}-{TYPE}-{title}.md`、5 目录规则、信任标记、质量检查 |
+| `docs/README.md` | 文档入口、5 目录索引、信任规则 |
+| `docs/01-ARC-架构/01-ARC-系统架构.md` | 模块关系、任务/主循环、数据流、硬件分配 |
+| `CLAUDE.md` | 仅当根目录没有 `CLAUDE.md`/`AGENTS.md` 时创建，不覆盖已有 `AGENTS.md` |
+
+**日常维护（6 阶段工作流）：**
+1. 读取入口文档 → 2. 提取工程元素 → 3. 收集代码证据 → 4. 设计变更 → 5. 写入文档 → 6. 验证
+
+**示例：**
+```
+/update-project-docs 初始化文档
+/update-project-docs 总结 Modbus 协议变更，更新 docs/00-REF-参考/01-REF-Modbus协议.md
 ```
 
 ---
@@ -91,7 +123,28 @@ docs/
 
 **触发词：** `/clangd_init`
 
-**功能：** 为当前嵌入式 C/C++ 工作区配置可验证的 clangd 函数跳转、查找引用和保存格式化。只读探查后按当前工程生成最小配置；不改生产固件逻辑，不全仓格式化。
+**功能：** 为当前嵌入式 C/C++ 工作区配置可验证的 clangd 函数跳转、查找引用和保存格式化。只读探查后按当前工程生成最小配置；不改生产固件逻辑，不全仓格式化。无 `.clang-format` 且确认 Jovi 规范时，使用 **code_zl V0.1.0** 模板（`ColumnLimit: 0`、宏对齐、控制语句 `{` 换行）；格式化器必须是 clangd。
+
+**验收：**
+
+- 跨文件**调用点** F12 返回实际 Location（C 可能先到 `.h` 声明，索引后再到 `.c` 实现）
+- 保存一个手工维护的 `.c` / `.h` 时，格式遵循 `.clang-format`，`.h` 声明+行尾 `//` 保持单行，且没有无关文件被改写
+- `clangd --check` 只证明解析，不能单独当作跳转成功
+
+**规则摘要：**
+
+- `compile_commands.json` 与 `compile_flags.txt` 二选一或共存，不无条件生成两份
+- 多 Target 必须先选定一个，禁止混合 AP/IAP 的宏和源文件
+- 已有 `.clang-format` 不覆盖；新建时优先 code_zl 模板，不把精简 Allman 强加给已有工程
+- `*.h` 关联为 `c`，`[c]` 使用 clangd 作为默认 formatter；配置后 Reload Window
+- `compile_commands.json` 本地生成并 gitignore；受版本控制的 flags 不得含本机绝对路径
+
+**示例：**
+```
+/clangd_init
+```
+
+完成后执行 `Clangd: Restart language server`，再在调用点按 F12。
 
 ---
 
@@ -101,9 +154,9 @@ docs/
 
 **触发词：** `/code_zl`、`代码整理`、`注释整理`、`添加注释`、`批量注释`、`白话注释`
 
-**功能：** 为嵌入式 C 工程添加标准化注释，遵循 Jovi 代码规范。纯注释/格式整理走本 skill；结构改写走 `/code_wrt`。
+**功能：** 为嵌入式 C 工程添加标准化注释，遵循 Jovi 代码规范。支持单文件和多文件并行处理。Ctrl+S 格式化与 `clangd_init` 共用 `.clang-format` 模板。注释必须白话；未上板行用 `// todo:`。结构改写仍走 `/code_wrt`。
 
-函数头格式：
+**注释格式：**
 
 ```c
 /*---------------------------------------------------------------------------
@@ -112,138 +165,192 @@ docs/
                len - 帧长度（字节）
  Output      : 无
  Description : 解析 Modbus RTU 响应帧，提取寄存器值写入 dev_para。
+               持 eeprom_mutex，阻塞等待信号量。
 ---------------------------------------------------------------------------*/
 ```
 
----
-
-### 5. code_wrt — 代码编写/简化/重构 + 架构门禁
-
-**版本：** V0.2.0
-
-**触发词：** `/code_wrt`、`写代码`、`代码简化整理`、`简化并注释`、`重构并整理`
-
-**固定工作流：**
-
-```text
-code_sc(pre-write design gate)
-        -> ponytail / implementation
-        -> code_zl V0.1.8
-        -> code_sc(post-write architecture gate)
-```
-
-V0.2.0 新增的核心限制：
-
-- 一个状态/决策只有一个 Owner；
-- `app/driver` 分层后还要检查 Application 内部 orchestration/policy/algorithm/safety/executor/observability；
-- 跨模块只传必要 DTO/标量，不把 `sample/profile/protection/controller` 整体扔给算法；
-- 公共头只暴露稳定合同，PI/search/private ctx 放私有头；
-- 禁止 Algorithm -> Charge Stage/Protection/Driver 逆向依赖；
-- 禁止 `charge/protection/output` peer-to-peer mutation 继续扩散；
-- PWM/Relay 等关键硬件只有一个主循环写出口；
-- 参数不能一值多义，例如 `0` 不能同时代表 hard-stop 和 soft-zero；
-- 控制量区分 `candidate -> approved -> committed -> hardware`；
-- 写完必须再用 `code_sc` 检查依赖环、Fat Interface、隐藏依赖、多写点、死接口。
+**处理范围：**
+- 函数头注释：标准 Name/Input/Output/Description 格式
+- 行内注释：`//` 中文，说明"为什么这样做"
+- **`.c` 分节**：`/* 主循环 */`（短标题，禁止 `====` 装饰）
+- **`.h` 分节**：`//=================== 标题 ===========================`
+- 驱动 Init：分节标题说明「配了什么」+ 少量关键行尾 `//`，不逐行注释寄存器
+- `.h` 文件：每个宏/枚举/结构体字段、API 声明必须有行尾 `//`
 
 **示例：**
-```text
-/code_wrt Application/app/src/mppt.c Application/app/src/charge.c
+```
+/code_zl src/modbus.c src/can.c inc/main.h
+代码整理（自动检测 git diff 暂存区文件）
 ```
 
 ---
 
-### 6. code_sc — 嵌入式深度代码审查
+### 5. code_wrt — 代码简化与注释整理
 
-**版本：** V0.1.0
+**版本：** V0.1.5
 
-**触发词：** `/code_sc`、`代码审查`、`架构审查`、`调用关系审查`、`模块边界审查`、`ownership review`
+**触发词：** `/code_wrt`、`代码简化整理`、`简化并注释`、`简化并整理`
 
-**功能：** 找“代码能跑，但架构已经写歪”的问题。默认只读，不直接改代码。
+**功能：** 固定按 `ponytail → code_zl` 执行。先做最小的行为保持式简化，再使用 **code_zl V0.1.8** 整理嵌入式 C 的注释、分节和格式。两阶段不可交换，也不可只执行其中一个阶段。触碰会进镜像的行为时，收工前升 `SOFT_VERSION` 并追加 `docs/版本更改/`。
 
-重点审查：
-
-- Ownership Inversion：子模块/controller 拥有不属于自己的业务状态机；
-- Boundary Violation：算法知道 Charge Stage、Protection、Driver；
-- Distributed State Machine：同一 Relay/Fault/Session 被两个模块用不同规则解释；
-- Bidirectional Semantic Coupling：Stage 命令清算法 integral，算法状态又决定 Stage 是否恢复；
-- Dependency Cycle/SCC：目录分层但 include/call graph 仍成环；
-- Fat Interface：整个 `app_sample_t*` / profile / protection context 跨模块乱传；
-- Type Ownership Error：类型定义在错误 header，逼出逆向 include；
-- Hidden Dependency / Mixed Snapshot：函数已传 snapshot，内部又读 driver/latest；
-- Multiple Sources of Truth：300W/PV×I/BAT×I 等限制多处重复重算；
-- Peer-to-Peer Mutation：同层模块互相 setter；
-- Semantic Overloading：同一值/flag 多种含义；
-- Dead Contract / Zombie Interface：永远不产生的 action、永远 false 的 flag、迁移残留；
-- PWM/Relay/COMP Break/ADC DMA/ISR/main 并发和恢复安全。
-
-**典型输出：**
-
-```text
-P1 Ownership Inversion:
-mppt_controller -> owns charge_stage_ctx
-应有 Owner: charge_stage.c / charge.c
-风险: MPPT 与 Charge FSM 会分别解释 Relay/session 生命周期，产生不同 reset 时机
-整改: Stage 留 Application；算法只吃窄 DTO，返回 candidate Duty；Application 再审核
-```
+**边界：** 保留公开接口、协议语义、硬件访问顺序、RTOS 时序、并发保护和错误处理；不确定简化是否等价时保留原代码并继续整理注释。Init 注释遵循 code_zl 分节粒度。
 
 **示例：**
-```text
-/code_sc 审查 charge/mppt/protection/output 的 Owner、依赖和 PWM 安全
+```
+/code_wrt src/modbus.c src/can.c
 ```
 
 ---
 
-### 7. prj_zl — Keil 工程 app/driver 目录重组
+### 6. prj_zl — Keil 工程 app/driver 目录重组
 
 **版本：** V0.1.0
 
 **触发词：** `/prj_zl`、`工程整理`、`目录整理`、`应用驱动分离`、`app/driver 分层`
 
-**功能：** 将 `Application` / `Bootloader` 整理为 `app/inc`、`app/src`、`driver/inc`、`driver/src`、`Project/MDK` 标准结构。注意：`prj_zl` 只解决物理目录分层；Application 内部责任边界由 `code_sc/code_wrt` 继续约束。
+**功能：** 将 `Application` / `Bootloader` 从 `Config/`、`Include/`、`Source/` 整理为 `app/inc`、`app/src`、`driver/inc`、`driver/src`、`Project/MDK` 标准结构。用 `git mv` 保留历史，同步 Keil `IncludePath`、`FilePath`、分组；支持 `IAP_Application1` → `IAP_Application` 重命名。**不改代码逻辑**，目录整理后与 **code_zl** 配对做注释。
+
+**目标结构：**
+```
+<FirmwareRoot>/
+├─ app/inc、app/src      # 业务层
+├─ driver/inc、driver/src # BSP/板级驱动
+└─ Project/MDK/          # Keil 工程与 startup
+```
+
+**示例：**
+```
+/prj_zl Application Bootloader
+/prj_zl Application
+```
 
 ---
 
-### 8. day_sum — 开发日报生成
+### 7. day_sum — 开发日报生成
 
 **触发词：** `/day_sum`、`总结日报`、`daily summary`、`work summary`
 
-**功能：** 从开发记录文件或 git log 生成结构化日报，按“发现问题 -> 分析 -> 解决”组织。
+**功能：** 从开发记录文件或 git log 生成结构化日报，按"发现问题 → 分析 → 解决"组织。
+
+**输出格式：**
+```markdown
+## 5.11 5.20
+
+### 5.11.1 IoT 影子变量自动推送 + PIID 类型修复
+
+1. 发现问题：`iot_task()` 只处理被动下发和定时上报，缺少主动检测本地变化的能力。
+2. 分析：参考 ESP32S3 `cloud.c` 的 23 个影子变量模式，移植到 GD32。
+3. 解决：
+ - 实现 `shadow_poll_and_publish()`，10 个影子变量每 100ms 对比变化
+ - 新增 `set_prop_int()` helper，修正 8 个 PIID 类型
+```
+
+**示例：**
+```
+/day_sum 总结 docs/开发记录.md
+总结今天的工作
+总结 5.20 和 5.21 的工作
+```
 
 ---
 
-### 9. child-claude — 多模型派发编排
+### 8. child-claude — 多模型派发编排
 
 **触发词：** `/child-claude`、`派给子claude`、`用mimo干`、`换便宜模型`、`delegate to child claude`
 
-**功能：** 父 Claude 规划/审核，把执行工作派发给子 Claude。
+**功能：** 父 claude（规划+审核）把执行工作派发给子 claude（走便宜模型如 MiMo/DeepSeek），省 token。通过 `--settings` 覆盖切换模型，每次独立会话 + prompt caching 走缓存价。
+
+**核心特性：**
+- `-Profile` 切换模型（mimo / mimo-official / 自定义 profile）
+- `-WorkingDirectory` 硬失败防误改别的工作区
+- `-ResumeId` 复用会话（仅依赖任务）
+- `Stderr`（清洗）+ `RawStderr`（原始）双字段捕获错误
+- profile token 用 `$VAR_NAME` 环境变量引用，无明文泄露
+
+**示例：**
+```
+/child-claude 用 mimo 在 E:\repo 写个加法函数+测试
+
+# 脚本调用
+Invoke-ChildClaude -Task "写 add(a,b)" -Profile mimo -WorkingDirectory "E:\repo"
+```
+
+**派发单模板：**
+```
+Task: <具体描述>
+Path: <文件路径>
+Path boundary: only touch files under <dir>
+Acceptance: <验收标准，如 test.py 跑通>
+Constraint: <约束，如只创建文件不跑命令>
+```
+
+**省 token 策略：**
+- 独立任务 → 新会话（默认，前缀走缓存价）
+- 依赖任务 → `-ResumeId` 复用
+- 失败重做 → 通常新会话（避免继承错误上下文）
+
 
 ---
 
-### 10. codex-memory — 安全项目永久记忆
+### 9. codex-memory — 安全项目永久记忆
 
 **触发词：** `/codex-memory`、`加载项目记忆`、`归档项目记忆`、`Obsidian memory`、`project memory`
 
-**功能：** 提供读取 -> 工作 -> 归档 -> 复盘的项目记忆闭环。
+**功能：** 提供“读取 → 工作 → 归档 → 复盘”的项目记忆闭环：任务前加载受限的项目上下文；任务后把已验证的计划、进度、决策与工作流投影到受管 Obsidian 笔记；每日复盘仅聚合脱敏的成功归档事件。
+
+**安全边界：**
+
+- 项目与验证证据是事实源；Obsidian 只接收投影，绝不反向改写项目。
+- 首次 `home` setup 必须显式提供 Vault 根目录，仓库不携带、推断或读取个人路径。
+- `company` profile 默认 fail-closed：没有获批准的 memory root 时，仅允许策略许可的本地 staging。
+- 写入先 `--dry-run`，使用哈希与受管区块保留手写内容；双侧变更时报告 `CONFLICT`，不覆盖。
+- Obsidian MCP 是可选增强，文件系统路径不可用时也不会绕过策略。
+
+**快速开始：**
+
+```
+/codex-memory setup --profile home（同时提供你的 Obsidian Vault 根目录）
+/codex-memory load
+/codex-memory --dry-run
+/codex-memory review
+```
+
+> 当前自动化脚本面向 Windows PowerShell 5.1+；Hook 与每日计划任务安装器默认只预览，必须完成对应人工验证后再显式启用。
 
 ---
 
-### 11. c-pan-reorganize — C 盘数据整理
+### 10. c-pan-reorganize — C 盘数据整理
 
 **触发词：** `C盘清理`、`C盘空间不足`、`迁移应用数据到D盘`、`清理更新包`、`清理安全缓存`
 
-**功能：** 审核 C 盘应用数据并做经授权的安全迁移/清理。
+**功能：** 审核 C 盘应用数据，将已授权且不在运行的数据迁移到 `D:\Document` 或 `D:\Documents` 的独立目录，并保留原路径 junction；同时区分可清理更新包、可重建缓存和必须保护的聊天数据库、项目数据、凭据及系统文件。
+
+**安全边界：**
+
+- 清理更新包或缓存不等于卸载软件；卸载/重装必须单独明确授权。
+- 迁移前确认应用已退出、目标目录不冲突，迁移后核对 junction、文件数、字节数与 C/D 盘空间。
+- 不手动删除 `pagefile.sys`、`hiberfil.sys`、`$WinREAgent`、活动数据库或当前聊天记录。
+
+**示例：**
+```
+/c-pan-reorganize 审核 C 盘可清理缓存，并将飞书和钉钉数据迁移到 D:\Document
+```
 
 ---
 
-### 12. Android App Skill Suite — Android 制作、安装与调试
+### 11. Android App Skill Suite — Android 制作、安装与调试
 
-**版本：** v0.1.0
+**版本：** v0.1.0（首次发布）
+
+这组三层 skill 面向 Windows PowerShell，支持 Gradle/Compose、Flutter、React Native：
 
 | Skill | 用途 |
-|---|---|
-| `android-app-delivery` | 协调识别、环境、构建、签名、安装、调试和报告 |
-| `android-build-release` | 工具链、测试、lint、APK 构建及签名校验 |
-| `android-device-verify` | ADB serial 预检、保留数据覆盖安装和限定日志采集 |
+|------|------|
+| `android-app-delivery` | 接收项目路径和主题，协调识别、环境、构建、签名、安装、调试和结构化报告 |
+| `android-build-release` | 独立完成工具链、测试、lint、APK 构建及 `aapt2`/`apksigner` 校验 |
+| `android-device-verify` | 独立完成 ADB serial 预检、同签名 `adb install -r` 覆盖安装和限定日志采集 |
+
+实体设备只允许保留数据的同签名 Release 覆盖安装；解锁、登录、验证码、Tesla 授权、虚拟钥匙和系统权限由用户人工完成。缺少系统级工具、包名或签名证据时，skill 会暂停并报告阻断原因。
 
 ---
 
@@ -255,12 +362,12 @@ mppt_controller -> owns charge_stage_ctx
 git clone https://github.com/Jovifei/Jovi-embedded-work-skill.git
 cd Jovi-embedded-work-skill
 
+# 复制到 Claude Code skills 目录
 # Windows
 xcopy /E /I project-init %USERPROFILE%\.claude\skills\project-init
 xcopy /E /I update-project-docs %USERPROFILE%\.claude\skills\update-project-docs
 xcopy /E /I clangd_init %USERPROFILE%\.claude\skills\clangd_init
 xcopy /E /I code_zl %USERPROFILE%\.claude\skills\code_zl
-xcopy /E /I code_sc %USERPROFILE%\.claude\skills\code_sc
 xcopy /E /I code_wrt %USERPROFILE%\.claude\skills\code_wrt
 xcopy /E /I prj_zl %USERPROFILE%\.claude\skills\prj_zl
 xcopy /E /I day_sum %USERPROFILE%\.claude\skills\day_sum
@@ -276,7 +383,6 @@ cp -r project-init ~/.claude/skills/
 cp -r update-project-docs ~/.claude/skills/
 cp -r clangd_init ~/.claude/skills/
 cp -r code_zl ~/.claude/skills/
-cp -r code_sc ~/.claude/skills/
 cp -r code_wrt ~/.claude/skills/
 cp -r prj_zl ~/.claude/skills/
 cp -r day_sum ~/.claude/skills/
@@ -295,61 +401,126 @@ cp -r android-device-verify ~/.claude/skills/
 ## 前置依赖
 
 | 工具 | GitHub | 安装方式 | 用途 |
-|---|---|---|---|
+|------|--------|---------|------|
 | CodeGraph | [colbymchenry/codegraph](https://github.com/colbymchenry/codegraph) | `npm install -g @colbymchenry/codegraph` | 代码知识图谱，MCP 提供代码探索能力 |
 | code-review-graph | [tirth8205/code-review-graph](https://github.com/tirth8205/code-review-graph) | `pip install code-review-graph` | 代码审查图谱，变更影响分析 |
 | comet | [rpamis/comet](https://github.com/rpamis/comet) | `npm install -g @rpamis/comet` | OpenSpec + Superpowers 五阶段工作流 |
-| OpenSpec | [Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec) | `openspec init` | 需求/设计/任务结构化管理 |
+| OpenSpec | [Fission-AI/OpenSpec](https://github.com/Fission-AI/OpenSpec) | `openspec init`（comet 已包含） | 需求/设计/任务结构化管理 |
 | Superpowers | [obra/superpowers](https://github.com/obra/superpowers) | 随 comet 安装 | TDD、brainstorming、计划执行等 skill 体系 |
+| codex-memory | — | Windows PowerShell 5.1+、Python 3、PyYAML、Claude CLI | 安全 setup / preflight；Obsidian MCP 可选 |
 
-`code_sc` 可利用 CodeGraph/code-review-graph/clangd 辅助建立调用图，但没有这些工具时仍必须基于源码完成 Owner、边界和并发审查。
+> `project-init` 会自动检测未安装的工具并提示。`update-project-docs`、`clangd_init` 和 `code_zl` 无额外依赖（`clangd_init` 需要 Cursor/VS Code 的 clangd 扩展）。
+>
+> `codex-memory` 的核心路径不依赖 Obsidian MCP；MCP 只是可选增强。
+>
+> **推荐安装顺序：** Superpowers → comet（含 OpenSpec）→ CodeGraph → code-review-graph
 
 ## 使用场景
 
 ### 场景 1：新工程初始化
 
-```text
-/project-init D:\work\stm32-sensor-hub
+```
+你：/project-init D:\work\stm32-sensor-hub
+
+Claude：自动检测 → CodeGraph/cr/comet 未初始化 → 依次执行 init
+→ 生成 CLAUDE.md + docs/README.md + 架构文档 → 输出初始化报告
 ```
 
-### 场景 2：代码注释整理
+### 场景 2：新工程文档脚手架
 
-```text
-/code_zl src/modbus.c src/can.c
+```
+你：/update-project-docs 初始化文档
+
+Claude：检测 docs/README.md 不存在 → 进入 Bootstrap 模式
+→ 扫描源码与构建文件 → 识别 MCU/RTOS/外设
+→ 只建 5 目录（REF/ARC/SOP/DBG/LOG），生成 README + GUIDE + 01-ARC-系统架构.md
+→ 有 AGENTS.md 时不覆盖写 CLAUDE.md
 ```
 
-### 场景 3：代码写入/重构
+### 场景 3：clangd 跳转与保存格式化
 
-```text
-/code_wrt Application/app/src/charge.c Application/app/src/mppt.c
+```
+你：/clangd_init
 
-Claude：先 code_sc 做 Owner/边界门 -> 实现/简化 -> code_zl -> code_sc 复审
+Claude：探查 uvprojx 与现有 compile_flags/compile_commands
+→ 单 Target 生成或复用编译配置，不全仓格式化
+→ 无 .clang-format 且确认 Jovi 时复制 code_zl 模板；formatter 必须是 clangd
+→ clangd --check 证明解析；调用点 F12 返回 Location 才算跳转成功
+→ 提示 Reload Window + Restart language server
 ```
 
-### 场景 4：深度架构审查
+### 场景 4：代码注释整理
 
-```text
-/code_sc 审查 Application 内部 charge/mppt/protection/output/debug 的调用关系
+```
+你：/code_zl src/modbus.c src/can.c
 
-Claude：Owner 表 -> include/call graph -> 状态机/会话 -> API/DTO -> 硬件单写点 -> ISR/主循环并发 -> P0/P1/P2 问题表
+Claude：读取两个文件 → 添加标准函数头注释 → `.c` 用 `/* 分节 */`、`.h` 用 `//=======` 分节
+→ Init 只写「配了什么」分节，不逐行注释寄存器
+→ 输出汇总报告（+12 函数头, +35 行内注释）
 ```
 
-### 场景 5：Keil 工程目录重组
+### 场景 5：代码简化与注释整理
 
-```text
-/prj_zl Application Bootloader
+```
+你：/code_wrt src/modbus.c src/can.c
+
+Claude：先用 ponytail 删除或内联行为等价的冗余代码
+→ 再用 code_zl V0.1.8 整理最终代码的函数头、行内注释和分节格式
+→ 输出两个阶段的变更与验证结果
+```
+
+### 场景 6：Keil 工程目录重组
+
+```
+你：/prj_zl Application Bootloader
+
+Claude：列出旧路径清单 → git mv 到 app/driver 四层目录
+→ 更新 uvprojx/uvoptx 的 IncludePath 与 FilePath
+→ 删除空 Config/Include/Source → 输出整理报告，提示 Keil Rebuild
+```
+
+### 场景 7：日报生成
+
+```
+你：总结今天的开发记录
+
+Claude：读取 git log 或开发记录文件 → 按"发现问题/分析/解决"组织
+→ 输出结构化日报
+```
+
+### 场景 8：跨会话项目记忆
+
+```
+你：/codex-memory load
+
+Claude：解析 profile 与项目 ID → 读取最小全局偏好及当前项目概览/计划/进度
+→ 输出带来源、长度受限且已脱敏的上下文摘要
+
+你：完成任务后 /codex-memory --dry-run
+
+Claude：优先审计 docs/README.md、docs/GUIDE.md、Git 与验证证据
+→ 预览受管区块更新；确认后才归档并写入成功事件
+```
+
+### 场景 9：C 盘数据迁移与安全清理
+
+```
+你：/c-pan-reorganize 审核 C 盘空间，将已关闭的飞书和钉钉数据迁移到 D:\Document
+
+Claude：先只读统计 C 盘数据和进程 → 确认目标目录与用户授权
+→ 移动精确数据目录并建立 junction → 核对文件数、字节数和 C/D 盘空间
 ```
 
 ## 文档命名规范
 
 所有 skill 生成的文档遵循统一命名：
 
-```text
+```
 {NN}-{TYPE}-{中文文档名}.md
 ```
 
 | 代码 | 类型 | 目录 | 示例 |
-|---|---|---|---|
+|------|------|------|------|
 | REF | 参考 | `00-REF-参考/` | `01-REF-Modbus协议.md` |
 | ARC | 架构 | `01-ARC-架构/` | `01-ARC-系统架构.md` |
 | SOP | 操作 | `02-SOP-操作/` | `01-SOP-固件烧录.md` |
@@ -358,12 +529,12 @@ Claude：Owner 表 -> include/call graph -> 状态机/会话 -> API/DTO -> 硬�
 
 ## 规范
 
-所有 skill 遵循 writing-skills 约定：
+所有 skill 遵循 [writing-skills](https://github.com/anthropics/claude-code) 规范：
 
-- frontmatter `description` 以 `Use when...` 开头，只描述触发条件；
-- 包含 `evals/evals.json`；
-- 支持中英文触发词；
-- 不在 description 中泄漏完整工作流。
+- frontmatter `description` 以 "Use when..." 开头，只描述触发条件
+- 包含 `evals/evals.json` 测试用例
+- 支持中英文触发词
+- 不在 description 中描述 skill 的工作流程（防止 Claude 走捷径）
 
 ## License
 
