@@ -1,11 +1,11 @@
 {
   "skill_name": "code_wrt",
-  "version": "V0.1.0",
+  "version": "V0.1.5",
   "evals": [
     {
       "id": 1,
       "prompt": "/code_wrt src/example.c",
-      "expected_behavior": "Must load ponytail and code_zl V0.1.0. First make only behavior-preserving simplifications, review that diff, then apply code_zl comments and formatting to the final code using short /* section */ in .c (no ====), and report both phases plus verification."
+      "expected_behavior": "Must load ponytail and code_zl V0.1.8. First make only behavior-preserving simplifications, review that diff, then apply code_zl comments and formatting to the final code using short /* section */ in .c (no ====), and report both phases plus verification."
     },
     {
       "id": 2,
@@ -20,7 +20,7 @@
     {
       "id": 4,
       "prompt": "/code_wrt Application/driver/src/bsp_pwm.c",
-      "expected_behavior": "After ponytail, Init comments must follow code_zl V0.1.0 granularity: section titles naming complementary PWM / dead-time / COMP0 Break, not per-register comments and not long principle paragraphs."
+      "expected_behavior": "After ponytail, Init comments must follow code_zl V0.1.8 granularity: section titles naming complementary PWM / dead-time / COMP0 Break, not per-register comments and not long principle paragraphs. Comments must be plain Chinese; unverified lines use // todo:."
     }
   ]
 }

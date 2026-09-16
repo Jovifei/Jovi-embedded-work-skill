@@ -4,13 +4,13 @@
     {
       "id": 1,
       "prompt": "将以上嵌入式固件调试对话总结，并判断应该写入哪个文档。如果已有文档能承载，不要新增；需要先读 README.md 和 GUIDE.md。",
-      "expected_output": "应先定位文档体系入口，抽取用户目标、已确认事实、已完成改动、验证证据和待办事项，再建议写入既有文档或输出总结。",
+      "expected_output": "应先定位文档体系入口，抽取用户目标、已确认事实、已完成改动、验证证据和待办事项，再建议写入既有文档或输出总结。不要假装已经全树写盘。",
       "files": []
     },
     {
       "id": 2,
       "prompt": "总结 04-DBG-UART接收丢包排查.md，并检查是否需要补充 Mermaid TB 排查流程图，低相关内容不要保留。",
-      "expected_output": "应读取目标文档、README 和 GUIDE，抽取现象、证据、假设、验证和根因元素，判断保留/删除/补充内容，并优先使用 flowchart TB 表达排查流程。",
+      "expected_output": "Targeted 模式：读取目标文档、README 和 GUIDE，抽取现象、证据、假设、验证和根因，判断保留/删除/补充；优先 flowchart TB。若该文件的 README 介绍过期，仍须同步介绍面。",
       "files": [
         "04-DBG-UART接收丢包排查.md"
       ]
@@ -29,7 +29,7 @@
     {
       "id": 4,
       "prompt": "I have a new embedded project at D:\\work\\my-new-board with no documentation. Initialize the docs.",
-      "expected_output": "Should detect missing docs/README.md, enter Bootstrap mode, scan project structure, identify MCU/RTOS/peripherals, generate docs/GUIDE.md + docs/README.md + docs/01-ARC-架构/01-ARC-系统架构.md and the five default directories (REF/ARC/SOP/DBG/LOG). Do not create the old 11 empty type folders or empty 00-阅读指引.md. Create CLAUDE.md only if AGENTS.md/CLAUDE.md are absent. Confirm with user before writing.",
+      "expected_output": "Should detect missing docs/README.md, enter Bootstrap mode, scan project structure (src/, inc/, build files), identify MCU/RTOS/peripherals, generate docs/GUIDE.md + docs/README.md + CLAUDE.md + docs/01-ARC-系统架构.md, then confirm with user before writing.",
       "files": []
     },
     {
@@ -37,6 +37,30 @@
       "prompt": "在 D:\\work\\smart-controller-4G-gd32f303\\Project 初始化文档",
       "expected_output": "Should detect GD32F303 MCU, FreeRTOS, Modbus+CAN+UART architecture, generate Chinese-language scaffold docs with accurate module table and task list from xTaskCreate calls.",
       "files": []
+    },
+    {
+      "id": 6,
+      "prompt": "/update-project-docs 代码里 TC 改成 2A、CC 改成 6A，请更新 docs。不要改 07-Code-Study。",
+      "expected_output": "Full Refresh：先从源码读 SOFT_VERSION 和电流宏，再列出 docs 下每个 md 的 Verdict。现网 ARC/README 介绍改成 2A/6A；历史 changelog 旧节只加横幅不改数字；07-Code-Study 标 SKIP。禁止只改两三篇专题就声称全部完成。回复必须含清单计数和未处理表。",
+      "files": [
+        "docs",
+        "Application"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "优先更新现有文档。上下文不够，先改 MPPT 算法那几篇就行。",
+      "expected_output": "拒绝把「优先更新现有」理解成少改文件。若本回合只能改一部分，必须输出未处理表（路径+原因），不得宣布文档已全部更新。",
+      "files": []
+    },
+    {
+      "id": 8,
+      "prompt": "SOFT_VERSION 已经升到新 z，docs/README 文首和现有文档表还写着上一版。",
+      "expected_output": "必须先改介绍面：README 当前固件、现有文档说明列、GUIDE/00-阅读指引。只改正文不改介绍视为未完成。",
+      "files": [
+        "docs/README.md",
+        "Application/app/inc/main.h"
+      ]
     }
   ]
 }

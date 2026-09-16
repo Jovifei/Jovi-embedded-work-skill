@@ -1,6 +1,6 @@
 {
   "skill_name": "code_zl",
-  "version": "V0.1.0",
+  "version": "V0.1.8",
   "evals": [
     {
       "id": 1,
@@ -26,6 +26,11 @@
       "id": 5,
       "prompt": "/code_zl Application/driver/src/bsp_pwm.c",
       "expected_behavior": "Init functions must use short /* 分节：配了什么 */ titles (clock, GPIO pins, timer base, complementary PWM, Break protection) plus only non-obvious trailing //. Must not annotate every DDL field, and must not write long principle paragraphs inside Init."
+    },
+    {
+      "id": 6,
+      "prompt": "/code_zl Application/driver/src/drv_device.c — 函数头里写了待上板验证",
+      "expected_behavior": "Must add // todo: markers on specific lines that need board test or follow-up confirmation (ASCII colon, one space after colon). Each todo must state what to verify and pass criteria. Must not leave 待确认 only in function header Description without line-level // todo:. Report todo count in summary table."
     }
   ]
 }

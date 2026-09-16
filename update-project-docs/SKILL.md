@@ -1,55 +1,68 @@
 ---
 name: update-project-docs
-description: "Use when project documentation is missing, outdated, or needs reorganization for an embedded C project. Also use when docs/README.md does not exist and scaffolding is needed. Triggers: update-project-docs, 更新文档, 初始化文档, setup docs, init docs, README/GUIDE updates."
+description: "Use when embedded project docs are missing, stale versus firmware, or need reorganization; when docs/README.md does not exist; when Application version, macros, entry points, or charge/protect behavior changed and docs/ file introductions or current-state claims may be wrong. Triggers: /update-project-docs, 更新文档, 初始化文档, setup docs, init docs, 文件介绍, 文档过期."
 ---
 
 # Update Embedded Project Docs
 
-**Version: V1.0.0**
+**Version: V1.1.0**
 
 目录分类以「以后会不会每周往里扔文件」为准，不按文档类型学铺空格子。依据：`4G-module-ml307r`（11 格几乎全空）、`external-4G-module-gd32f303`（5 格持续在用）、`smart-controller-gd32f4`（ARC/REF/DBG/RPT 有货，SOP/TST/PORT/SER 空或错位）。
+
+V1.0.0 的失败模式：agent 把「优先更新现有文档」理解成「只改几篇重要的」，只读 README/GUIDE/用户点名文件，不扫全树，也不根据代码 diff 回写文件介绍。V1.1.0 强制：**代码事实 → 全树清单 → 现网正文/历史横幅 → 入口介绍**。
 
 ## Goal
 
 把对话、现有文档、代码、日志、协议抓包和硬件证据，写成可维护的嵌入式工程文档。目标不是多写文件，而是把已核实的知识放到正确位置，并分清：当前实现、目标能力、参考工程行为、未验证假设。
 
-## Default Entry Points
+代码一变，`docs/` 里自称「当前 / 现网 / 工作树」的正文，以及 README/GUIDE/`00-阅读指引` 的**文件介绍**，必须一起变。禁止只改算法专题、把索引和介绍留在旧版本。
 
-文档根默认是 `docs/`。先读该目录。
+## When to Use
 
-### Bootstrap Detection
+- 用户说 `/update-project-docs`、更新文档、初始化文档、文档过期、文件介绍。
+- `Application/`（或等价固件树）改了版本宏、电流/电压/包络、入口函数、保护/充电行为。
+- README 文首「当前固件」或「现有文档」表与源码不一致。
 
-Phase 1 之前检查 `docs/README.md`：
+用户只要对话摘要、且未要求写盘时：只输出结构化摘要，但仍要列出建议落点。不要假装已经全树更新。
 
-- **不存在：** 进入 Phase 0。只搭 5 个默认目录，禁止生成 11 个空类型目录。
-- **已存在：** 跳过 Bootstrap，直接 Phase 1。若现有结构仍是 11 格空目录或根目录平铺编号，更新文档时应逐步迁到 5 目录，不要再补空文件夹。
+## Modes
 
-用户说「初始化文档」「setup docs」「init docs」时也可触发 Bootstrap。
+```text
+用户点名 1～3 个文件，且未说「全部/逐个/目录」
+  → Targeted：只改点名文件 + 仍必须同步被影响的入口介绍
+否则（含裸 /update-project-docs、全部、代码刚改完、文件介绍）
+  → Full Refresh：每个 docs 下 .md 都要有清单结论
+```
 
-必读：
+默认排除（除非用户点名）：`07-Code-Study/`、厂商 PDF、二进制。排除不等于「其余文件也可以不列」。
 
-1. `docs/README.md`：入口、类型、信任规则。
-2. `docs/GUIDE.md`：`{NN}-{TYPE}-{title}.md` 命名与质量检查。
-3. 用户指定的目标文档。
-4. 涉及实现时：源码、日志、测试、抓包或参考工程。
+## Forbidden Shortcuts
 
-用户指定了别的文档根，先读那个根的 README/GUIDE，再按本 skill 流程做。
+禁止用下面任何一句结束任务：
+
+- 「优先更新现有文档，所以只改了 ARC-04 / README。」
+- 「历史 changelog 不能改写成现网，所以整个 `版本更改/` 跳过。」（必须仍核对文首「当前工作树」行）
+- 「排除了 07-Code-Study，所以没做全树清单。」
+- 「上下文太长，先改重要的 MPPT 几篇，其余以后再说。」（可以分批，但本回合回复必须带未处理表）
+- 「Phase 1 只要求读 README 和 GUIDE。」
+- 「RIPER 在 RESEARCH，所以不写盘。」用户已经要求更新文档时，写盘是任务本身。
+- 把目标行为、参考表、旧版本节写成当前固件。
 
 ## Core Principles
 
 ### 1. Verify Before Writing Implementation Claims
 
-不要把目标行为写成当前行为。实现声明至少要有一项证据：源码路径/函数/结构体/宏、构建或测试输出、板级日志、协议抓包、示波器/逻辑分析仪、明确的参考工程对照。
+不要把目标行为写成当前行为。实现声明至少要有一项证据：源码路径/函数/结构体/宏、构建或测试输出、板级日志、协议抓包、示波器/逻辑分析仪、明确的参考工程对照。仅静态阅读代码时写清楚。未上板写「待上板验证」。
 
-仅静态阅读代码时写清楚。未上板写「待上板验证」。
+### 2. Prefer Updating Existing Docs — 不是少改文件
 
-### 2. Prefer Updating Existing Docs
+默认不新建空目录、不发明新类型码。用户只要摘要时不写盘。
 
-默认不新建文档。用户只要摘要时只给结构化摘要，除非要求写文件。
+「优先更新现有」= 能回写就回写，禁止为格式铺空格子。**不等于**只挑几篇改。Full Refresh 时每个 `.md` 都要有 `UPDATE_CURRENT` / `BANNER_HISTORICAL` / `SYNC_INTRO` / `SKIP` / `NEW` 之一。
 
 ### 3. Search Reference Projects Broadly
 
-用户说「参考某工程」时，按符号和调用链搜全，不要只看同名文件。覆盖：初始化入口、主循环/任务、ISR、参数保存、UI/业务触发、测试与脚本。
+用户说「参考某工程」时，按符号和调用链搜全。覆盖：初始化入口、主循环/任务、ISR、参数保存、UI/业务触发、测试与脚本。
 
 ### 4. Preserve Embedded Context Boundaries
 
@@ -62,26 +75,71 @@ ISR / RTOS 任务 / Driver / 应用 / UI 分开写。驱动细节不要写进业
 ```
 
 - `NN`：该目录内序号，从 `01` 起。`00` 仅用于该目录**已有正文之后**的阅读指引或模板。
-- `TYPE` 必须与所在目录一致（`ARC` 目录里不要出现 `01-REQ-...`）。
+- `TYPE` 必须与所在目录一致。
 - 禁止为了格式先建空目录，再只放一份讲目录格式的 `00-阅读指引.md`。
 
-默认类型码只有：`REF` `ARC` `SOP` `DBG` `LOG`。
+默认类型码：`REF` `ARC` `SOP` `DBG` `LOG`。可选（有连续正文再创建）：`PLN` `EXP`。过期进 `archive/`，不要预建。
 
-可选（有连续正文再创建目录）：`PLN` `EXP`。过期文档进 `archive/`，不要预建。
-
-旧 11 格类型码不再作为默认结构。归并：
-
-| 旧类型 | 落到 |
-|--------|------|
-| REQ | ARC 文首或 LOG 待办；没有正式需求就不建 |
-| COM | 寄存器/帧格式表 → REF；时序/状态机 → ARC |
-| PLN / TOD / WORK | 短清单 → README 或 LOG 末尾；多份计划才建 PLN |
-| TST / RPT | 操作步骤 → SOP；流水账 → LOG |
-| STUD / SER / PORT | 不预建；同一专题满 3 篇再开子目录 |
+旧 11 格归并：REQ→ARC 文首或 LOG 待办；COM 寄存器/帧格式→REF、时序/状态机→ARC；PLN/TOD/WORK 短清单→README 或 LOG 末尾；TST/RPT→SOP 步骤或 LOG 流水账；STUD/SER/PORT 满 3 篇再开子目录。
 
 ### 6. Use Mermaid `flowchart TB`
 
 流程、状态机、模块关系、验证路径用 `flowchart TB`。能用表就不要长文。
+
+### 7. Coverage, Not Cherry-Picking
+
+Full Refresh 的完成条件是清单覆盖，不是「改过的文件看起来很多」。未改的文件必须写明为何是历史快照或排除项。
+
+### 8. Code Diff Drives File Introductions
+
+入口介绍（下面「介绍面」）描述的是**今天怎么读这些文件**，必须跟 `SOFT_VERSION` 和当前宏一致。只改正文、不改介绍 = 任务未完成。
+
+## Code Facts First
+
+在改任何「现网」句子之前，从源码提取事实，不要从旧文档抄：
+
+1. `git status` / `git diff`（至少 `Application/` 或项目等价固件树）。
+2. `SOFT_VERSION`（或等价版本宏）。
+3. 本次改动的宏、阈值、入口函数、状态机、包络/限流。
+4. 默认编译开关（充电阶段、遥测、NTC 等）。
+
+然后在 `docs/` 全树（排除项除外）搜索这些**旧值**被写成「当前/现网/工作树」的句子。Windows 下中文路径用 Python `pathlib` 列文件，不要只靠 Glob。
+
+代码 → 文档最小映射：
+
+| 代码变化 | 至少同步 |
+|---|---|
+| `SOFT_VERSION` | README 文首；阶段 changelog 追加一节（仓库若有版本规则则遵守）；所有自称当前版本的介绍 |
+| 电流/电压/功率/包络宏 | 所有无日期地写成现网的表；README/GUIDE/`00-阅读指引` 说明列 |
+| 入口函数改名/所有权变化 | 现网 ARC 调用链；ALG2/接口文；SOP 若自称当前操作 |
+| 保护/充电行为 | 现网 ARC + 相关 DBG 口径；历史 DBG 只加横幅 |
+| 新增/重命名 md | README「现有文档」+「文档入口」+ 目录 `00-阅读指引` |
+
+## File Introductions（介绍面）
+
+这些不是可选项。Full Refresh 或代码驱动更新时必须核对：
+
+- `docs/README.md` 文首「当前固件」
+- `docs/README.md`「文档入口」
+- `docs/README.md`「目录结构」
+- `docs/README.md`「现有文档」表：每一行说明 = 该文件今天该怎么用，不是创建时的口号
+- `docs/GUIDE.md`「本工程的补充目录」（若有）
+- 各目录 `00-阅读指引.md`
+- 专题 `README.md`（如 `MPPT算法/`、`06-BRINGUP/`）
+
+「现有文档」表允许不枚举每一个历史 RESULT，但**现网入口文件**和本回合新建/改口径的文件必须有行。缺行要在回复里标明「索引仍缺」。
+
+## Verdicts
+
+| 结论 | 何时 | 做什么 |
+|---|---|---|
+| `UPDATE_CURRENT` | 文自称当前/现网/工作树，或读者会当成今天的代码 | 按源码改正文 |
+| `BANNER_HISTORICAL` | 标明日期/旧版本的快照、旧 DBG、旧 changelog 节 | 不改历史数字；文首补一行「非现网，现网见 … / SOFT_VERSION=…」 |
+| `SYNC_INTRO` | README/GUIDE/`00-阅读指引`/专题 README | 只更新介绍、链接、版本口径 |
+| `SKIP` | 用户排除、PDF/二进制、空 | 清单里写原因 |
+| `NEW` | 现有文档无法承载，且用户要求覆盖该主题 | 落到 5 默认目录或已有内容的可选目录 |
+
+changelog 旧节里的 TC=1A、BAT×8A 等是历史，不要全局替换。只改文首「当前工作树」和读者会误当成现网的未注明句子。
 
 ## Default Directories (V1.0.0)
 
@@ -161,9 +219,11 @@ docs/
 - [ ] 落在 5 个默认目录之一（或已证实需要的可选目录）
 - [ ] 实现声明有代码/日志/测试证据
 - [ ] 区分当前实现、目标能力、参考行为、待验证
-- [ ] 优先更新现有文档
+- [ ] 优先更新现有文档（不是少改文件）
 - [ ] `{NN}-{TYPE}-{title}.md` 且 TYPE 匹配目录
 - [ ] 流程图 `flowchart TB`
+- [ ] Full Refresh 时每个 .md 都有清单结论
+- [ ] README/GUIDE/阅读指引的文件介绍已跟 SOFT_VERSION 对齐
 ```
 
 不要在 GUIDE 里再列出 REQ/COM/PLN/WORK/TST/RPT/TOD/STUD 为默认目录。
@@ -182,6 +242,8 @@ docs/
 # {项目名} 文档索引
 
 文档体系 V1.0.0。
+
+> **当前固件：{SOFT_VERSION}** —— 用源码宏填写，不要抄旧 README。
 
 ## 文档入口
 - [编写指南](GUIDE.md)
@@ -219,13 +281,17 @@ docs/
 
 ## Standard Workflow
 
-### Phase 1: Read Entries and Scope
+文档根默认是 `docs/`。用户指定了别的文档根，先读那个根的 README/GUIDE。
 
-读 README、GUIDE、用户指定文档。从对话提取目标、已确认事实、改动、证据、待办。大范围改目录先征得同意。
+### Phase 1: Inventory and Scope
+
+读 README、GUIDE。列出 `docs/` 下全部 `.md`（排除项单独成表）。给每个文件一个 Verdict。从对话提取目标、已确认事实、改动、证据、待办。大范围改目录先征得同意。
+
+文件很多时：用子代理做清单与过期句搜索，父代理写盘。不要因为上下文不够就只改 3 个文件还不列其余。
 
 ### Phase 2: Extract Engineering Elements
 
-动态发现源码路径，不要假设固定目录。元素：硬件、固件、协议、持久化、验证、文档落点。
+动态发现源码路径。元素：硬件、固件、协议、持久化、验证、文档落点。
 
 ### Phase 3: Gather Evidence
 
@@ -233,7 +299,7 @@ docs/
 
 ### Phase 4: Design the Doc Change
 
-列出目标文件与 add/update/merge/split/archive。新文件必须落在 5 默认目录（或已有内容的可选目录）。
+列出目标文件与 add/update/merge/split/archive。新文件必须落在 5 默认目录（或已有内容的可选目录）。介绍面始终在计划里。
 
 ### Phase 5: Write or Update Docs
 
@@ -241,15 +307,27 @@ docs/
 
 发现未覆盖的功能点：追加到 `04-LOG-记录` 最近一篇或 README 待办表。不要为一条待办去创建 `04-PLN-计划/` 或 `02-REQ-需求/`。同一计划连续多篇时再开 PLN。
 
+若本回合改了会进固件镜像的代码，遵守该仓库的版本号规则（升 `z`、追加阶段 changelog）。本 skill 不代替版本规则。
+
 ### Phase 6: Verify
 
 - 新 Markdown 符合 `{NN}-{TYPE}-{title}.md`，TYPE 匹配目录。
 - 没有新建空的 11 格类型目录或空阅读指引。
-- README 链接有效。
+- README 链接有效；介绍面与 `SOFT_VERSION` 一致。
 - 实现有证据；目标能力未写成当前能力。
+- Full Refresh：清单覆盖每个 `.md`；未处理项公开列出。
 - 有 CodeGraph 且本次改了较多源码时：`codegraph index`。
 
-报告：修改/新增文件、核心调整、证据、仍需上板的缺口。
+## Completion Gate
+
+Full Refresh 未完成，禁止说「文档已更新完毕」，除非：
+
+1. 清单覆盖 `docs/` 下每个 `.md`（排除项有原因）。
+2. 每个 `UPDATE_CURRENT` 已改，或出现在「未处理」表（路径 + 原因 + 建议下一刀）。
+3. 介绍面已按本回合代码事实更新。
+4. 回复含下方「更新结果」，且含清单摘要。
+
+Targeted 模式：点名文件已改，且被影响的介绍面已改。
 
 ## Output Formats
 
@@ -278,8 +356,13 @@ docs/
 
 ```markdown
 ## 更新结果
+- 模式：Targeted | Full Refresh
+- 代码事实：SOFT_VERSION / 关键宏（来源路径）
 - 修改文件：
 - 新增文件：
+- 介绍面：README 文首 / 现有文档 / GUIDE / 00-阅读指引
+- 清单：UPDATE_CURRENT n / BANNER_HISTORICAL n / SYNC_INTRO n / SKIP n / NEW n
+- 未处理：路径 + 原因（没有则写「无」）
 - 合并/删除建议：
 - 核心调整：
 - 验证证据：
@@ -289,9 +372,12 @@ docs/
 ## Quality Checklist
 
 - [ ] 读过 README 和 GUIDE
+- [ ] 已从源码提取版本和关键宏，不是从旧文档抄
+- [ ] Full Refresh 时每个 `.md` 都有 Verdict
+- [ ] 介绍面已同步
 - [ ] 新内容落在 REF/ARC/SOP/DBG/LOG（或已证实需要的可选目录）
 - [ ] 未创建空类型目录、空 `00-阅读指引.md`
 - [ ] 实现声明有证据；目标能力未写成当前能力
 - [ ] `{NN}-{TYPE}-{title}.md` 且 TYPE 匹配目录
 - [ ] 流程图 `flowchart TB`
-- [ ] 回复里报告了证据与剩余缺口
+- [ ] 回复里报告了证据、清单计数与剩余缺口
