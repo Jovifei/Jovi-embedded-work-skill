@@ -1,27 +1,31 @@
 ---
 name: code_wrt
-description: "Use when the user invokes /code_wrt or asks to write, simplify, refactor, organize, or standardize embedded C code while preserving architecture and hardware-safety boundaries. Triggers include code_wrt, 写代码, 代码简化整理, 简化并注释, 重构并整理."
+description: "Use when the user invokes /code_wrt or asks to write, simplify, refactor, organize, or standardize embedded C code while preserving architecture, layer boundaries, call relationships, interrupt/service bridges, naming rules, and hardware-safety constraints. Triggers include code_wrt, 写代码, 代码简化整理, 简化并注释, 重构并整理."
 ---
 
 # Code WRT
 
-**Version: V0.2.0**
+**Version: V0.2.1**
 
-`code_wrt` 不再只是“ponytail 简化 + code_zl 注释”。V0.2.0 增加 **架构写入门禁**，固定执行：
+`code_wrt` 不再只是“ponytail 简化 + code_zl 注释”。它是嵌入式代码的**写入门禁**：先把层级、Owner、调用关系、中断/回调/服务链、API 和参数语义画清楚，再允许写代码；写完还要重新审查一次。
+
+固定流程：
 
 ```text
 code_sc(pre-write design gate)
+        -> layer/owner/call-contract freeze
         -> ponytail / implementation
         -> code_zl
         -> code_sc(post-write architecture gate)
 ```
 
-目标：避免写出“单个函数能跑、整个 Application 边界却越来越乱”的代码。
+目标：避免“每个函数单看都能跑，但整个 Application 越写越乱”。
 
 ## 版本记录
 
-- **V0.2.0**：新增强制 `code_sc` 前后双门禁；引入唯一 Owner、单向依赖、窄 DTO、公共/私有接口、单硬件写点、参数单语义、candidate/approved/committed 命名、Application 内部分层、peer-to-peer mutation 禁令。修正旧规则中“保护一律用文件级快照、不要 input DTO”的过强约束：跨模块边界允许且鼓励窄 DTO，禁止的是 giant context/fat interface。
-- **V0.1.5**：第二阶段对齐 code_zl V0.1.8（白话注释、先定义再使用、`// todo:`）。
+- **V0.2.1**：新增强制层级合同、Driver/Application 双向调用规则、ISR→Driver→callback/pending→Application service 链、Application 模块关系表、函数角色命名和参数命名/放置规则。写代码前必须给出 `Layer / Owner / Caller / Callee / Timing / Data / Side Effect`，不能只凭目录名判断分层。
+- **V0.2.0**：新增强制 `code_sc` 前后双门禁；引入唯一 Owner、单向依赖、窄 DTO、公共/私有接口、单硬件写点、参数单语义、candidate/approved/committed 命名、Application 内部分层、peer-to-peer mutation 禁令。
+- **V0.1.5**：第二阶段对齐 code_zl V0.1.8。
 - **V0.1.4**：固件 `SOFT_VERSION` 与 `docs/版本更改/` 门禁。
 - **V0.1.3**：任务入口归功能 `.c`；`main()` 只排任务；软件保护不进 SysTick。
 - **V0.1.2**：一职一函数、调度只排列调用、硬件单写出口。
@@ -30,85 +34,285 @@ code_sc(pre-write design gate)
 
 ## 必需子技能
 
-**REQUIRED SUB-SKILL:** 修改前完整加载并应用 `code_sc`，执行“pre-write design gate”。
+**REQUIRED SUB-SKILL:** 修改前完整加载并应用 `code_sc`，执行 pre-write design gate。
 
 **REQUIRED SUB-SKILL:** 完整加载并应用 `ponytail`，默认 `full` 强度。
 
 **REQUIRED SUB-SKILL:** 完整加载并应用 `code_zl`（当前 V0.1.8）。
 
-**REQUIRED SUB-SKILL:** 修改后再次应用 `code_sc`，执行“post-write architecture gate”。
+**REQUIRED SUB-SKILL:** 修改后再次应用 `code_sc`，执行 post-write architecture gate。
 
 任一必需 skill 不可用时停止结构性修改，不得凭记忆模拟。
 
-## 一、写代码前：先定 Owner，后写函数
+# 一、写代码前必须先冻结“层级 + Owner + 调用链”
 
-每次新增/重构跨模块逻辑，先在 scratch/计划中写 Owner 表。至少回答：
+新增或重构跨模块逻辑时，不能先写函数再解释结构。先写以下表，至少覆盖本次触碰的模块：
 
-| 问题 | 必须回答 |
+| 字段 | 必须说明 |
 |---|---|
-| 谁拥有这个状态？ | 唯一 `.c` / module |
-| 谁决定策略？ | policy/application/algorithm |
-| 谁最终仲裁？ | application/safety |
-| 谁写硬件？ | executor/driver 唯一出口 |
-| 谁只读诊断？ | debug/telemetry |
+| Layer | ISR / Driver / Adapter-Service / Application Domain / Coordinator / Executor / Observability |
+| Owner | 哪个 `.c` 唯一拥有状态或决策 |
+| Public API | 对外允许调用的函数 |
+| Caller | 谁可以调用 |
+| Callee | 它允许再调用谁 |
+| Timing | ISR / 1ms task / main-loop every-pass / event driven |
+| Input | 数据来自哪里、单位是什么 |
+| Output | 返回值/DTO/事件/命令是什么 |
+| State Mutation | 修改哪个 Owner 的状态 |
+| HW Side Effect | 是否读写硬件；写哪个外设 |
 
-### 强制原则：一个事实只有一个 Owner
+没有这张表，禁止开始跨模块结构性修改。
 
-禁止：
+## 强制原则：一个事实/状态/决策只有一个 Owner
+
+错误：
 
 ```c
-/* 错：算法 controller 拥有充电阶段状态机 */
 typedef struct
 {
-    mppt_ctx_t algorithm;
-    charge_stage_ctx_t charge_stage;
-} mppt_controller_t;
+    app_mppt_algorithm_ctx_t algorithm;
+    app_charge_stage_ctx_t charge_stage;
+} app_mppt_controller_t;
 ```
 
-除非模块本身就是更高层 Application Coordinator，而且名字/接口明确表达这一点。`mppt`、`algorithm`、`driver` 之类子域模块禁止偷偷长成 God Controller。
+这里不是“结构体有点大”，而是 Ownership Inversion：MPPT 算法模块拥有了充电阶段业务状态。
 
-如果两个模块都在解释同一事件，例如：
+如果两个模块都解释同一个事件，例如：
 
 ```text
 charge: relay lost 100ms 才判会话失效
 mppt: 一帧 relay=false 就 reset tracking
 ```
 
-必须先修 Owner/会话语义，不能继续堆 if。
+必须先统一 Owner 和事件语义，禁止继续堆 if。
 
-## 二、Application / Driver 分离不等于架构完成
+# 二、代码层级必须明确，不允许只靠目录名分层
 
-`app/` 与 `driver/` 物理目录分离只是第一层。复杂控制固件的 Application 内部至少按责任区分：
-
-```text
-Scheduler / Application Service
-        |
-        +--> Domain Policy       (charge stage / battery)
-        +--> Algorithm           (MPPT)
-        +--> Safety Policy       (protection)
-        +--> Measurement Adapter (sample)
-        +--> Output Executor     (PWM / Relay)
-        +--> Observability       (debug / telemetry, read-only)
-```
-
-依赖应尽量单向：
+`app/` 和 `driver/` 物理分目录只完成第一层。实际代码至少区分以下角色：
 
 ```text
-sample -> safety/policy -> application arbitration -> output -> driver
-                         -> algorithm -> candidate result -> application validation
+L0 Hardware / Register
+        ^
+L1 Driver / BSP
+        ^
+L2 Application Adapter / Service bridge
+        ^
+L3 Application Domain / Policy / Algorithm
+        ^
+L4 Application Coordinator / Scheduler
+
+Observability(debug/telemetry) 只旁路读取，不反向控制
+Output Executor 是 Application 到 Driver 的唯一执行桥
+ISR 是异步入口，不等于业务层
 ```
 
-禁止出现：
+推荐理解：
 
-- Algorithm -> Charge Stage / Protection / Driver
-- Debug/Telemetry -> 反向控制 Charge/Protection
-- `charge <-> protection <-> output` 互相修改内部状态
-- 一个 peer module 调另一个 peer 的 task 入口
-- 为了拿一个 enum/宏，被迫 include 不属于自己的业务 header
+| 层 | 典型内容 | 可以知道什么 | 不能知道什么 |
+|---|---|---|---|
+| ISR bridge | `USART_IRQHandler`, DMA/ADC IRQ wrapper | IRQ flag / peripheral instance | Charge/MPPT/协议业务 |
+| Driver/BSP | GPIO/PWM/ADC/UART/COMP/Flash | 寄存器、DMA、ring buffer、raw event | TC/CC/CV/FC、Battery policy、MPPT strategy |
+| Adapter/Service | sample convert、UART frame ingress、output executor | Driver contract + Application DTO | 不应复制产品策略 |
+| Domain/Policy | charge stage、battery、protection policy | 工程量、业务状态 | Driver register |
+| Algorithm | MPPT/control algorithm | 窄 DTO、限制、算法模式 | Charge Stage ctx、Protection ctx、Relay GPIO |
+| Coordinator | main/application service | 各模块 public contract | 不进入算法内部 ctx |
+| Observability | debug/telemetry | read-only snapshot | 不允许 setter 改控制状态 |
 
-## 三、跨模块接口：只传必要 DTO，不传整个世界
+## 允许的依赖方向
 
-### 3.1 禁止 giant context / fat interface
+正常下行：
+
+```text
+Coordinator
+   -> Application task/domain
+   -> Adapter/Executor
+   -> Driver API
+   -> Hardware
+```
+
+正常控制算法：
+
+```text
+Measurement snapshot
+   -> Policy
+   -> Algorithm DTO
+   -> candidate result
+   -> Application/Safety validation
+   -> approved command
+   -> Output Executor
+   -> Driver
+```
+
+正常异步上行：
+
+```text
+Hardware IRQ
+   -> IRQ wrapper
+   -> drv_xxx_irq_handler()
+   -> driver-owned buffer / pending / neutral callback
+   -> Application service/task later consumes
+```
+
+禁止：
+
+```text
+Driver -> include charge.h/mppt.h/protection.h
+Algorithm -> Driver
+Algorithm -> Charge Stage / Protection
+Debug -> 控制 setter
+peer task -> 调另一个 peer task
+Application module A <-> module B 双向 mutation
+```
+
+# 三、Driver 与 Application 之间的“中断 / 回调 / Service”必须画完整链
+
+这是 V0.2.1 的硬门禁。触碰 UART/ADC/DMA/COMP/PWM/Timer/EXTI 等异步路径时，必须明确完整路径，不能只写一个 callback 名字。
+
+## 3.1 ISR wrapper
+
+芯片中断入口只做桥接：
+
+```c
+void USART1_IRQHandler(void)
+{
+    drv_uart_irq_handler();
+}
+```
+
+IRQ wrapper 不允许：
+
+- 解析协议；
+- 改 Charge/MPPT stage；
+- printf；
+- 阻塞等待；
+- 调 `app_task_*`；
+- 直接写 Flash；
+- 在 UART/ADC ISR 中执行复杂控制算法。
+
+## 3.2 Driver IRQ handler
+
+`drv_xxx_irq_handler()` 只处理 Driver 自己拥有的硬件事实：
+
+```text
+读/清 IRQ flag
+搬字节
+更新 DMA/ring buffer
+保存 timestamp/sequence
+置 pending/event
+触发“中性回调”
+```
+
+Driver 不得 include Application 业务头文件。
+
+## 3.3 Callback 规则
+
+如果使用 callback，上层注册接口可以是：
+
+```c
+typedef void (*drv_adc_block_cb_t)(const drv_adc_block_t *block,
+                                   void *user_ctx);
+
+void drv_adc_set_block_callback(drv_adc_block_cb_t cb,
+                                void *user_ctx);
+```
+
+规则：
+
+- callback type 定义在 Driver contract；
+- Driver 只认识函数指针和中性 payload，不认识 `app_sample_t`/`charge_ctx_t`；
+- callback 如果在 ISR context 执行，必须在 API 注释明确写“ISR context”；
+- ISR callback 只允许复制最小 metadata / 置 pending / 入队；
+- callback 里禁止跑完整业务状态机和输出执行；
+- `user_ctx` 是 opaque 指针，Driver 不解析其 Application 类型。
+
+如果 callback 没有必要，优先 Driver 提供 `read/take/pending` API，由 Application service 主动消费。
+
+## 3.4 Service / Task 规则
+
+`service` 不是“什么都塞进去”的万能函数。
+
+命名语义：
+
+```text
+drv_xxx_service()   -> Driver 自己的 deferred work
+app_task_xxx()      -> Scheduler 调用的 Application 顶层任务
+app_xxx_service()   -> Application 模块自己的事件/队列服务
+xxx_step()          -> 一次确定性的状态/控制推进
+xxx_apply()/commit()-> 执行/提交 side effect
+```
+
+典型链：
+
+```text
+ADC DMA IRQ
+ -> drv_adc_irq_handler()
+ -> publish block/pending
+ -> app_task_sample()
+ -> sample_convert()
+ -> publish app_sample_snapshot
+ -> app_task_protect()
+ -> app_task_charge()
+ -> app_task_output()
+```
+
+不允许：
+
+```text
+DRV ADC callback -> app_task_charge()
+app_task_charge() -> app_task_output()
+app_task_output() -> app_task_protect()
+```
+
+顶层 task 的调度顺序由 Coordinator/main 决定，不允许 peer task 互相嵌套调用。
+
+# 四、Application 内部模块关系必须明确
+
+对于控制类固件，推荐关系如下。工程可换模块名，但责任和方向要保持清楚：
+
+```text
+sample
+  -> measurement snapshot
+       |
+       +-> protection -> safety decision/event
+       |
+       +-> charge policy/session
+               |
+               +-> mppt narrow DTO -> candidate duty
+               |
+               +-> approved charge command
+                            |
+                            v
+                         output
+                            |
+                            v
+                          driver
+
+debug/telemetry <- read-only snapshots from sample/protection/charge/mppt/output
+```
+
+参考 Owner：
+
+| 模块 | Owner 内容 | 允许直接调用 | 禁止 |
+|---|---|---|---|
+| `sample.c` | ADC 工程量快照、sequence、validity | Driver read/take | 改 charge/protection |
+| `protection.c` | fault state、恢复资格、安全 decision | sample/read-only HW facts | 直接写 PWM/Relay；直接改 charge internals |
+| `charge.c` | OFF/WAIT/PRECHARGE/RELAY/RUN/FAULT session、业务编排 | charge policy、MPPT public API、read-only safety snapshot | 直接改 MPPT private ctx；直接寄存器写 |
+| `charge_stage.c` | TC/CC/CV/FC、battery charge policy | battery/profile inputs | `clear_power_integral` 等算法内部命令 |
+| `mppt.c` | MPPT public algorithm package、candidate Duty | private algorithm implementation | charge stage ctx、protection ctx、driver |
+| `output.c` | approved command -> PWM/Relay executor | Driver API、final safety check | 反向制定 charge policy |
+| `debug.c` | UART/debug/telemetry/read-only diag | getters/snapshots | 调 control setters |
+
+如果项目需要 Application Coordinator，可单独存在；但不能再造一个无边界的 `app_runtime.c` 把所有逻辑搬进去。
+
+## Peer 模块调用规则
+
+- peer module 可以调用对方**稳定、只读或窄语义 public API**，前提是依赖单向且无环；
+- peer module 不允许调用对方 `app_task_*`；
+- peer module 默认不允许直接 setter 修改对方内部状态；
+- 跨 Owner 的“请求”优先变成 event/command/decision，由 Coordinator 归并；
+- 如果 A 必须调 B，B 又必须调 A，先认定为架构风险，不能用 callback 掩盖环依赖。
+
+# 五、跨模块接口只传必要 DTO，不传整个世界
 
 默认禁止把这些整对象直接交给算法/子模块：
 
@@ -120,7 +324,7 @@ app_protection_t *
 app_charge_ctx_t *
 ```
 
-如果调用方只需几个工程量，创建窄 DTO/标量合同：
+如果算法只需 Vpv/Ipv/Ppv/Vbat 和限制，应使用窄 DTO：
 
 ```c
 typedef struct
@@ -132,60 +336,212 @@ typedef struct
     uint32_t power_limit_mw;
     uint16_t applied_duty_permille;
     uint16_t duty_limit_permille;
-} mppt_input_t;
+} app_mppt_duty_in_t;
 ```
 
 DTO 规则：
 
-- 字段必须是下游真正需要的语义；
-- 单位写进名字：`_mv/_ma/_mw/_ms/_permille`；
+- 字段必须是下游真实需要；
+- 单位进入名字；
 - 上游先完成 validity/stale/safety qualification；
 - 不把 fault/session/stage/profile 等无关上层概念塞进去；
-- 不为了“以后可能用”预埋十几个字段。
+- 不为了“以后可能用”预埋字段；
+- giant DTO 只是 giant context 换名字，同样禁止。
 
-### 3.2 修正旧规则：DTO 与文件 static 如何选
+跨模块边界优先窄 DTO/显式参数；模块内部 helper 在 Owner 清楚、生命周期明确时可以读本模块 private static snapshot。
 
-旧版曾写“不要 `prot_step_in_t`，用文件级采样快照”。V0.2.0 改为：
-
-- **跨模块边界**：优先窄 DTO/显式参数，让依赖可见、可测试；
-- **模块内部 helper**：在单线程、Owner 清晰、生命周期明确时，可读模块私有 static snapshot；
-- 禁止 helper 表面无参数，实际依赖大量跨域 `s_sample/s_relay/s_charge/s_duty`；
-- 禁止 giant DTO 只是把整个 Application context 换了个名字。
-
-## 四、公共头只暴露合同，内部实现必须私有
+# 六、公共头只暴露合同，内部实现必须私有
 
 公共 `app/inc/*.h` 只允许暴露：
 
-- 稳定业务 DTO
-- 稳定 enum（属于该模块）
-- public API
-- debug snapshot（明确 read-only）
+- 稳定业务 DTO；
+- 属于本模块的稳定 enum；
+- public API；
+- 明确 read-only 的 diagnostic snapshot。
 
 禁止公共头暴露：
 
-- PI integral
-- search internals
-- private state machine ctx
-- 只被本模块 `.c` 使用的 helper
-- `clear_power_integral`、`reset_tracking` 这类实现细节命令
+- PI integral；
+- search internals；
+- private state-machine ctx；
+- 仅本模块使用的 helper；
+- `clear_power_integral`、`reset_tracking` 这类实现细节命令。
 
-算法内部头优先放 `app/src/*_priv.h` 或私有目录，并通过 grep/CI 确保只有算法实现 include。
+算法内部头优先放 `app/src/*_priv.h` 或私有目录，并 grep 确保只有所属实现 include。
 
-## 五、类型放在真正 Owner 所在模块
+# 七、类型必须放在真正 Owner 的模块
+
+错误：完整 Charge Session enum（WAIT/PRECHARGE/RUN/FAULT）定义在 `charge_stage.h`，导致 MPPT 为了判断 RUN include Stage。
+
+正确归属：
+
+```text
+Session enum          -> charge contract
+TC/CC/CV/FC           -> charge policy
+MPPT internal mode    -> mppt private/public contract as appropriate
+Fault bits/decision   -> protection
+HW command/snapshot   -> output/driver contract
+```
 
 不要因为“这里刚好也会用”就把 enum/struct 放错 header。
 
-错误例：完整 Charge Session enum（WAIT/PRECHARGE/RUN/FAULT）定义在 `charge_stage.h`，导致 MPPT 为了判断 `RUN` include Stage。
+# 八、函数命名必须表达“层级 + Owner + 动作 + 对象”
 
-正确：
+禁止仅靠 `process() / handle() / do_work() / run()` 让调用者猜用途。
 
-- Session 类型 -> `charge.h` / charge contract
-- TC/CC/CV/FC -> charge policy
-- MPPT mode/search internals -> mppt
-- fault bits/disposition -> protection
-- hardware command/snapshot -> output/driver contract
+## 8.1 推荐函数角色
 
-## 六、参数一个值只表达一个语义
+| 角色 | 推荐命名 | 语义 |
+|---|---|---|
+| IRQ wrapper | `USARTx_IRQHandler` | 芯片向量入口，只桥接 Driver |
+| Driver IRQ | `drv_uart_irq_handler` | Driver ISR 处理 |
+| Driver init | `drv_pwm_init` | 只初始化 Driver/HW |
+| Driver get/read | `drv_adc_read_raw` | 获取 Driver 拥有数据 |
+| Driver write | `drv_pwm_set_duty` | 直接影响硬件，必须是明确 Driver API |
+| App scheduler entry | `app_task_charge` | main/coordinator 调用的顶层任务 |
+| State update | `app_charge_step` | 单次状态推进，不自己决定调度时机 |
+| Service | `app_uart_service` | 消费本模块 pending/queue |
+| Algorithm step | `app_mppt_duty_step` | 输入 DTO，输出候选控制量 |
+| Executor | `app_output_apply` / `pwm_apply` | 提交已批准命令 |
+| Snapshot getter | `app_charge_snapshot_get` | read-only snapshot |
+| Event consume | `xxx_event_take` | 明确“取走/消费”语义 |
+| Session reset | `app_mppt_session_reset` | reset 范围写进名字 |
+
+## 8.2 `init/start/stop/reset/service/step/apply/commit` 不能混用
+
+- `init`：对象/硬件初始化，不承担正常运行策略；
+- `start/stop`：生命周期切换；
+- `reset_xxx`：必须说明 reset 的范围；
+- `step`：单次推进，调用时机由上层决定；
+- `service`：消费 pending/deferred work，不等于万能业务函数；
+- `apply`：把已决定的命令写到执行层；
+- `commit`：强调不可逆/原子提交，例如 Flash/配置提交；
+- `get/read` 默认不修改业务状态；若寄存器 read-clear，必须写在 API contract；
+- `set/write` 必须由真实 Owner 提供，不能成为 peer mutation 逃生口。
+
+同一模块不能同时出现三四套近义生命周期函数让调用者猜：
+
+```text
+app_mppt_init
+app_mppt_controller_init
+app_mppt_algorithm_init
+app_mppt_restart
+```
+
+先收敛层级，再命名。
+
+# 九、函数参数命名与放置必须符合语义
+
+## 9.1 参数顺序
+
+推荐顺序：
+
+```c
+return_type module_func(module_ctx_t *ctx,
+                        const module_input_t *in,
+                        uint32_t now_ms,
+                        module_output_t *out);
+```
+
+原则：
+
+1. Owner ctx（若需要）放最前；
+2. 只读输入用 `const`；
+3. 时间/limit 等少量标量放中间；
+4. 输出指针放最后；
+5. 不能同时用返回值和 `out` 表示同一个结果；
+6. 不允许未说明 alias 的 input/output 指向同一对象。
+
+## 9.2 参数名必须带角色和单位
+
+推荐：
+
+```text
+now_ms
+timeout_ms
+pv_mv
+pv_i_ma
+pv_power_mw
+power_limit_mw
+duty_limit_permille
+candidate_duty_permille
+approved_duty_permille
+committed_duty_permille
+sample_sequence
+frame_len
+channel_count
+profile_id
+```
+
+禁止含糊：
+
+```text
+value
+data
+para
+flag
+state
+status
+temp
+num
+len        # 不知道是什么长度
+mode       # 不知道谁的 mode
+reset      # 不知道清什么
+```
+
+如果确实使用 `state/status/mode`，必须带 Owner：
+
+```text
+charge_state
+mppt_mode
+protection_status
+relay_state
+```
+
+## 9.3 bool 用正向语义
+
+推荐：
+
+```text
+enable
+valid
+ready
+pwm_active
+relay_request_on
+fault_active
+sample_fresh
+```
+
+避免：
+
+```text
+flag1
+not_disable
+no_error
+is_ok2
+```
+
+如果 bool 代表命令和事实，必须分开：
+
+```text
+relay_request_on     # command
+relay_odr_on         # GPIO mirror
+relay_contact_closed # 真实反馈
+```
+
+## 9.4 ctx / in / out 的含义固定
+
+- `ctx`：本模块拥有的可变上下文；
+- `in`：本次调用只读输入；
+- `out`：本次输出；
+- `snapshot`：某一时刻只读事实快照；
+- `cmd`：已形成的命令；
+- `event`：离散事件；
+- `pending`：尚未消费的异步事实。
+
+Driver API 不得拿 `app_*_ctx_t *`；Algorithm API 不得拿 Driver ctx。
+
+# 十、参数一个值只表达一个语义
 
 禁止 Semantic Overloading：
 
@@ -195,43 +551,30 @@ power_allow_mw == 0
 有时 = SOFT ZERO
 ```
 
-应拆成明确控制语义：
+应该拆成：
 
 ```text
-mode = TRACK / HOLD / SOFT_ZERO
-hard stop -> 根本不调用算法或显式 session invalid
+numeric power_limit + explicit control mode/session semantics
 ```
 
 同样禁止：
 
-- `relay_applied` 实际只是 GPIO ODR 镜像却被当触点反馈；
-- `pwm_active` 同时表示 request、MOE、实际 compare 生效；
+- `pwm_active` 同时表示 request、MOE、compare 已生效；
+- `relay_applied` 实际只是 GPIO ODR 镜像；
 - 一个 `reset` 同时清 session、PI、search、duty。
 
-## 七、命名必须表达控制流水线
+# 十一、控制流水线命名必须可追踪
 
-Duty/PWM 控制至少区分：
-
-```text
-candidate_duty   # 算法候选
-approved_duty    # Application/Safety 批准
-committed_duty   # 已提交 executor/driver
-hardware_duty    # 寄存器/生效值
-```
-
-Relay 至少区分：
+Duty/PWM 至少区分：
 
 ```text
-relay_request_on
-relay_odr_on
-relay_contact_closed  # 只有真实触点反馈才能这样叫
+candidate_duty_permille   # 算法候选
+approved_duty_permille    # Application/Safety 批准
+committed_duty_permille   # 已交给 executor/driver
+hardware_duty_permille    # HW/寄存器实际值
 ```
 
-init/reset/start/stop 不允许出现 3~4 套近义 API 让调用者猜层级。
-
-## 八、谁决定、谁执行、谁验证
-
-推荐控制链：
+控制链：
 
 ```text
 Measurement
@@ -244,53 +587,43 @@ Measurement
    -> Driver / HW
 ```
 
-算法只能产候选，不得：
+算法只能产候选，不得直接写 PWM/Relay、清 protection fault、绕过 cap 或决定 STOP 会话生命周期。
 
-- 直接 `DRV_PWM_*`
-- 直接 Relay GPIO
-- 清 protection fault
-- 绕过 Duty/Power cap
-- 决定 STOP 是否结束会话
+# 十二、硬件必须单写出口
 
-Application/Safety 必须对外部算法结果再验证，不能因为“算法工程师会遵守”就省掉 envelope。
+PWM、Relay、Flash commit、关键 EN 脚必须有唯一主写点。
 
-## 九、硬件单写出口
-
-PWM、Relay、Flash commit、关键 EN 脚必须有唯一写点。
-
-例如：
+推荐：
 
 ```text
-charge/mppt/protection -> command only
-output.c               -> app_relay_set / pwm_apply
-bsp/driver              -> register write
+charge/mppt/protection -> command/event only
+output.c               -> app_output_apply / app_relay_set / pwm_apply
+Driver                  -> register write
 ```
 
-禁止多个 `.c` 都写同一寄存器/GPIO。
+禁止多个 `.c` 写同一 GPIO/CCR/MOE。
 
-如果 ISR Break 能异步关 PWM，主循环恢复前必须有明确 epoch/session gate，防止同拍重新发波。
+若 COMP/Break/ISR 能异步关 PWM，主循环恢复前必须有 epoch/session gate，防止同拍重新发波。
 
-## 十、函数真实依赖必须出现在签名或模块合同里
+# 十三、函数真实依赖必须出现在签名或模块合同里
 
-如果 `app_output_step(in, hw_snapshot)` 已传快照，函数内部又：
+如果函数已经传 `hw_snapshot`，内部又偷偷：
 
 ```c
 DRV_PWM_IsOutputEnabled();
 app_protection_latest();
 ```
 
-必须说明这是：
+必须判断：
 
-- 无意隐藏依赖（应删除），还是
-- 有意的最终硬件安全复核（应移动到 executor/safety-commit 层）。
+- 无意 hidden dependency -> 删除；
+- 有意 final safety recheck -> 移到 executor/safety-commit，并在 API contract 明写。
 
-禁止注释写“本函数不访问硬件”而实现直接读 driver。
+禁止注释说“不访问硬件”而实现直接读 Driver。
 
-## 十一、避免 peer-to-peer mutation
+# 十四、避免 peer-to-peer mutation
 
-同层模块默认只返回结果/事件，不直接修改另一个 peer 的内部状态。
-
-危险关系：
+危险：
 
 ```text
 charge -> protection_latch()
@@ -298,25 +631,25 @@ protection -> charge_lock_startup()
 output -> protection_latch() + charge_lock_startup()
 ```
 
-遇到这类结构先让 Application Coordinator 统一仲裁，或者通过事件/command 归并；不要继续增加交叉 setter。
+不要继续加 setter。让 Coordinator 汇总 event/decision，或者使用单向 command/event contract。
 
-## 十二、Multiple Sources of Truth
+# 十五、一个业务约束只允许一个 Policy Owner
 
-同一个业务约束只能有一个 Policy Owner，例如：
+例如：
 
 ```text
 300W limit
 PV * 8A
 BAT * 6A
 battery target
-charge stage power allowance
+charge-stage power allowance
 ```
 
-允许 defence-in-depth，但第二层只能验证/钳位，不要复制一套完整业务公式。
+可以 defence-in-depth，但第二层只能验证/钳位，不应复制整套业务公式。
 
-## 十三、Config 按 Owner 拆，不做参数垃圾桶
+# 十六、Config 按 Owner 拆
 
-触碰大 `app_config.h` 时审查配置归属：
+大 `app_config.h` 要审查归属：
 
 ```text
 Product/Safety
@@ -326,150 +659,156 @@ Driver/HW
 Debug/Telemetry
 ```
 
-如果算法工程师为了调 Kp/Ki 必须阅读 Relay/Protection/Battery 所有宏，应拆 `mppt_config.h` 等专属配置。
+算法工程师为了调 Kp/Ki 不应该被迫读 Relay/Protection/Battery 全部宏。应拆 `mppt_config.h` 等专属配置。
 
-`STAGE_ETA` 一类 Charge 估算参数不能因为 MPPT 也用到功率就被丢进算法配置。
+# 十七、Dead Contract / Zombie Interface 不允许新增
 
-## 十四、Dead Contract / Zombie Interface 不允许新增
-
-写完必须搜索：
+写完搜索：
 
 - enum/action 是否有 producer；
 - flag 是否永远常量；
-- request/restart/park 是否已经没人设置；
-- 注释说支持某路径，代码是否实际 reject；
-- result/diag 是否重复镜像同一事实。
+- request/restart/park 是否没人设置；
+- 注释说支持的路径是否实际被 reject；
+- result/diag 是否重复镜像同一事实；
+- 新增 API 是否有真实 caller。
 
-新增 API 必须有真实 caller；删功能时同步删消费分支和注释。
+# 十八、故障检测、主循环与节拍
 
-## 十五、故障检测与节拍调度
+保留既有约束：
 
-保留既有微逆风格约束：
+- `Fault_Detection()` 只调度；一类故障一个 `Fault_Xxx()`；检测与已有恢复同函数；
+- 不发明恢复；保护阈值不擅改；
+- SysTick 只 `drv_time_tick_isr()` / 置标志；
+- `main()` 是任务目录；
+- UART ISR 搬字节，ADC/DMA ISR 产数/置 pending；
+- 一个业务不要 ISR 和 main 各跑一套判据；
+- `Fault_*` 不直接关 PWM，硬件写走 executor/driver 唯一出口。
 
-- `Fault_Detection()` 只调度；一故障类一个 `Fault_Xxx()`；检测与已有软件恢复同函数；
-- 不发明不存在的恢复；保护判据保持原阈值；
-- SysTick 只 `drv_time_tick_isr()` / 置标志，不跑软件保护、printf、LED、协议解析；
-- `main()` 是任务目录；保护 -> 充电 -> 输出 -> 恢复顺序显式；
-- UART ISR 搬字节，ADC/DMA ISR 产数/置 pending，业务转换在主循环；
-- 一个业务不要 ISR 和 main 各跑一套判据。
+典型主循环：
 
-但必须服从 V0.2.0 Owner 门禁：`Fault_*` 不得直接关 PWM；PWM 最终写由 output/driver 单出口。
+```c
+while (1)
+{
+    app_task_uart(now_ms);
+    app_task_sample();
 
-## 十六、任务归属与函数书写
+    if (drv_time_1ms_taken())
+    {
+        app_task_protect(tick_ms);
+        app_task_charge(tick_ms);
+        app_task_output(tick_ms);
+        app_task_recover(tick_ms);
+    }
 
-`app_task_*` 声明在功能 `.h`，实现和同域 helper 在功能 `.c`。`main()` 只调用任务入口。
-
-典型：
-
-| 功能 | 任务入口 | Owner 文件 |
-|---|---|---|
-| 采样 | `app_task_sample` | `sample.c` |
-| 保护/恢复 | `app_task_protect/recover` | `protection.c` |
-| 充电 | `app_task_charge` | `charge.c` |
-| 输出 | `app_task_output` | `output.c` |
-| UART/遥测 | `app_task_uart/telemetry` | `debug.c` |
-
-一职一函数。写函数前明确：
-
-```text
-Purpose / Caller / Timing / Inputs / Outputs / State Mutation / HW Side Effects
+    app_task_telemetry(now_ms);
+}
 ```
 
-调度函数只排列调用，不塞业务判据。
+`app_task_charge()` 不得自己调用 `app_task_output()`；调度顺序属于 main/Coordinator。
 
-## 十七、code_wrt 固定工作流
+# 十九、code_wrt 固定工作流
 
-### Phase A — pre-write code_sc
+## Phase A — pre-write code_sc + layer contract
 
-1. 读取目标模块及直接调用链；
-2. 给关键状态做 Owner 表；
-3. 检查 include/call graph 是否已有环；
-4. 确定本次 API/DTO；
-5. 确定硬件写点和 safety envelope；
-6. 若设计会制造新 Ownership Inversion / Fat Interface / peer mutation，**停止写代码，先修设计**。
+修改前必须：
 
-### Phase B — ponytail / implementation
+1. 读取目标模块和必要调用链；
+2. 写 Layer/Owner 表；
+3. 写 caller -> callee 边表；
+4. 若涉及中断，写 IRQ -> driver -> pending/callback -> service/task 全链；
+5. 给 Application peer modules 写允许/禁止直接关系；
+6. 确定 API/DTO、类型归属和参数名字；
+7. 确定硬件单写点和 safety envelope；
+8. 检查 include/call graph 是否已有环；
+9. 如果设计会制造 Ownership Inversion / Fat Interface / peer mutation / reverse dependency，停止写代码，先修设计。
+
+## Phase B — ponytail / implementation
 
 - 删除/内联冗余；
-- 复用现有能力；
-- 结构性修改必须遵守前述 Owner/DTO/单写点规则；
-- 不确定行为等价时保留原逻辑并明确 TODO/风险。
+- 复用已有能力；
+- 函数名必须体现 layer/owner/action/object；
+- 参数遵守 ctx/in/out、单位、正向 bool、单语义规则；
+- 不确定行为等价时保留原逻辑并明确风险。
 
-### Phase C — code_zl
+## Phase C — code_zl
 
 按 code_zl V0.1.8 做函数头、白话注释、分节、格式、先定义再使用和 `// todo:`。
 
-### Phase D — post-write code_sc
+函数头 Description 至少能回答：
 
-重新审查 diff，至少验证：
+```text
+谁调用 / 什么时候调用 / 数据从哪里来 / 改什么状态 / 是否有硬件副作用 / 失败如何处理
+```
 
-- 没有新 dependency cycle/SCC；
-- 没有新增 cross-domain context pointer；
-- 没有新增硬件第二写点；
-- 公共头没有泄漏 private ctx；
-- 参数没有一值多义；
+## Phase D — post-write code_sc
+
+至少验证：
+
+- Layer 方向未反转；
 - Owner 表仍唯一；
-- debug/telemetry 没有反向进入控制；
-- 算法结果仍经过 Application/Safety 验证；
-- ISR/main ownership 没被破坏；
-- 没有 dead enum/flag/API。
+- caller/callee 图无新 SCC/环；
+- ISR callback 没跑业务；
+- peer task 没互相调用；
+- 没新增 cross-domain giant context；
+- 公共头没泄漏 private ctx；
+- 参数名/单位/command-vs-fact 语义正确；
+- 没新增硬件第二写点；
+- debug/telemetry 没反向控制；
+- 算法结果仍过 Application/Safety；
+- ISR/main shared state 有并发保护；
+- 没 dead enum/flag/API。
 
-## 十八、配置与注释门禁
+# 二十、配置、注释与版本门禁
 
-- `.c` 分节：`/* 标题 */`，禁止 `====` 装饰；
+- `.c` 分节：`/* 标题 */`；
 - `.h` 分节：`//=================== 标题 ===========================`；
-- Init/SysClk：按“配置了什么”分节，不逐行解释寄存器；
-- `config.h` 有效宏写用途、单位/枚举、当前值；
-- 注释不能掩盖坏架构：发现 Owner 错误时先整改，不准只是给错误结构加漂亮注释。
+- Init/SysClk：按“配置了什么”分节，不逐行翻译寄存器；
+- `config.h` 宏写用途、单位/枚举、当前值；
+- 注释不能掩盖坏架构，Owner 错误先整改；
+- 凡进入固件镜像的结构/行为变更，按项目约定升 `SOFT_VERSION`、追加同阶段版本文档、同步 docs README；未上板不得写 BOARD_PASS。
 
-## 十九、固件版本与版本更改文档
+# 二十一、验证
 
-适用 mppt-charger-300w 及同约定仓：只要本轮改了会进镜像的行为/宏/结构：
-
-1. 读取 `SOFT_VERSION=Vx.y.z`，同阶段只 `z + 1`；
-2. 在现有 `docs/版本更改/Vx.y.0....md` 文末追加一节；
-3. 同步 `docs/README.md` 当前固件；
-4. 未上板写 `⚠️ 未上板`，禁止伪造 BOARD_PASS。
-
-一节至少包含：目的/根因、具体文件/函数/宏差分、明确不做、验证。
-
-只有用户明确说“先别升版本/只改注释不记版本”才能跳过，并在回复说明。
-
-## 二十、验证
-
-结构性改动至少做：
+结构性修改至少做：
 
 - build/compile；
 - 相关 host tests；
-- grep include boundary；
-- 搜索硬件写点；
-- 对关键控制链给出调用图；
-- 对 ISR/main/shared state 做并发检查；
-- 对算法/策略接口做 fake/stub 越界测试（适用时）。
+- include boundary grep；
+- caller/callee 搜索；
+- IRQ/callback/service 链审查；
+- Application module relation 审查；
+- 硬件写点搜索；
+- ISR/main/shared-state 并发审查；
+- fake/stub 越界测试（算法/策略可替换时）。
 
-例如可替换算法至少测试：
+可替换算法至少测试：
 
 ```text
-fake return normal duty -> Application 正常运行
-fake return over-limit duty -> Application 必须阻断
+fake normal output -> Application 正常运行
+fake over-limit output -> Application/Safety 必须阻断
 ```
 
-## 边界
+# 边界
 
-- 用户只要纯注释 -> `/code_zl`。
-- 用户只要只读深度审查 -> `/code_sc`。
-- `/code_wrt` 可以结构整改，但不能擅自改保护阈值、协议、硬件时序或产品策略。
-- 不确定业务语义时先报告并保留行为。
-- 默认不扩大用户指定文件范围；为了确认调用/Owner 可以只读必要调用链。
+- 纯注释 -> `/code_zl`；
+- 只读深度审查 -> `/code_sc`；
+- `/code_wrt` 可做结构整改，但不得擅改保护阈值、协议、硬件时序或产品策略；
+- 不确定业务语义时先报告并保留行为；
+- 默认不扩大用户指定写范围；为了确认层级/调用/Owner 可只读必要调用链；
 - 不自动 commit/push，除非用户明确要求。
 
-## 报告
+# 报告
 
 完成后必须报告：
 
-- **Pre-write Code_SC**：Owner/依赖/API 设计结论；
-- **Implementation/Ponytail**：改了什么、保留什么；
-- **Code_ZL**：注释/分节/格式；
-- **Post-write Code_SC**：是否新增环依赖、Fat Interface、Owner 冲突、隐藏依赖、多写点、死接口；
-- **Verification**：build/tests/grep/并发与安全检查；
-- **Version**：新 `SOFT_VERSION` 和追加文档；若跳过则写明原因。
+1. **Layer Contract**：Driver/Application/ISR/Service/Executor/Observability 层级；
+2. **Owner Matrix**：每个关键状态/决策归谁；
+3. **Call Graph**：关键 caller -> callee；
+4. **IRQ/Callback/Service Chain**：涉及异步路径时必须给出；
+5. **API/Parameter Contract**：函数名、参数名、单位、DTO、类型归属；
+6. **Pre-write Code_SC**：已有风险；
+7. **Implementation/Ponytail**：改了什么；
+8. **Code_ZL**：注释/分节/格式；
+9. **Post-write Code_SC**：环依赖、Fat Interface、Owner 冲突、隐藏依赖、多写点、死接口结果；
+10. **Verification**：build/tests/grep/并发与安全检查；
+11. **Version**：新 SOFT_VERSION 和文档，或明确为何未升。
