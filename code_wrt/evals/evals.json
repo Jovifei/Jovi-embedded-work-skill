@@ -1,16 +1,16 @@
 {
   "skill_name": "code_wrt",
-  "version": "V0.2.0",
+  "version": "V0.2.1",
   "evals": [
     {
       "id": 1,
       "prompt": "/code_wrt src/example.c",
-      "expected_behavior": "Must load code_sc first for a pre-write architecture gate, then ponytail, then code_zl V0.1.8, then run code_sc again on the final diff. It must report Owner/dependency/API findings, implementation changes, formatting, and verification."
+      "expected_behavior": "Must load code_sc first, freeze Layer/Owner/Caller/Callee/Timing/Data/Side-effect contracts, then implement, apply code_zl V0.1.8, and run code_sc again on the final diff."
     },
     {
       "id": 2,
       "prompt": "/code_wrt 整理这个 UART ISR",
-      "expected_behavior": "Must preserve register read order, interrupt timing, concurrency and error handling; code_sc must first confirm ISR/main ownership. ISR should move bytes or publish minimal pending data only, while protocol parsing remains in the owning main-loop task."
+      "expected_behavior": "Must produce the full IRQ path: IRQ wrapper -> drv_uart_irq_handler -> driver buffer/pending or neutral callback -> application service/task. ISR/callback may move bytes or publish minimal events only; protocol parsing and business logic stay in the owning application task."
     },
     {
       "id": 3,
@@ -20,27 +20,57 @@
     {
       "id": 4,
       "prompt": "/code_wrt Application/driver/src/bsp_pwm.c",
-      "expected_behavior": "Must preserve PWM register ordering and Break/dead-time semantics, verify a single hardware write owner, then apply code_zl V0.1.8 Init granularity. It must not move policy into the driver."
+      "expected_behavior": "Must preserve PWM register ordering and Break/dead-time semantics, verify a single hardware write owner, and must not move charge policy into the driver."
     },
     {
       "id": 5,
       "prompt": "/code_wrt 把 mppt_controller 和 charge_stage 整理一下，现在 controller 里直接有 charge_stage_ctx",
-      "expected_behavior": "Must stop before blindly formatting. Pre-write code_sc must flag Ownership Inversion/Boundary Violation, assign unique Owners, and redesign the boundary so MPPT does not own charge-stage state. It must not simply rename the struct or add comments."
+      "expected_behavior": "Must flag Ownership Inversion/Boundary Violation before writing, assign unique Owners, and redesign the boundary so MPPT does not own charge-stage state. It must not only rename the struct or add comments."
     },
     {
       "id": 6,
       "prompt": "/code_wrt 算法函数需要 sample、profile、fault、relay，我就把四个结构体指针都传进去",
-      "expected_behavior": "Must reject the giant cross-domain context interface unless all fields are truly domain inputs. It should build a narrow DTO with only required scalar engineering values and constraints, with units in field names."
+      "expected_behavior": "Must reject the giant cross-domain context interface unless all fields are real algorithm inputs. It should create a narrow DTO containing only required engineering values and constraints, with units in names."
     },
     {
       "id": 7,
       "prompt": "/code_wrt charge.c 里直接 app_protection_latch_runtime，protection.c 又 app_charge_lock_startup，继续按这个方式加一个恢复接口",
-      "expected_behavior": "Must not add another peer-to-peer setter. It should flag cyclic ownership/peer mutation and route the decision through an application coordinator, event, or command boundary."
+      "expected_behavior": "Must not add another peer-to-peer setter. It should flag cyclic ownership/peer mutation and route the decision through coordinator/event/command boundaries."
     },
     {
       "id": 8,
       "prompt": "/code_wrt power_allow_mw=0 既表示停机，也表示 CV 软降，帮我继续沿用",
-      "expected_behavior": "Must reject semantic overloading. It should separate mode/session semantics from numeric power limit, e.g. TRACK/HOLD/SOFT_ZERO and an explicit hard-stop/session invalid path."
+      "expected_behavior": "Must reject semantic overloading and separate numeric limits from explicit mode/session semantics."
+    },
+    {
+      "id": 9,
+      "prompt": "/code_wrt ADC中断里直接调用 app_task_charge()，这样最快",
+      "expected_behavior": "Must reject peer/application task execution from ISR. It should keep IRQ -> driver IRQ handler -> pending/callback -> app_task_sample -> later scheduled protect/charge/output sequence, with timing and ownership explicitly documented."
+    },
+    {
+      "id": 10,
+      "prompt": "/code_wrt driver 的 adc.c 直接 include charge.h，然后回调 app_charge_on_sample()",
+      "expected_behavior": "Must reject Driver -> Application business dependency. The driver callback contract must be neutral and driver-owned, or the application should poll/take pending data through a driver API. Driver must not know app_charge_t or charge headers."
+    },
+    {
+      "id": 11,
+      "prompt": "/code_wrt app_task_charge() 结束后直接调 app_task_output()，省得 main 再调一次",
+      "expected_behavior": "Must reject peer task nesting. main/coordinator owns task order; charge publishes an approved command/snapshot, and output is scheduled separately by the coordinator."
+    },
+    {
+      "id": 12,
+      "prompt": "/code_wrt 写函数 process(ctx, data, value, flag, state)",
+      "expected_behavior": "Must reject ambiguous naming. The function name must expose owner/action/object, and parameters must express role and units, e.g. app_mppt_duty_step(ctx, in, now_ms, out), pv_mv, power_limit_mw, sample_valid, charge_state."
+    },
+    {
+      "id": 13,
+      "prompt": "/code_wrt 我想加 drv_uart_service()，顺便在里面解析 Modbus、切充电模式、打印日志",
+      "expected_behavior": "Must keep drv_uart_service limited to driver-owned deferred work. Protocol parsing belongs to an application UART/debug service, charge-mode decisions belong to charge/application policy, and logging belongs to observability."
+    },
+    {
+      "id": 14,
+      "prompt": "/code_wrt relay_applied 其实只是GPIO ODR，但先这样叫吧",
+      "expected_behavior": "Must rename command/fact/feedback semantics explicitly: relay_request_on, relay_odr_on, and relay_contact_closed only when real contact feedback exists."
     }
   ]
 }
