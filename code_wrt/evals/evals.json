@@ -1,16 +1,16 @@
 {
   "skill_name": "code_wrt",
-  "version": "V0.1.5",
+  "version": "V0.2.0",
   "evals": [
     {
       "id": 1,
       "prompt": "/code_wrt src/example.c",
-      "expected_behavior": "Must load ponytail and code_zl V0.1.8. First make only behavior-preserving simplifications, review that diff, then apply code_zl comments and formatting to the final code using short /* section */ in .c (no ====), and report both phases plus verification."
+      "expected_behavior": "Must load code_sc first for a pre-write architecture gate, then ponytail, then code_zl V0.1.8, then run code_sc again on the final diff. It must report Owner/dependency/API findings, implementation changes, formatting, and verification."
     },
     {
       "id": 2,
       "prompt": "/code_wrt 整理这个 UART ISR",
-      "expected_behavior": "Must preserve register read order, interrupt timing, concurrency, error handling, and observable behavior during ponytail simplification; then apply code_zl hardware and comment rules. If equivalence is uncertain, keep the code and continue formatting."
+      "expected_behavior": "Must preserve register read order, interrupt timing, concurrency and error handling; code_sc must first confirm ISR/main ownership. ISR should move bytes or publish minimal pending data only, while protocol parsing remains in the owning main-loop task."
     },
     {
       "id": 3,
@@ -20,7 +20,27 @@
     {
       "id": 4,
       "prompt": "/code_wrt Application/driver/src/bsp_pwm.c",
-      "expected_behavior": "After ponytail, Init comments must follow code_zl V0.1.8 granularity: section titles naming complementary PWM / dead-time / COMP0 Break, not per-register comments and not long principle paragraphs. Comments must be plain Chinese; unverified lines use // todo:."
+      "expected_behavior": "Must preserve PWM register ordering and Break/dead-time semantics, verify a single hardware write owner, then apply code_zl V0.1.8 Init granularity. It must not move policy into the driver."
+    },
+    {
+      "id": 5,
+      "prompt": "/code_wrt 把 mppt_controller 和 charge_stage 整理一下，现在 controller 里直接有 charge_stage_ctx",
+      "expected_behavior": "Must stop before blindly formatting. Pre-write code_sc must flag Ownership Inversion/Boundary Violation, assign unique Owners, and redesign the boundary so MPPT does not own charge-stage state. It must not simply rename the struct or add comments."
+    },
+    {
+      "id": 6,
+      "prompt": "/code_wrt 算法函数需要 sample、profile、fault、relay，我就把四个结构体指针都传进去",
+      "expected_behavior": "Must reject the giant cross-domain context interface unless all fields are truly domain inputs. It should build a narrow DTO with only required scalar engineering values and constraints, with units in field names."
+    },
+    {
+      "id": 7,
+      "prompt": "/code_wrt charge.c 里直接 app_protection_latch_runtime，protection.c 又 app_charge_lock_startup，继续按这个方式加一个恢复接口",
+      "expected_behavior": "Must not add another peer-to-peer setter. It should flag cyclic ownership/peer mutation and route the decision through an application coordinator, event, or command boundary."
+    },
+    {
+      "id": 8,
+      "prompt": "/code_wrt power_allow_mw=0 既表示停机，也表示 CV 软降，帮我继续沿用",
+      "expected_behavior": "Must reject semantic overloading. It should separate mode/session semantics from numeric power limit, e.g. TRACK/HOLD/SOFT_ZERO and an explicit hard-stop/session invalid path."
     }
   ]
 }

@@ -1,8 +1,118 @@
-# code_wrt V0.2.2 注释样例
+# code_wrt 架构写入门禁样例
 
-对照 2026-09-02 `mppt-charger-300w` G2 手改。执行时用这些当合格线，不要用「每个 DDL 字段一行中文」当合格线。
+V0.2.0 起，`code_wrt` 不能只把代码“写得更整齐”。写之前先过 `code_sc` Owner/边界门，写完再复审依赖和副作用。
 
-## 控制流：写不变量和失败含义
+## 例 1：不要让算法 Controller 拥有 Charge Stage
+
+错误：
+
+```c
+typedef struct
+{
+    app_mppt_algorithm_ctx_t algorithm;
+    app_charge_stage_ctx_t charge_stage;
+} app_mppt_controller_t;
+```
+
+问题不是命名难看，而是 Ownership Inversion。MPPT 算法不应该拥有 TC/CC/CV/FC 业务状态。
+
+正确方向：
+
+```text
+charge.c / charge_stage.c
+    -> power_limit / duty_limit / algorithm mode
+    -> mppt DTO
+    -> mppt candidate duty
+    -> application validation
+    -> output executor
+```
+
+## 例 2：跨模块只传窄 DTO
+
+错误：
+
+```c
+mppt_step(sample, profile, protection, charge_ctx);
+```
+
+如果算法实际只用 Vpv/Ipv/Ppv/Vbat 和功率/Duty 上限，应写：
+
+```c
+typedef struct
+{
+    int32_t pv_mv;
+    int32_t pv_i_ma;
+    int32_t pv_power_mw;
+    int32_t bat_mv;
+    uint32_t power_limit_mw;
+    uint16_t applied_duty_permille;
+    uint16_t duty_limit_permille;
+} mppt_input_t;
+```
+
+不要把上层 Fault、Relay、Charge Stage、Battery Profile 整体泄漏给算法。
+
+## 例 3：参数不能一值多义
+
+错误：
+
+```text
+power_allow_mw == 0
+  有时表示 Fault hard-stop
+  有时表示 CV soft-zero
+```
+
+改成：
+
+```text
+numeric power_limit + explicit mode/session semantics
+TRACK / HOLD / SOFT_ZERO
+hard-stop -> 不调用算法或明确 session invalid
+```
+
+## 例 4：函数签名必须说真话
+
+如果：
+
+```c
+app_output_step(const app_output_hw_t *hw);
+```
+
+内部又：
+
+```c
+DRV_PWM_IsOutputEnabled();
+app_protection_latest();
+```
+
+不能只加注释。先判断这是隐藏依赖还是最终安全复核；若是安全复核，应把它放进 executor/safety-commit 层，让 policy step 只依赖传入 snapshot。
+
+## 例 5：控制 Duty 命名分层
+
+不要所有地方都叫 `duty`：
+
+```text
+candidate_duty   # 算法候选
+approved_duty    # Application/Safety 批准
+committed_duty   # 交给 output/driver
+hardware_duty    # 寄存器/已生效
+```
+
+这样出现“算法算 320‰，示波器看到 304‰”时才有可追踪路径。
+
+## 例 6：保护、充电、输出不要 peer-to-peer mutation
+
+危险：
+
+```text
+charge -> protection_latch()
+protection -> charge_lock_startup()
+output -> protection_latch() + charge_lock_startup()
+```
+
+不要继续加第四条 setter。让 Application Coordinator 汇总 event/decision，再统一提交状态和输出。
+
+## 控制流注释仍按 code_zl V0.1.8
 
 ```c
 /* 3. 连续稳定窗口：弱光下可无限等待，掉门限必须整窗重开 */
@@ -21,44 +131,25 @@ for (;;)
 
     if (!drv_system_supply_is_good())
     {
-        // 跌破 2.8V 不是 Fault：抖动 1ms 也要把已积累的 99ms 清掉，否则会带着半窗放行
+        // 跌破 2.8V 要清掉已积累稳定窗，不能带着半窗放行
         stable_tracking = false;
         stable_start_ms = 0U;
         __WFI();
         continue;
     }
-    ...
 }
 ```
 
-PVD Ready 超时要写成「芯片 PVD/时钟异常」，不要写成「弱光」。弱光路径是后面那个无限等待循环。
-
-## 看门狗票：写成故障模式，不要只写「主循环置位」
+## Init 注释仍只写关键硬件事实
 
 ```c
-#define DRV_WATCHDOG_TICKET_MAIN    (1UL << 0) // 缺此票：主循环没转，禁止 feed
-#define DRV_WATCHDOG_TICKET_CONTROL (1UL << 2) // 缺此票：1ms ISR 没到，禁止 feed
-```
-
-## Init：写算出来的数，不写字段翻译
-
-```c
-/* GPIO：5 路模拟输入 PA8/PA9、PB0/PB5/PB12（legacy，无 PB1） */
+/* GPIO：5 路模拟输入，关闭上下拉避免并联采样分压 */
 gpio.Mode = DDL_GPIO_MODE_ANALOG;
-gpio.Pull = DDL_GPIO_PULL_NO; // 内部上下拉会并联到 26:1 分压，必须关
-gpio.Pin = DDL_GPIO_PIN_8 | DDL_GPIO_PIN_9;
+gpio.Pull = DDL_GPIO_PULL_NO;
 
 DDL_RCC_SetADCClkDiv(DDL_RCC_ADCCLK_DIVISION_4); // 64MHz/4=16MHz
 timer.Prescaler = 63U;  // 64MHz/(63+1)=1MHz
-timer.Autoreload = 99U; // 1MHz/(99+1)=10kHz → 100μs 触发一轮扫描
+timer.Autoreload = 99U; // 10kHz -> 100us 触发一轮扫描
 ```
 
-不要给 `Mode`/`Drive`/`OutputType`/`InputEnable` 各写一遍中文别名。
-
-## 删除非产品路径时的整链
-
-删 UART 回环：同时删 `drv_debug_uart_poll`、主循环调用、RX 环与 RXNE 入队（若 TX 打印仍需要 RXNE，至少在注释写明「RX 无消费者，满则丢」并评估是否关 RX 中断）。
-
-删 Logo / 复位原因打印：声明、定义、调用使用同一组 `#if DEBUG_ENABLE && DEBUG_XXX_ENABLE`。不要只在头文件加 `DEBUG_ENABLE`。
-
-不要为了读 `DEBUG_RESET_REASON_ENABLE` 在 `driver/src/*.c` 里 `#include "main.h"`。捕获放 Driver 常开，或把开关放到 `drv_device.h`。
+不要用漂亮注释掩盖 Owner/依赖错误；先修结构，再整理注释。
