@@ -1,40 +1,64 @@
 # Jovi Embedded Work Skills
 
-> 嵌入式工程开发、Android 交付与 Windows 工作环境维护 Claude Code Skills 集合 — 新工程一键初始化、文档自动化、代码质量、Android 构建安装调试、日报生成与 C 盘数据整理。
+> 嵌入式工程开发、Android 交付与 Windows 工作环境维护 Claude Code Skills 集合 — 新工程一键初始化、文档自动化、注释整理、架构审查、写代码门禁、源码学习资料、Android 构建安装调试、日报生成与 C 盘数据整理。
 
 专为嵌入式 C 工程（GD32/STM32/ESP32 + FreeRTOS + Modbus/CAN/UART）设计，开箱即用。
 
-## 当前版本（2026-09-16）
+## 当前版本（2026-09-17）
 
-本次推送只更新下面四项；其余 skill 版本不变。
+版本号以各 skill 目录 `SKILL.md` 文首 `**Version:**`（或 `VERSION` 文件）为准；本表必须与之同步。明细见 [`CHANGELOG.md`](CHANGELOG.md)。
 
-| Skill | 版本 | 相对 GitHub 上一版 |
+### 本轮 README 对齐（相对旧 README 漏记项）
+
+| Skill | 版本 | 说明 |
 |---|---|---|
-| `update-project-docs` | **V1.1.0** | V1.0.0 → 全树清单、代码 diff 驱动、介绍面完成门 |
-| `code_zl` | **V0.1.8** | V0.1.0 → 白话注释、先定义再使用、`// todo:`、任务目录注释 |
-| `code_wrt` | **V0.1.5** | V0.1.0 → 结构/节拍门禁、固件版本门禁；第二阶段对齐 **code_zl V0.1.8** |
-| `prj_zl` | **V0.1.0** | 号未升；与本地核对后同步（Keil `app/driver` 四层） |
-| `clangd_init` | V1.1.0 | 本次未改 |
+| `code_sc` | **V0.1.0** | **新增**：深度架构/Owner/调用关系审查（默认只审不改） |
+| `code_wrt` | **V0.2.1** | README 曾误写 V0.1.5；现网为写入门禁：`code_sc` → 实现 → `code_zl` → `code_sc` |
+| `code-study` | **V1.3.0** | **新增**：项目内 `docs/code-study/<基线>/` 逐模块/逐函数学习资料 |
+| `update-project-docs` | **V1.1.0** | Full Refresh 全树清单 + 介绍面完成门（纯文档不升固件版本） |
+| `code_zl` | **V0.1.8** | 白话注释、先定义再使用、`// todo:` |
+| `prj_zl` | **V0.1.0** | Keil `app/driver` 四层；号未升 |
+| `clangd_init` | **V1.1.0** | 跳转 + 保存格式化 |
 
-明细见仓库根 [`CHANGELOG.md`](CHANGELOG.md)。
+### 全量版本清单
+
+| Skill | 版本 | 一句话 |
+|---|---|---|
+| `project-init` | 未编号 | 工程工具链一键 init |
+| `update-project-docs` | **V1.1.0** | 文档 bootstrap + Full Refresh |
+| `clangd_init` | **V1.1.0** | clangd 跳转与 Ctrl+S 格式化 |
+| `code_zl` | **V0.1.8** | 注释/分节/格式标准化 |
+| `code_sc` | **V0.1.0** | 架构与所有权审查 |
+| `code_wrt` | **V0.2.1** | 写代码门禁 + 简化 + 注释 |
+| `code-study` | **V1.3.0** | 项目内源码学习书 |
+| `prj_zl` | **V0.1.0** | Keil app/driver 目录重组 |
+| `day_sum` | 未编号 | 开发日报 |
+| `child-claude` | 未编号 | 多模型派发编排 |
+| `codex-memory` | 未编号 | 项目永久记忆 |
+| `c-pan-reorganize` | 未编号 | C 盘迁移与安全清理 |
+| `android-app-delivery` | **v0.1.0** | Android 交付总控 |
+| `android-build-release` | **v0.1.0** | Android 构建与签名校验 |
+| `android-device-verify` | **v0.1.0** | ADB 安装与设备调试 |
 
 ## Skills 总览
 
 ```
 jovi-embedded-work/
 ├── project-init/              # 一键初始化工程工具链
-├── update-project-docs/       # 文档 bootstrap + 日常维护
-├── clangd_init/               # clangd 函数跳转 + 保存格式化
-├── code_zl/                   # C 代码注释标准化
-├── code_wrt/                  # Ponytail 简化 + code_zl 注释整理
-├── prj_zl/                    # Keil 工程 app/driver 目录重组
+├── update-project-docs/       # 文档 bootstrap + 日常维护（V1.1.0）
+├── clangd_init/               # clangd 函数跳转 + 保存格式化（V1.1.0）
+├── code_zl/                   # C 代码注释标准化（V0.1.8）
+├── code_sc/                   # 架构 / Owner / 调用关系审查（V0.1.0）
+├── code_wrt/                  # 写代码门禁：code_sc → 实现 → code_zl → code_sc（V0.2.1）
+├── code-study/                # 项目内源码学习资料（V1.3.0）
+├── prj_zl/                    # Keil 工程 app/driver 目录重组（V0.1.0）
 ├── day_sum/                   # 开发日报生成
 ├── child-claude/              # 多模型派发编排（父规划+审核，子执行）
 ├── codex-memory/              # 安全项目永久记忆（Obsidian / staging）
 ├── c-pan-reorganize/          # C 盘应用数据迁移 + 更新包/缓存安全清理
-├── android-app-delivery/      # Android 制作、构建、安装与调试总控
-├── android-build-release/     # Android 测试、构建、签名与 APK 校验
-└── android-device-verify/     # ADB 预检、保留数据安装与设备调试
+├── android-app-delivery/      # Android 制作、构建、安装与调试总控（v0.1.0）
+├── android-build-release/     # Android 测试、构建、签名与 APK 校验（v0.1.0）
+└── android-device-verify/     # ADB 预检、保留数据安装与设备调试（v0.1.0）
 ```
 
 ---
@@ -185,15 +209,47 @@ docs/
 
 ---
 
-### 5. code_wrt — 代码简化与注释整理
+### 5. code_sc — 架构与所有权审查
 
-**版本：** V0.1.5
+**版本：** V0.1.0
 
-**触发词：** `/code_wrt`、`代码简化整理`、`简化并注释`、`简化并整理`
+**触发词：** `/code_sc`、`代码审查`、`架构审查`、`调用关系审查`、`模块边界审查`、`ownership review`
 
-**功能：** 固定按 `ponytail → code_zl` 执行。先做最小的行为保持式简化，再使用 **code_zl V0.1.8** 整理嵌入式 C 的注释、分节和格式。两阶段不可交换，也不可只执行其中一个阶段。触碰会进镜像的行为时，收工前升 `SOFT_VERSION` 并追加 `docs/版本更改/`。
+**功能：** 嵌入式 C 的「结构 + 行为」审查。默认**只审查、不改代码**。重点不是空指针/语法，而是模块边界是否写歪：Owner 不唯一、Controller 越权、Application 环依赖、整上下文乱传、算法层看见硬件/充电阶段、多写点 PWM/Relay、隐藏全局依赖、死接口、ISR/主循环竞争等。
 
-**边界：** 保留公开接口、协议语义、硬件访问顺序、RTOS 时序、并发保护和错误处理；不确定简化是否等价时保留原代码并继续整理注释。Init 注释遵循 code_zl 分节粒度。
+**流程摘要：** 事实基线 → Owner 表 → 依赖图/环 → Ownership 反模式 → 调用与 DTO/API → 状态机/保护/PWM-Relay → 并发 → 输出分级结论（P0～P3）。用户明确要求「修复/整改」时，先给边界再改。
+
+**与 `code_wrt` 关系：** `code_wrt` 把 `code_sc` 当作写前/写后双门禁；单独审查时直接用本 skill。
+
+**示例：**
+```
+/code_sc Application/app/src/charge.c Application/app/src/mppt.c
+架构审查：重点看 MPPT 与充电阶段的 Owner 边界
+```
+
+---
+
+### 6. code_wrt — 写代码门禁（审查 → 实现 → 注释 → 再审查）
+
+**版本：** V0.2.1
+
+**触发词：** `/code_wrt`、`写代码`、`代码简化整理`、`简化并注释`、`重构并整理`
+
+**功能：** 嵌入式代码的**写入门禁**，不再只是「ponytail + code_zl」。固定流程：
+
+```text
+code_sc(pre-write design gate)
+  → 冻结 Layer / Owner / Caller / Callee / Timing / Data / Side Effect
+  → ponytail / 实现
+  → code_zl（当前 V0.1.8）
+  → code_sc(post-write architecture gate)
+```
+
+V0.2.1 起强制：Driver/Application 层级合同、ISR→Driver→callback/pending→Application service 全链、Application 模块关系、task 调度边界、函数角色命名与参数命名/单位/位置规则。触碰会进镜像的行为时，**随代码提交收口**升 `SOFT_VERSION` 并追加 `docs/版本更改/`；纯文档/`update-project-docs` 不升固件版本。
+
+**必需子技能：** `code_sc`、`ponytail`、`code_zl`。任一不可用时停止结构性修改。
+
+**边界：** 保留公开接口、协议语义、硬件访问顺序、RTOS 时序、并发保护和错误处理；不确定简化是否等价时保留原代码并继续整理注释。
 
 **示例：**
 ```
@@ -202,7 +258,25 @@ docs/
 
 ---
 
-### 6. prj_zl — Keil 工程 app/driver 目录重组
+### 7. code-study — 项目内源码学习资料
+
+**版本：** V1.3.0
+
+**触发词：** `/code-study`、`$code-study`、`源码学习`、`代码学习资料`、`制作学习文档`
+
+**功能：** 在**当前项目**内直接生成/维护 `docs/code-study/<源码基线>/`：逐模块与逐函数 Markdown、SVG/DOT 流程与调用图、核心算法/状态机专题、分阶段学习路线、唯一离线全文搜索页 `index.html`。函数页先展示完整原函数体与原注释，再做解释。
+
+**硬边界：** 不生成学习资料 ZIP；不修改业务源码；不自动 commit/push；不得把 MPPT 工程的版本/参数/阶段数当成其他工程事实。Codex 推荐安装到 `~/.agents/skills/code-study/`（见 [`code-study/INSTALL.md`](code-study/INSTALL.md)）。
+
+**示例：**
+```
+/code-study 为当前项目制作完整代码学习资料
+$code-study 增量更新 charge / mppt 模块文章
+```
+
+---
+
+### 8. prj_zl — Keil 工程 app/driver 目录重组
 
 **版本：** V0.1.0
 
@@ -226,7 +300,7 @@ docs/
 
 ---
 
-### 7. day_sum — 开发日报生成
+### 9. day_sum — 开发日报生成
 
 **触发词：** `/day_sum`、`总结日报`、`daily summary`、`work summary`
 
@@ -254,7 +328,7 @@ docs/
 
 ---
 
-### 8. child-claude — 多模型派发编排
+### 10. child-claude — 多模型派发编排
 
 **触发词：** `/child-claude`、`派给子claude`、`用mimo干`、`换便宜模型`、`delegate to child claude`
 
@@ -292,7 +366,7 @@ Constraint: <约束，如只创建文件不跑命令>
 
 ---
 
-### 9. codex-memory — 安全项目永久记忆
+### 11. codex-memory — 安全项目永久记忆
 
 **触发词：** `/codex-memory`、`加载项目记忆`、`归档项目记忆`、`Obsidian memory`、`project memory`
 
@@ -319,7 +393,7 @@ Constraint: <约束，如只创建文件不跑命令>
 
 ---
 
-### 10. c-pan-reorganize — C 盘数据整理
+### 12. c-pan-reorganize — C 盘数据整理
 
 **触发词：** `C盘清理`、`C盘空间不足`、`迁移应用数据到D盘`、`清理更新包`、`清理安全缓存`
 
@@ -338,7 +412,7 @@ Constraint: <约束，如只创建文件不跑命令>
 
 ---
 
-### 11. Android App Skill Suite — Android 制作、安装与调试
+### 13. Android App Skill Suite — Android 制作、安装与调试
 
 **版本：** v0.1.0（首次发布）
 
@@ -368,7 +442,9 @@ xcopy /E /I project-init %USERPROFILE%\.claude\skills\project-init
 xcopy /E /I update-project-docs %USERPROFILE%\.claude\skills\update-project-docs
 xcopy /E /I clangd_init %USERPROFILE%\.claude\skills\clangd_init
 xcopy /E /I code_zl %USERPROFILE%\.claude\skills\code_zl
+xcopy /E /I code_sc %USERPROFILE%\.claude\skills\code_sc
 xcopy /E /I code_wrt %USERPROFILE%\.claude\skills\code_wrt
+xcopy /E /I code-study %USERPROFILE%\.claude\skills\code-study
 xcopy /E /I prj_zl %USERPROFILE%\.claude\skills\prj_zl
 xcopy /E /I day_sum %USERPROFILE%\.claude\skills\day_sum
 xcopy /E /I child-claude %USERPROFILE%\.claude\skills\child-claude
@@ -378,12 +454,17 @@ xcopy /E /I android-app-delivery %USERPROFILE%\.claude\skills\android-app-delive
 xcopy /E /I android-build-release %USERPROFILE%\.claude\skills\android-build-release
 xcopy /E /I android-device-verify %USERPROFILE%\.claude\skills\android-device-verify
 
+# Codex / agents 另装 code-study（推荐）
+xcopy /E /I code-study %USERPROFILE%\.agents\skills\code-study
+
 # macOS / Linux
 cp -r project-init ~/.claude/skills/
 cp -r update-project-docs ~/.claude/skills/
 cp -r clangd_init ~/.claude/skills/
 cp -r code_zl ~/.claude/skills/
+cp -r code_sc ~/.claude/skills/
 cp -r code_wrt ~/.claude/skills/
+cp -r code-study ~/.claude/skills/
 cp -r prj_zl ~/.claude/skills/
 cp -r day_sum ~/.claude/skills/
 cp -r child-claude ~/.claude/skills/
@@ -392,6 +473,7 @@ cp -r c-pan-reorganize ~/.claude/skills/
 cp -r android-app-delivery ~/.claude/skills/
 cp -r android-build-release ~/.claude/skills/
 cp -r android-device-verify ~/.claude/skills/
+mkdir -p ~/.agents/skills && cp -r code-study ~/.agents/skills/
 ```
 
 ### 方式二：直接下载
@@ -459,17 +541,37 @@ Claude：读取两个文件 → 添加标准函数头注释 → `.c` 用 `/* 分
 → 输出汇总报告（+12 函数头, +35 行内注释）
 ```
 
-### 场景 5：代码简化与注释整理
+### 场景 5：架构审查（code_sc）
 
 ```
-你：/code_wrt src/modbus.c src/can.c
+你：/code_sc Application/app/src/charge.c Application/app/src/mppt.c
 
-Claude：先用 ponytail 删除或内联行为等价的冗余代码
-→ 再用 code_zl V0.1.8 整理最终代码的函数头、行内注释和分节格式
-→ 输出两个阶段的变更与验证结果
+Claude：读规范与调用链 → 画 Owner 表与依赖图
+→ 按 P0～P3 输出边界/环依赖/DTO/多写点问题
+→ 默认不改代码；用户要求整改时再进 code_wrt
 ```
 
-### 场景 6：Keil 工程目录重组
+### 场景 6：写代码门禁（code_wrt）
+
+```
+你：/code_wrt Application/app/src/mppt.c
+
+Claude：先跑 code_sc 写前门禁并冻结 Layer/Owner/调用合同
+→ ponytail/实现 → code_zl V0.1.8 注释与分节
+→ 再跑 code_sc 写后门禁 → 输出两阶段审查与变更摘要
+```
+
+### 场景 7：源码学习资料（code-study）
+
+```
+你：/code-study 为当前项目制作完整代码学习资料
+
+Claude：在项目 docs/code-study/<基线>/ 落盘模块/函数 Markdown 与 SVG
+→ 函数页先贴完整原函数，再解释；生成唯一 index.html 搜索页
+→ 不打包 ZIP、不改业务源码
+```
+
+### 场景 8：Keil 工程目录重组
 
 ```
 你：/prj_zl Application Bootloader
@@ -479,7 +581,7 @@ Claude：列出旧路径清单 → git mv 到 app/driver 四层目录
 → 删除空 Config/Include/Source → 输出整理报告，提示 Keil Rebuild
 ```
 
-### 场景 7：日报生成
+### 场景 9：日报生成
 
 ```
 你：总结今天的开发记录
@@ -488,7 +590,7 @@ Claude：读取 git log 或开发记录文件 → 按"发现问题/分析/解决
 → 输出结构化日报
 ```
 
-### 场景 8：跨会话项目记忆
+### 场景 10：跨会话项目记忆
 
 ```
 你：/codex-memory load
@@ -502,7 +604,7 @@ Claude：优先审计 docs/README.md、docs/GUIDE.md、Git 与验证证据
 → 预览受管区块更新；确认后才归档并写入成功事件
 ```
 
-### 场景 9：C 盘数据迁移与安全清理
+### 场景 11：C 盘数据迁移与安全清理
 
 ```
 你：/c-pan-reorganize 审核 C 盘空间，将已关闭的飞书和钉钉数据迁移到 D:\Document
