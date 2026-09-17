@@ -6,6 +6,7 @@
 
 | 项 | 说明 |
 |---|---|
+| code_sc | **V0.1.0 → V0.2.0**：补齐 safety-edge 第一拍/最后一拍、COMP/Break live window、ISR/main TOCTOU、same-generation safety snapshot、lifecycle single-owner、API truthfulness、producer-consumer reachability、driver→app 逆向依赖、产品 envelope 单一真值与完整审查完成门；eval 从 6 条扩展到 15 条。 |
 | README | 对齐 `SKILL.md`：补 `code_sc` V0.1.0、`code-study` V1.3.0；`code_wrt` 纠正为 **V0.2.1**（旧 README 误写 V0.1.5）；增加全量版本清单、安装命令与使用场景 |
 
 ## 2026-09-16

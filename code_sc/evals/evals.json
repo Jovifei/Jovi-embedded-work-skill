@@ -1,6 +1,6 @@
 {
   "skill_name": "code_sc",
-  "version": "V0.1.0",
+  "version": "V0.2.0",
   "evals": [
     {
       "id": 1,
@@ -10,7 +10,7 @@
     {
       "id": 2,
       "prompt": "/code_sc 检查 app/ 和 driver/ 已经分层的工程，看看 Application 内部还有没有架构问题",
-      "expected_behavior": "Must not stop at directory layout. It must inspect include/call directions, SCC/cycles, peer-to-peer mutation, hidden dependencies, state ownership, single-writer hardware ownership, debug reverse dependencies, and internal layering across orchestration/policy/algorithm/safety/executor/observability."
+      "expected_behavior": "Must not stop at directory layout. It must inspect include/call directions, SCC/cycles, peer-to-peer mutation, hidden dependencies, state ownership, single-writer hardware ownership, debug reverse dependencies, driver-to-application reverse includes, and internal layering across orchestration/policy/algorithm/safety/executor/observability."
     },
     {
       "id": 3,
@@ -25,12 +25,57 @@
     {
       "id": 5,
       "prompt": "/code_sc 检查 PWM、Relay、保护、中断和恢复是否有竞争或多 Owner",
-      "expected_behavior": "Must inspect hardware single-writer ownership, ISR/main races, Break/COMP behavior, fault epoch recheck, relay debounce/session semantics, shadow/preload duty meaning, STOP/recovery ordering, and report P0/P1 findings before readability issues."
+      "expected_behavior": "Must inspect hardware single-writer ownership, ISR/main races, Break/COMP behavior, fault epoch recheck, relay debounce/session semantics, shadow/preload duty meaning, STOP/recovery ordering, and report P0/P1 findings before readability issues. It must also build at least one safety-edge timeline rather than only inspect steady-state code."
     },
     {
       "id": 6,
       "prompt": "/code_sc 只看看代码风格，顺便帮我直接改掉",
       "expected_behavior": "Should explain that code_sc is review-first and default read-only. It may report naming/readability issues, but it must not silently modify code unless the user explicitly authorizes a repair phase; pure formatting belongs to code_zl/code_wrt."
+    },
+    {
+      "id": 7,
+      "prompt": "/code_sc PWM 从 WAIT_ZERO 切到 ACTIVE 的这一拍，pwm_supervise_comp2() 先看到 MOE=0 清掉 seen_high，随后 pwm_apply() 才 Arm 并写非零 Duty；下一次 1ms task 才 MarkOutputHigh。这样安全吗？",
+      "expected_behavior": "Must build an ordered first-cycle timeline, identify a protection-window gap if COMP2 ISR requires seen_high/armed before it reacts, estimate the exposure in task/PWM-cycle terms when possible, classify as Safety-edge Window P1 or P0 depending consequence, and recommend moving live-window arming into the PWM executor/driver transaction before the first hazardous pulse."
+    },
+    {
+      "id": 8,
+      "prompt": "/code_sc 主循环先 COMP_IsHigh()，然后才 edge_armed=true；COMP 下降沿 ISR 会先判断 edge_armed，是否有竞争？",
+      "expected_behavior": "Must explicitly analyze the read-then-arm TOCTOU interleaving, show how ISR can fire between the two operations and be dropped, reject volatile as a sufficient fix, and propose an atomic/driver-owned handshake, hardware latch, or tightly scoped critical section depending hardware semantics."
+    },
+    {
+      "id": 9,
+      "prompt": "/code_sc 一拍里 protection_service_runtime() 跑了两次，第二次只更新 protection_fault 和 epoch，但 fault_mask/disposition 还是第一次的值",
+      "expected_behavior": "Must classify this as Mixed Snapshot / Generation Mismatch, require a same-generation safety snapshot containing epoch/mask/disposition/pending, and state that after a second protection evaluation the whole decision bundle must be refreshed before charge/output consumes it."
+    },
+    {
+      "id": 10,
+      "prompt": "/code_sc STOP 时外层先 mppt_reset，RUN->OFF transition 里又 reset，stop wrapper 最后又 reset；reset 是幂等的所以应该没问题吧？",
+      "expected_behavior": "Must not accept idempotence as proof of good ownership. It must identify Lifecycle Multi-Owner, locate the single transition owner that should perform reset exactly once, and explain that duplicated lifecycle effects create future non-idempotent regression risk and confuse session semantics."
+    },
+    {
+      "id": 11,
+      "prompt": "/code_sc app_charge_try_start() 在非 OFF 状态调用 start() 什么都不做，但前置保护条件通过后仍 return true",
+      "expected_behavior": "Must identify an API Truthfulness Bug, distinguish precondition-passed from transition-happened/command-accepted/already-running semantics, and require the return contract to match the actual state change."
+    },
+    {
+      "id": 12,
+      "prompt": "/code_sc Application 已经传 power_limit_mw，但 mppt_algorithm 里又硬编码 300000、PV*8000、BAT*6000 做 envelope，数值现在一样",
+      "expected_behavior": "Must flag Multiple Sources of Truth even if values currently match, search duplicated formulas/constants, distinguish policy owner from independent absolute safety validator, and explain regression when one product limit changes without the other."
+    },
+    {
+      "id": 13,
+      "prompt": "/code_sc 工程有 APP_FAULT_RELAY_FAULT，注释说继电器吸合反馈异常，但硬件只有 GPIO ODR，没有辅助触点；这个 fault 也没有任何赋值 producer",
+      "expected_behavior": "Must identify both Hardware Capability Mismatch and Zombie Contract, state that ODR proves only the MCU request/register state and not physical contact closure, require producer-consumer-recovery reachability tracing, and recommend truthful naming such as relay_request_on/relay_odr_on unless real feedback exists."
+    },
+    {
+      "id": 14,
+      "prompt": "/code_sc include 图没环了，是不是依赖就干净了？drv_comp.c 还 include main.h，sample.c 为了日志直接读 charge/output/protection",
+      "expected_behavior": "Must reject include-only PASS, detect driver-to-application reverse dependency and observability leakage, inspect call/write edges in addition to includes, and require debug/telemetry to consume read-only snapshots rather than measurement/driver layers pulling higher-level state."
+    },
+    {
+      "id": 15,
+      "prompt": "/code_sc 全面复核，现有 host tests 全 PASS，可以直接说没问题了吗？",
+      "expected_behavior": "Must not conclude PASS from unit tests alone. It must enforce the completion gate: Owner table, SCC/reverse edges, actuator writer table, safety-edge timeline, ISR guard/TOCTOU analysis, snapshot-generation check, lifecycle side-effect table, producer-consumer reachability, duplicated product-limit search, and clearly separate source/static/Keil/board validation levels."
     }
   ]
 }
