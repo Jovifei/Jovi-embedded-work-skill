@@ -12,7 +12,7 @@
 
 | Skill | 版本 | 说明 |
 |---|---|---|
-| `code_sc` | **V0.1.0** | **新增**：深度架构/Owner/调用关系审查（默认只审不改） |
+| `code_sc` | **V0.2.0** | 安全边沿/TOCTOU/同代快照/lifecycle Owner/producer-consumer 完整审查门禁 |
 | `code_wrt` | **V0.2.1** | README 曾误写 V0.1.5；现网为写入门禁：`code_sc` → 实现 → `code_zl` → `code_sc` |
 | `code-study` | **V1.3.0** | **新增**：项目内 `docs/code-study/<基线>/` 逐模块/逐函数学习资料 |
 | `update-project-docs` | **V1.1.0** | Full Refresh 全树清单 + 介绍面完成门（纯文档不升固件版本） |
@@ -28,7 +28,7 @@
 | `update-project-docs` | **V1.1.0** | 文档 bootstrap + Full Refresh |
 | `clangd_init` | **V1.1.0** | clangd 跳转与 Ctrl+S 格式化 |
 | `code_zl` | **V0.1.8** | 注释/分节/格式标准化 |
-| `code_sc` | **V0.1.0** | 架构与所有权审查 |
+| `code_sc` | **V0.2.0** | 架构、所有权、安全边沿与并发审查 |
 | `code_wrt` | **V0.2.1** | 写代码门禁 + 简化 + 注释 |
 | `code-study` | **V1.3.0** | 项目内源码学习书 |
 | `prj_zl` | **V0.1.0** | Keil app/driver 目录重组 |
@@ -48,7 +48,7 @@ jovi-embedded-work/
 ├── update-project-docs/       # 文档 bootstrap + 日常维护（V1.1.0）
 ├── clangd_init/               # clangd 函数跳转 + 保存格式化（V1.1.0）
 ├── code_zl/                   # C 代码注释标准化（V0.1.8）
-├── code_sc/                   # 架构 / Owner / 调用关系审查（V0.1.0）
+├── code_sc/                   # 架构 / Owner / 安全时序审查（V0.2.0）
 ├── code_wrt/                  # 写代码门禁：code_sc → 实现 → code_zl → code_sc（V0.2.1）
 ├── code-study/                # 项目内源码学习资料（V1.3.0）
 ├── prj_zl/                    # Keil 工程 app/driver 目录重组（V0.1.0）
@@ -211,13 +211,13 @@ docs/
 
 ### 5. code_sc — 架构与所有权审查
 
-**版本：** V0.1.0
+**版本：** V0.2.0
 
-**触发词：** `/code_sc`、`代码审查`、`架构审查`、`调用关系审查`、`模块边界审查`、`ownership review`
+**触发词：** `/code_sc`、`代码审查`、`架构审查`、`调用关系审查`、`模块边界审查`、`ownership review`、`PWM安全审查`、`中断竞争审查`
 
-**功能：** 嵌入式 C 的「结构 + 行为」审查。默认**只审查、不改代码**。重点不是空指针/语法，而是模块边界是否写歪：Owner 不唯一、Controller 越权、Application 环依赖、整上下文乱传、算法层看见硬件/充电阶段、多写点 PWM/Relay、隐藏全局依赖、死接口、ISR/主循环竞争等。
+**功能：** 嵌入式 C 的「结构 + 行为 + 安全时序」审查。默认**只审查、不改代码**。除了 Owner、边界、依赖环、DTO/API、隐藏依赖外，V0.2.0 强制审查 PWM 第一拍/最后一拍、COMP/Break live window、ISR/main TOCTOU、same-generation safety snapshot、lifecycle reset/start/stop 唯一 Owner、API 返回语义、fault/action producer-consumer 可达性，以及产品功率/电流包络是否存在多份真值。
 
-**流程摘要：** 事实基线 → Owner 表 → 依赖图/环 → Ownership 反模式 → 调用与 DTO/API → 状态机/保护/PWM-Relay → 并发 → 输出分级结论（P0～P3）。用户明确要求「修复/整改」时，先给边界再改。
+**流程摘要：** 事实基线 → Owner 表 → 依赖/SCC/逆向边 → Actuator writer 表 → DTO/API/隐藏依赖 → 状态机/lifecycle → Safety-edge timeline → ISR/TOCTOU → Snapshot generation → Producer/Consumer → Multiple Sources of Truth → 静态/Host/Keil/Board 验证分级。用户明确要求「修复/整改」时，先给边界再改。
 
 **与 `code_wrt` 关系：** `code_wrt` 把 `code_sc` 当作写前/写后双门禁；单独审查时直接用本 skill。
 
@@ -407,7 +407,7 @@ Constraint: <约束，如只创建文件不跑命令>
 
 **示例：**
 ```
-/c-pan-reorganize 审核 C 盘可清理缓存，并将飞书和钉钉数据迁移到 D:\Document
+/c-pan-reorganize 审核 C 盘可清理缓存，并将已关闭的飞书和钉钉数据迁移到 D:\Document
 ```
 
 ---
@@ -546,8 +546,9 @@ Claude：读取两个文件 → 添加标准函数头注释 → `.c` 用 `/* 分
 ```
 你：/code_sc Application/app/src/charge.c Application/app/src/mppt.c
 
-Claude：读规范与调用链 → 画 Owner 表与依赖图
-→ 按 P0～P3 输出边界/环依赖/DTO/多写点问题
+Claude：读规范与调用链 → 画 Owner 表、依赖/SCC 与 writer 表
+→ 审 PWM 第一拍/最后一拍、COMP/Break ISR guard、TOCTOU、snapshot generation、lifecycle owner
+→ 按 P0～P3 输出问题与 SOURCE/STATIC/KEIL/BOARD 验证等级
 → 默认不改代码；用户要求整改时再进 code_wrt
 ```
 
