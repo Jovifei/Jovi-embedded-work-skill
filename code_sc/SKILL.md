@@ -5,11 +5,58 @@ description: "Use when the user invokes /code_sc or asks for a deep embedded-C c
 
 # Code SC
 
-**Version: V0.2.0**
+**Version: V0.3.0**
 
 `code_sc` 是嵌入式 C 的“结构 + 行为 + 安全时序”代码审查 skill。它不只找空指针、越界和语法问题，而是专门发现“代码能跑、测试能过，但 Owner / 状态机 / 安全提交时序已经写歪”的问题：Owner 不唯一、Controller 越权、Application 内部环依赖、整个上下文对象乱传、算法层知道硬件/充电阶段、同一状态被多个模块解释、硬件多写点、隐藏全局依赖、参数语义重载、死接口、ISR/主循环竞争、首拍保护空窗、TOCTOU、跨代 snapshot、重复 lifecycle reset、API 假成功、产品限制多份真值等。
 
 默认 **只审查、不改代码**。用户明确要求“修复/整改/提交”时，先输出审查结论和整改边界，再改。
+
+## V0.3.0 新增：集成/合并/实时性硬门禁
+
+V0.3.0 专门补足“单个模块看起来正确，但工程一合并就裂脑”的漏洞。以下检查在全面复核时不可跳过：
+
+1. **Exact-baseline gate**：报告必须写 repo/ref/SHA/工作树状态；本地未 push、远端旧 SHA、旧 ZIP 不得混为“当前代码”。
+2. **Merge-is-new-code gate**：merge/rebase/conflict resolution 后重新审 API、头文件、ISR、项目文件、CI；父分支各自 PASS 不继承到 merge commit。
+3. **Public-contract resurrection gate**：搜索被删 public header、旧 typedef/API/fault bit 是否被 merge 恢复；检查新旧消费者是否同时进入 Keil/CMake target。
+4. **Critical-preprocessor gate**：安全开关不得靠传递 include；核对预处理后的实际值。未定义安全宏在 `#if` 中按 0 静默关闭，按 P1 处理。
+5. **IRQ completeness gate**：每个 `NVIC_EnableIRQ` 必须追到 startup vector、强 `Xxx_IRQHandler`、driver handler、foreground consumer；落到 weak Default_Handler 视为运行卡死 P1。
+6. **Re-arm stale-command gate**：检查临时停波/样本 stale/HOLD 后 `0 -> 旧大 Duty`。物理 OFF→ON 必须有 executor-owned first-duty cap/rebuild/ramp。
+7. **Veto reachability gate**：`power_inhibited/maintenance_busy/settings_pending/storage_blocked` 等禁止动作必须在 start/autostart/restart/PWM commit/Relay close 等危险入口有消费者。
+8. **Liveness != deadline gate**：看门狗票据只证明还能跑，不能证明 1ms deadline。检查 tick 合并、WCET、float/sqrt、Flash stall、日志和最长临界区。
+9. **Header economy + IWYU gate**：公共头数量要克制，但不能靠 main.h 聚合或传递 include。检查符号 Owner、直接 include、private/public 边界和无意义“一文件一 DTO”。
+10. **Evidence integrity gate**：CI failure、关键 job skipped、测试路径失效、仅旧 SHA Keil PASS，都不能写成当前 PASS。
+
+### 0.x 当前代码身份必须可复现
+
+最终报告开头必须写 Repository、Target ref、HEAD、Compared base（如有）、Build file、CI run/status、Worktree 状态。用户说“本地已修”但只给远端 URL，而远端 SHA 没变化时，要明确说本地修改未出现在远端。
+
+### 0.y Merge Contract Matrix
+
+Merge 后至少审 public API/typedef、fault schema、safety veto、IRQ、build membership、tests 六类合同。每类都要找到 Producer/Owner、Consumer 和 merge 后证据。任何一条断裂，都不能用“能 merge/能看懂”判通过。
+
+### 关键安全配置的预处理检查
+
+对保护开关检查唯一 Owner、当前 `.c` 是否直接 include、是否依赖多级传递 include、Keil/project define 是否另行覆盖、是否有 `#if !defined(...) #error`。安全开关注释写 1 不算证据，translation unit 实际预处理值才算。
+
+### IRQ/向量闭环审查
+
+每个已启用中断列完整路径：peripheral IT enable -> NVIC enable -> startup vector -> strong handler -> driver handler -> pending/ring/latch -> main/task consumer。启动文件 weak handler 会让缺失实现“链接成功但第一次中断就卡死”，按 P1。
+
+### 重新发波 Safety Edge
+
+除了第一次上电发波，还必须检查第二次发波：ACTIVE 高 Duty -> temporary fault/stale/hold -> MOE=0,Duty=0 -> algorithm memory 保留 -> 条件恢复 -> WAIT_ZERO -> Arm -> first nonzero。若 executor 可直接恢复旧高 Duty，即使算法内存保留合理，也要判定 re-arm 斜坡缺失。修复优先归 Output/Executor 生命周期，不要重新让 MPPT 拥有 Arm 状态。
+
+### Veto 可达性矩阵
+
+对 `power_inhibited/storage_blocked/settings_pending/...` 至少审 Start、AutoStart、Restart、PWM commit、Relay close、Maintenance 六个入口。只有 producer 没 consumer，属于 Zombie Safety Gate。
+
+### 实时性：看门狗不等于周期正确
+
+检查 1ms tick 是 counter 还是 bool、CONTROL ticket 是否只证明函数返回、M0/M0+ 是否无 FPU却在控制路径使用 float/sqrtf、Flash 是否可能 stall/暂停 ADC、printf 是否阻塞、最长关中断区间、missed-tick/max-exec-time 诊断。没有 WCET/示波器/目标测量时必须写“deadline 未验证”。
+
+### 头文件收拢的审查尺度
+
+目标不是越少越好，而是最少且 Owner 清楚。单独 header 的合理理由是打断环、稳定 ABI、独立 Owner、多独立消费者。禁止 main.h 变万能配置桶、安全宏通过多层 include 偶然可见、public 目录残留 private/zombie algorithm header、同名宏多头重复定义、为一行 wrapper 再建一对 `.h/.c`。
 
 ## V0.2.0 新增硬门禁
 

@@ -5,7 +5,7 @@ description: "Use when the user invokes /code_wrt or asks to write, simplify, re
 
 # Code WRT
 
-**Version: V0.2.1**
+**Version: V0.3.0**
 
 `code_wrt` 不再只是“ponytail 简化 + code_zl 注释”。它是嵌入式代码的**写入门禁**：先把层级、Owner、调用关系、中断/回调/服务链、API 和参数语义画清楚，再允许写代码；写完还要重新审查一次。
 
@@ -23,6 +23,7 @@ code_sc(pre-write design gate)
 
 ## 版本记录
 
+- **V0.3.0**：加入“工程集成不变量”硬门禁：精确基线/SHA、merge 视为新代码、公共头最小化与 Include-What-You-Use、安全宏显式定义、NVIC→向量→强 handler 完整链、临时停波后的重新发波爬升、授权/禁止功率 veto 可达性、1ms 调度与 WCET/看门狗分离、CI/Keil/Host/Board 分级验收。禁止用“两个分支各自 PASS”“能编译”“看门狗不复位”替代合并后完整验证。
 - **V0.2.1**：新增强制层级合同、Driver/Application 双向调用规则、ISR→Driver→callback/pending→Application service 链、Application 模块关系表、函数角色命名和参数命名/放置规则。写代码前必须给出 `Layer / Owner / Caller / Callee / Timing / Data / Side Effect`，不能只凭目录名判断分层。
 - **V0.2.0**：新增强制 `code_sc` 前后双门禁；引入唯一 Owner、单向依赖、窄 DTO、公共/私有接口、单硬件写点、参数单语义、candidate/approved/committed 命名、Application 内部分层、peer-to-peer mutation 禁令。
 - **V0.1.5**：第二阶段对齐 code_zl V0.1.8。
@@ -32,13 +33,73 @@ code_sc(pre-write design gate)
 - **V0.1.1**：保护与节拍按微逆风格整理。
 - **V0.1.0**：首次版本化。
 
+## V0.3.0 — 工程集成不变量（写代码时必须满足）
+
+下面这些不是“建议风格”，而是写入前后都要守住的工程不变量。任何一条没有证据时，不得把任务写成“已经完成”。
+
+### A. 精确基线：先确认你到底在改哪一棵树
+
+写代码前必须记录 repo/worktree、branch/ref、HEAD SHA、dirty files、目标构建入口和当前 CI。用户说“远端最新”“本地刚改”“merge 后 main”时，必须重新读取目标 ref；不能拿旧 ZIP、旧 SHA、旧分支的结论套到新工作树。
+
+**Merge commit 视为全新的代码版本。** 两个父分支分别 PASS，不代表 merge 结果 PASS。冲突解决后必须重新做 API、头文件、ISR、构建工程和安全路径审查。禁止盲选 ours/theirs 后直接宣布完成，也禁止把未 push 的本地改动当成远端事实。
+
+### B. 文件/头文件要少，但不能靠隐藏依赖“省文件”
+
+默认优先复用真实 Owner 的已有头文件，不为一个 DTO、一个宏、一个一行 wrapper 新建独立头。只有在打断真实依赖环、形成独立稳定 ABI/Owner、被多个互不隶属模块直接共享、或属于生成/外部协议合同时，才新建公共头。
+
+放置默认规则：
+
+- 跨 Application 产品参数 -> `app_config.h`
+- 模块公共 API/DTO -> 该模块已有 `.h`
+- 仅本 `.c` 使用的参数 -> `.c` 顶部
+- Driver 参数 -> `drv_xxx.h` / `drv_xxx.c`
+- 算法私有结构 -> `src` 私有头，不进入 `app/inc`
+
+**头文件少不等于 main.h 大杂烩。** 禁止把 debug、output、protection、driver、version 等无关配置全部塞进一个“万能 main.h”。
+
+### C. Include What You Use：安全配置不能靠传递包含
+
+某个 `.c` 使用跨模块类型/宏，就必须能明确指出该符号 Owner，并直接 include 对应 Owner 头。禁止依赖 `protection.c -> protection.h -> sample.h -> main.h -> SAFETY_MACRO` 这种“碰巧可见”的链。
+
+对会改变保护行为的编译期宏，必须防止“未定义按 0”静默关闭；要么放进双方都直接依赖的唯一共享配置 Owner，要么使用 `#if !defined(...) #error` 明确失败。不能仅靠注释说默认开启。
+
+### D. 接口变更必须做 Consumer Matrix
+
+新增、删除、重命名 API/typedef/fault bit/header 后，必须搜索 definition、all callers、include sites、test mocks、Keil/CMake project membership、docs/telemetry/protocol decoder。Merge 时特别检查：删除的旧 public header 是否复活、新模块是否仍调用旧 API、声明存在但实现丢失、实现变 `static` 但外部还在调用、互斥的新旧模块是否同时进目标。
+
+### E. 每个已 Enable 的 IRQ 必须闭环到强实现
+
+异步路径必须逐条验证：peripheral IT enable -> `NVIC_EnableIRQ()` -> startup vector -> strong `Xxx_IRQHandler()` -> `drv_xxx_irq_handler()` -> pending/ring/latch -> foreground consumer。只要 NVIC 已开，却只剩 startup weak `Default_Handler`，按运行卡死 P1 处理；不能因为“能链接”就通过。
+
+### F. 物理停波后的重新发波必须有独立安全合同
+
+任何 `MOE=1 -> 0 -> 1`、Duty `nonzero -> 0 -> nonzero` 都是新的 Safety Edge。如果 MPPT/PI 保留旧内部 Duty，Output Executor 不能在重新 Arm 后直接把旧的大 Duty 一拍恢复。
+
+要求顺序：physical OFF -> zero applied -> protection live window -> safe first-duty cap/probe -> bounded rebuild/ramp -> follow candidate duty。重新发波斜坡属于 Output/Executor 生命周期，不能为了方便重新塞回 MPPT 算法 Owner。
+
+### G. “禁止动作”也必须有可达性
+
+任何新增 `power_inhibited`、`maintenance_busy`、`settings_pending`、`storage_blocked`、`safe_to_start` 都必须列 Consumer Matrix，至少检查 start、autostart、restart/recovery、PWM commit、Relay close、Flash/maintenance entry。定义了 veto 但危险路径没消费，等同安全门不存在。
+
+### H. 看门狗证明活着，不证明 1ms 实时性
+
+对 1ms 控制任务必须区分 liveness、deadline、tick accounting。Cortex-M0/M0+ 上新增 float、sqrtf、Flash erase/program、大量日志或长循环时，必须评估 WCET/栈/RAM。至少记录 max control execution time、missed/coalesced tick counter、stack/map 使用和 Flash maintenance worst-case。没有目标证据时写“未验证”，不能用“IWDT 没复位”代替实时性证明。
+
+### I. 一行 helper / wrapper 不默认算“更清晰”
+
+只执行一行的函数只有在建立明确语义/事务边界、唯一硬件写点、多调用者复用、测试 seam、平台抽象或集中审计副作用时才保留。否则优先直接写清楚调用，不为了形式分层制造大量跳转函数。
+
+### J. 提交前完成门
+
+写后 `code_sc` 必须重新基于最终 diff/最终 merge SHA 检查。至少区分 SOURCE contract、architecture/ownership、critical preprocess/config、IRQ-vector-handler、Host/static、Keil/CMake clean build、CI required jobs、Board/Scope。CI 红、关键 job SKIPPED、测试脚本路径失效，都不能写成“验证通过”。
+
 ## 必需子技能
 
 **REQUIRED SUB-SKILL:** 修改前完整加载并应用 `code_sc`，执行 pre-write design gate。
 
 **REQUIRED SUB-SKILL:** 完整加载并应用 `ponytail`，默认 `full` 强度。
 
-**REQUIRED SUB-SKILL:** 完整加载并应用 `code_zl`（当前 V0.1.8）。
+**REQUIRED SUB-SKILL:** 完整加载并应用 `code_zl`（当前 V0.2.0）。
 
 **REQUIRED SUB-SKILL:** 修改后再次应用 `code_sc`，执行 post-write architecture gate。
 

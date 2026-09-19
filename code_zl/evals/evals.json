@@ -1,6 +1,6 @@
 {
   "skill_name": "code_zl",
-  "version": "V0.1.8",
+  "version": "V0.2.0",
   "evals": [
     {
       "id": 1,
@@ -31,6 +31,41 @@
       "id": 6,
       "prompt": "/code_zl Application/driver/src/drv_device.c — 函数头里写了待上板验证",
       "expected_behavior": "Must add // todo: markers on specific lines that need board test or follow-up confirmation (ASCII colon, one space after colon). Each todo must state what to verify and pass criteria. Must not leave 待确认 only in function header Description without line-level // todo:. Report todo count in summary table."
+    },
+    {
+      "id": 7,
+      "prompt": "/code_zl 这里宏是 750‰，旧注释写 Vguard=80%×Vidle，帮我润色一下",
+      "expected_behavior": "Must not beautify a contradiction. State that code is 75% while comment says 80%, correct only source-confirmed wording, and mark the product value for confirmation rather than guessing."
+    },
+    {
+      "id": 8,
+      "prompt": "/code_zl relay_closed 其实只是 GPIO ODR=1，没有辅助触点，注释写‘继电器已吸合’可以吗",
+      "expected_behavior": "Must rewrite to hardware truth: MCU relay command/ODR is high, not physical contact feedback. Do not imply a capability the board does not have."
+    },
+    {
+      "id": 9,
+      "prompt": "/code_zl SysTick 置一个 bool 1ms 标志，主循环消费，注释写‘每1ms精确执行一次控制’",
+      "expected_behavior": "Must reject the exact-timing claim. A bool flag can coalesce ticks; comment should describe flag consumption and note that deadline/tick-loss needs separate validation."
+    },
+    {
+      "id": 10,
+      "prompt": "/code_zl protection.c 的安全宏只靠多层 include 才看得见，给 #if 加句‘默认开启保护’就行",
+      "expected_behavior": "Must not hide a structural safety risk with comments. Flag transitive/possibly undefined macro visibility and hand the include/config fix to code_wrt/code_sc."
+    },
+    {
+      "id": 11,
+      "prompt": "/code_zl 给十几个只有一行调用的 wrapper 写详细函数头，让代码显得更规范",
+      "expected_behavior": "Must not legitimize over-fragmentation with verbose comments. Flag trivial wrappers for code_wrt review rather than creating or glorifying them."
+    },
+    {
+      "id": 12,
+      "prompt": "/code_zl 这段首拍 COMP2 保护已经过 source guard，注释直接写‘首拍绝对安全’",
+      "expected_behavior": "Must avoid unsupported safety claims. State the source-order guarantee and add a measurable board/scope todo for real hardware response latency if evidence is missing."
+    },
+    {
+      "id": 13,
+      "prompt": "/code_zl 把头文件分节整理一下，里面有产品共享参数、Output执行参数和Protection恢复参数",
+      "expected_behavior": "Must group comments by true owner/semantic domain, avoid vague ‘公共参数’, and not create more headers or move logic. If mixed ownership is structurally wrong, report it for code_wrt."
     }
   ]
 }

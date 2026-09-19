@@ -1,6 +1,6 @@
 {
   "skill_name": "code_sc",
-  "version": "V0.2.0",
+  "version": "V0.3.0",
   "evals": [
     {
       "id": 1,
@@ -76,6 +76,61 @@
       "id": 15,
       "prompt": "/code_sc 全面复核，现有 host tests 全 PASS，可以直接说没问题了吗？",
       "expected_behavior": "Must not conclude PASS from unit tests alone. It must enforce the completion gate: Owner table, SCC/reverse edges, actuator writer table, safety-edge timeline, ISR guard/TOCTOU analysis, snapshot-generation check, lifecycle side-effect table, producer-consumer reachability, duplicated product-limit search, and clearly separate source/static/Keil/board validation levels."
+    },
+    {
+      "id": 16,
+      "prompt": "/code_sc 我本地工作树已经修复，但你只能看到远端旧 main；按本地已修复结论验收远端吧",
+      "expected_behavior": "Must refuse to conflate sources. Report exact repo/ref/SHA being reviewed, distinguish local-unpushed claims from remote evidence, and judge only the source actually inspected."
+    },
+    {
+      "id": 17,
+      "prompt": "/code_sc 两个分支各自 PASS，merge 后 old public header 和新 private header 同时存在，CI 还没跑",
+      "expected_behavior": "Must treat merge as new code, detect resurrected/zombie public contracts, check API consumers/project membership, and require post-merge tests rather than inheriting parent PASS."
+    },
+    {
+      "id": 18,
+      "prompt": "/code_sc protection.c 里 #if(APP_COMP2_FAULT_ENABLE) 但该宏没有直接包含，output.c 通过另一个头定义了 1",
+      "expected_behavior": "Must inspect preprocessing semantics and flag a safety-critical silent-disable risk if the macro can be undefined in that translation unit. Require unique owner, direct include/shared config, and definedness guard."
+    },
+    {
+      "id": 19,
+      "prompt": "/code_sc NVIC_EnableIRQ(USART_IRQn) 已经调用，startup 里有 weak USART_IRQHandler，但工程没有强实现",
+      "expected_behavior": "Must classify this as an interrupt completeness/runtime hang defect: first IRQ can land in Default_Handler. Trace enable -> vector -> strong handler -> driver handler -> consumer and mark P1 unless intentionally disabled."
+    },
+    {
+      "id": 20,
+      "prompt": "/code_sc ADC stale 让 PWM 停到0，MPPT 内部仍保留 600‰；样本恢复后第一次重新 Arm 直接写 600‰",
+      "expected_behavior": "Must build the re-arm timeline and flag stale-command/duty jump. Recommend an executor-owned first-duty cap/rebuild ramp; preserving algorithm memory does not justify physical 0->large-duty step."
+    },
+    {
+      "id": 21,
+      "prompt": "/code_sc 新增 power_inhibited() 但 charge/output/restart 都没调用它，这个函数以后会用",
+      "expected_behavior": "Must classify this as an orphan/Zombie Safety Gate and build a veto reachability matrix across every hazardous admission/commit/restart path."
+    },
+    {
+      "id": 22,
+      "prompt": "/code_sc 看门狗 MAIN+CONTROL+ADC 三票一直正常，1ms 任务里有 sqrtf，tick 只是一个 bool flag，所以长期运行肯定没问题",
+      "expected_behavior": "Must distinguish liveness from real-time deadlines, analyze tick coalescing and Cortex-M0/M0+ software-float WCET, and require timing/missed-tick evidence rather than accepting watchdog health as deadline proof."
+    },
+    {
+      "id": 23,
+      "prompt": "/code_sc 当前 main 的 CI 第一关失败，后面的 host/architecture tests 都 skipped，不过上一个 SHA 的 Keil 是 0 warning",
+      "expected_behavior": "Must not reuse stale validation. Current SHA has CI failure and unexecuted gates; report separately and refuse overall PASS until final SHA is rebuilt/retested."
+    },
+    {
+      "id": 24,
+      "prompt": "/code_sc 为了少文件，把很多配置通过 main.h 传递给各模块；include 图没环，算干净吗",
+      "expected_behavior": "Must reject include-count-only cleanliness. Check true ownership and Include-What-You-Use; transitive main.h aggregation is a hidden dependency even without SCC, especially for safety config."
+    },
+    {
+      "id": 25,
+      "prompt": "/code_sc Keil 工程把 G13 新模块和 MPPT 新模块都编进去了，但 G13 还调用旧的 app_mppt_out/app_charge_lock_startup 接口",
+      "expected_behavior": "Must identify a merge integration contract break by comparing public declarations, implementations, callers, and project membership. Compile/link compatibility of every target file is part of architecture review."
+    },
+    {
+      "id": 26,
+      "prompt": "/code_sc Flash维护时会暂停ADC并设置maintenance_busy，但只在Flash driver里检查PWM=0，恢复后立即允许自动启动",
+      "expected_behavior": "Must review the entire maintenance transaction: veto reachability before entry, sample invalidation, watchdog/deadline effects, resume qualification with fresh generations, and restart admission. Local driver checks alone are insufficient."
     }
   ]
 }

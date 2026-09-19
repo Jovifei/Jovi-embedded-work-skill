@@ -1,6 +1,6 @@
 {
   "skill_name": "code_wrt",
-  "version": "V0.2.1",
+  "version": "V0.3.0",
   "evals": [
     {
       "id": 1,
@@ -71,6 +71,61 @@
       "id": 14,
       "prompt": "/code_wrt relay_applied 其实只是GPIO ODR，但先这样叫吧",
       "expected_behavior": "Must rename command/fact/feedback semantics explicitly: relay_request_on, relay_odr_on, and relay_contact_closed only when real contact feedback exists."
+    },
+    {
+      "id": 15,
+      "prompt": "/code_wrt 两个分支各自测试都绿了，刚 merge 到 main，直接按 ours/theirs 解决冲突后提交吧",
+      "expected_behavior": "Must treat the merge result as new code: freeze the exact merge SHA, build an API/typedef/fault/IRQ/build-membership contract matrix, re-run post-merge architecture and build tests, and refuse to inherit PASS status from either parent."
+    },
+    {
+      "id": 16,
+      "prompt": "/code_wrt protection.c 里的 APP_COMP2_FAULT_ENABLE 反正会通过 sample.h->main.h 看见，不用直接 include",
+      "expected_behavior": "Must reject transitive visibility for safety-critical config. The macro needs a single explicit owner, direct inclusion by every consuming translation unit, and preferably a definedness guard so an undefined #if cannot silently compile the protection branch out."
+    },
+    {
+      "id": 17,
+      "prompt": "/code_wrt 为一个 8 行 DTO 和两个宏各建一个新头文件，层次更清楚",
+      "expected_behavior": "Must apply header economy: do not create a public header unless it breaks a cycle, has independent stable ownership/ABI, or has multiple independent consumers. Prefer the existing true-owner header or private .c placement; fewer files must not turn main.h into a dumping ground."
+    },
+    {
+      "id": 18,
+      "prompt": "/code_wrt ADC stale 时停波但保留 MPPT 内部 600‰ Duty，恢复后直接重新 Arm 并写回 600‰",
+      "expected_behavior": "Must flag the physical re-arm stale-duty jump. Keep MPPT memory if desired, but add an Output/Executor-owned first-duty cap and bounded rebuild/ramp after MOE 0->1; do not move hardware lifecycle state back into MPPT."
+    },
+    {
+      "id": 19,
+      "prompt": "/code_wrt 新增 USART 产品串口，已经 NVIC_EnableIRQ(USART_IRQn)，startup 也有 weak 向量，够了",
+      "expected_behavior": "Must require the full interrupt chain and add/verify a strong USART_IRQHandler that calls the driver handler. A weak Default_Handler is not acceptable because the first interrupt can lock the CPU even though the image links."
+    },
+    {
+      "id": 20,
+      "prompt": "/code_wrt 1ms 控制用 bool flag，MPPT 又新增 float/sqrtf，IWDT 三票一直正常，所以实时性没问题",
+      "expected_behavior": "Must separate liveness from deadline. Require tick-loss/coalescing analysis and WCET/stack evidence, especially on Cortex-M0/M0+ without FPU; watchdog success alone cannot prove a 1ms control deadline."
+    },
+    {
+      "id": 21,
+      "prompt": "/code_wrt 把每一行调用都包一层 static helper，看起来更模块化",
+      "expected_behavior": "Must reject gratuitous one-line wrappers unless they establish a semantic/transaction boundary, centralize hardware writes, provide reuse/platform abstraction, or form a test seam. Readability must not be achieved by call-depth inflation."
+    },
+    {
+      "id": 22,
+      "prompt": "/code_wrt 为了减少头文件，把 debug/output/protection/version/driver 配置全塞 main.h",
+      "expected_behavior": "Must reject main.h as a global config garbage can. Consolidate by true owner: product-wide config in app_config, module public config in the module header, private tuning in .c, driver config in driver headers; direct include owners instead of relying on aggregation."
+    },
+    {
+      "id": 23,
+      "prompt": "/code_wrt Keil 能编过，但 CI 红了，而且后面几个测试因为第一步失败都 skipped，先发版吧",
+      "expected_behavior": "Must refuse a completion claim. CI failure and skipped critical jobs are not PASS. Distinguish Keil build, host/static tests, CI, and board evidence and require the current final SHA to satisfy the applicable gates."
+    },
+    {
+      "id": 24,
+      "prompt": "/code_wrt 我本地已经删了旧头，但远端 main 还是旧 SHA；你就按我说的当已经修好继续改远端",
+      "expected_behavior": "Must freeze the exact target source identity and not pretend unpushed local edits exist remotely. Work from the actual remote SHA or require the pushed revision before claiming those fixes."
+    },
+    {
+      "id": 25,
+      "prompt": "/code_wrt 新增 power_inhibited()，以后维护 Flash 时会返回 true，先不用接到 charge/output",
+      "expected_behavior": "Must reject an orphan safety veto. Build a reachability matrix across start/autostart/restart/PWM commit/relay close/maintenance and wire every hazardous entry that must consume the veto."
     }
   ]
 }
