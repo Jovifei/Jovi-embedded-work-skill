@@ -2,6 +2,15 @@
 
 版本号写在各 skill 的 `SKILL.md` 文首 `**Version:**` 或对应版本声明，以及本文件。README「当前版本」表应与之一致。
 
+## 2026-09-19
+
+| Skill | 从 | 到 | 说明 |
+|---|---|---|---|
+| code_wrt | V0.2.1 | **V0.3.0** | 从“写前/写后架构门禁”升级为工程集成门禁：精确 SHA、merge-as-new-code、公共头最小化/IWYU、安全宏 definedness、API Consumer Matrix、IRQ 向量强实现、临时停波 re-arm ramp、veto 可达性、WCET/tick/CI 分级；eval 14→25。 |
+| code_sc | V0.2.0 | **V0.3.0** | 新增 merge 合同矩阵、public contract resurrection、关键预处理值、NVIC→vector→strong handler、re-arm stale Duty、orphan veto、liveness≠deadline、header economy、CI/旧 SHA 证据隔离；eval 15→26。 |
+| code_zl | V0.1.8 | **V0.2.0** | 注释从“白话”提升到“白话且真实”：数字/单位/硬件能力/时序/验证等级必须与源码一致；发现传递 include 安全宏、75%/80%、ODR/触点、bool tick/精确 1ms 等矛盾必须报警；eval 6→13。 |
+| README | — | — | 同步三项 skill 新版本、触发能力与工程防错原则。 |
+
 ## 2026-09-17
 
 | 项 | 说明 |

@@ -4,19 +4,19 @@
 
 专为嵌入式 C 工程（GD32/STM32/ESP32 + FreeRTOS + Modbus/CAN/UART）设计，开箱即用。
 
-## 当前版本（2026-09-17）
+## 当前版本（2026-09-19）
 
 版本号以各 skill 目录 `SKILL.md` 文首 `**Version:**`（或 `VERSION` 文件）为准；本表必须与之同步。明细见 [`CHANGELOG.md`](CHANGELOG.md)。
 
-### 本轮 README 对齐（相对旧 README 漏记项）
+### 本轮三技能加强（2026-09-19）
 
 | Skill | 版本 | 说明 |
 |---|---|---|
-| `code_sc` | **V0.2.0** | 安全边沿/TOCTOU/同代快照/lifecycle Owner/producer-consumer 完整审查门禁 |
-| `code_wrt` | **V0.2.1** | README 曾误写 V0.1.5；现网为写入门禁：`code_sc` → 实现 → `code_zl` → `code_sc` |
+| `code_sc` | **V0.3.0** | 在 safety-edge 基础上新增 merge-as-new-code、精确 SHA、关键宏预处理、IRQ 强 handler、re-arm stale Duty、veto 可达性、WCET/tick/CI 证据门禁 |
+| `code_wrt` | **V0.3.0** | 写入门禁升级：合并后重新验收、头文件最小化/IWYU、安全宏 definedness、IRQ 向量闭环、Output re-arm ramp、实时性与 CI 完成门 |
 | `code-study` | **V1.3.0** | **新增**：项目内 `docs/code-study/<基线>/` 逐模块/逐函数学习资料 |
 | `update-project-docs` | **V1.1.0** | Full Refresh 全树清单 + 介绍面完成门（纯文档不升固件版本） |
-| `code_zl` | **V0.1.8** | 白话注释、先定义再使用、`// todo:` |
+| `code_zl` | **V0.2.0** | 注释真实性优先：数字/单位/硬件能力/时序/验证等级与代码一致；不再用注释掩盖结构或安全问题 |
 | `prj_zl` | **V0.1.0** | Keil `app/driver` 四层；号未升 |
 | `clangd_init` | **V1.1.0** | 跳转 + 保存格式化 |
 
@@ -27,9 +27,9 @@
 | `project-init` | 未编号 | 工程工具链一键 init |
 | `update-project-docs` | **V1.1.0** | 文档 bootstrap + Full Refresh |
 | `clangd_init` | **V1.1.0** | clangd 跳转与 Ctrl+S 格式化 |
-| `code_zl` | **V0.1.8** | 注释/分节/格式标准化 |
-| `code_sc` | **V0.2.0** | 架构、所有权、安全边沿与并发审查 |
-| `code_wrt` | **V0.2.1** | 写代码门禁 + 简化 + 注释 |
+| `code_zl` | **V0.2.0** | 注释/分节/格式标准化 |
+| `code_sc` | **V0.3.0** | 架构、所有权、安全边沿与并发审查 |
+| `code_wrt` | **V0.3.0** | 写代码门禁 + 简化 + 注释 |
 | `code-study` | **V1.3.0** | 项目内源码学习书 |
 | `prj_zl` | **V0.1.0** | Keil app/driver 目录重组 |
 | `day_sum` | 未编号 | 开发日报 |
@@ -174,11 +174,11 @@ docs/
 
 ### 4. code_zl — 代码注释标准化
 
-**版本：** V0.1.8
+**版本：** V0.2.0
 
 **触发词：** `/code_zl`、`代码整理`、`注释整理`、`添加注释`、`批量注释`、`白话注释`
 
-**功能：** 为嵌入式 C 工程添加标准化注释，遵循 Jovi 代码规范。支持单文件和多文件并行处理。Ctrl+S 格式化与 `clangd_init` 共用 `.clang-format` 模板。注释必须白话；未上板行用 `// todo:`。结构改写仍走 `/code_wrt`。
+**功能：** 为嵌入式 C 工程添加标准化注释，遵循 Jovi 代码规范。支持单文件和多文件并行处理。V0.2.0 起增加 Comment-to-Code 真值核对：数值、单位、状态、硬件能力、时序和验证等级必须与源码一致；发现 75%/80%、ODR/触点、1ms flag/精确周期、安全宏传递 include 等冲突时先报告，结构改写仍走 `/code_wrt`。
 
 **注释格式：**
 
@@ -211,11 +211,11 @@ docs/
 
 ### 5. code_sc — 架构与所有权审查
 
-**版本：** V0.2.0
+**版本：** V0.3.0
 
 **触发词：** `/code_sc`、`代码审查`、`架构审查`、`调用关系审查`、`模块边界审查`、`ownership review`、`PWM安全审查`、`中断竞争审查`
 
-**功能：** 嵌入式 C 的「结构 + 行为 + 安全时序」审查。默认**只审查、不改代码**。除了 Owner、边界、依赖环、DTO/API、隐藏依赖外，V0.2.0 强制审查 PWM 第一拍/最后一拍、COMP/Break live window、ISR/main TOCTOU、same-generation safety snapshot、lifecycle reset/start/stop 唯一 Owner、API 返回语义、fault/action producer-consumer 可达性，以及产品功率/电流包络是否存在多份真值。
+**功能：** 嵌入式 C 的「结构 + 行为 + 安全时序 + 工程集成」审查。默认**只审查、不改代码**。V0.3.0 在 Owner/safety-edge/TOCTOU/same-generation snapshot 基础上，强制检查精确 ref/SHA、merge 后接口裂脑、被复活的 zombie public header、关键安全宏预处理值、NVIC→startup vector→强 handler、临时停波后的 stale Duty re-arm、maintenance/power veto 可达性、bool tick 合并/WCET，以及 CI failure/skipped/stale Keil 证据。
 
 **流程摘要：** 事实基线 → Owner 表 → 依赖/SCC/逆向边 → Actuator writer 表 → DTO/API/隐藏依赖 → 状态机/lifecycle → Safety-edge timeline → ISR/TOCTOU → Snapshot generation → Producer/Consumer → Multiple Sources of Truth → 静态/Host/Keil/Board 验证分级。用户明确要求「修复/整改」时，先给边界再改。
 
@@ -231,7 +231,7 @@ docs/
 
 ### 6. code_wrt — 写代码门禁（审查 → 实现 → 注释 → 再审查）
 
-**版本：** V0.2.1
+**版本：** V0.3.0
 
 **触发词：** `/code_wrt`、`写代码`、`代码简化整理`、`简化并注释`、`重构并整理`
 
@@ -245,7 +245,7 @@ code_sc(pre-write design gate)
   → code_sc(post-write architecture gate)
 ```
 
-V0.2.1 起强制：Driver/Application 层级合同、ISR→Driver→callback/pending→Application service 全链、Application 模块关系、task 调度边界、函数角色命名与参数命名/单位/位置规则。触碰会进镜像的行为时，**随代码提交收口**升 `SOFT_VERSION` 并追加 `docs/版本更改/`；纯文档/`update-project-docs` 不升固件版本。
+V0.3.0 起除原有 Driver/Application 层级、ISR→Driver→pending→Application service、命名/参数规则外，还强制：merge 结果按新代码验收、公共头最小化但禁止 main.h 大杂烩、Include-What-You-Use、安全宏未定义不得静默降为 0、每个已 Enable IRQ 必须有强 handler、MOE 重新开启必须有 executor-owned first-duty/rebuild、看门狗 liveness 与 1ms deadline 分开证明。触碰会进镜像的行为时，**随代码提交收口**升 `SOFT_VERSION` 并追加 `docs/版本更改/`；纯文档不升固件版本。
 
 **必需子技能：** `code_sc`、`ponytail`、`code_zl`。任一不可用时停止结构性修改。
 
@@ -558,7 +558,7 @@ Claude：读规范与调用链 → 画 Owner 表、依赖/SCC 与 writer 表
 你：/code_wrt Application/app/src/mppt.c
 
 Claude：先跑 code_sc 写前门禁并冻结 Layer/Owner/调用合同
-→ ponytail/实现 → code_zl V0.1.8 注释与分节
+→ ponytail/实现 → code_zl V0.2.0 注释与分节
 → 再跑 code_sc 写后门禁 → 输出两阶段审查与变更摘要
 ```
 
