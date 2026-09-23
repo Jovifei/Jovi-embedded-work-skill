@@ -5,7 +5,7 @@ description: "Use when the user invokes /code_sc or asks for a deep embedded-C c
 
 # Code SC
 
-**Version: V0.3.0**
+**Version: V0.3.1**
 
 `code_sc` 是嵌入式 C 的“结构 + 行为 + 安全时序”代码审查 skill。它不只找空指针、越界和语法问题，而是专门发现“代码能跑、测试能过，但 Owner / 状态机 / 安全提交时序已经写歪”的问题：Owner 不唯一、Controller 越权、Application 内部环依赖、整个上下文对象乱传、算法层知道硬件/充电阶段、同一状态被多个模块解释、硬件多写点、隐藏全局依赖、参数语义重载、死接口、ISR/主循环竞争、首拍保护空窗、TOCTOU、跨代 snapshot、重复 lifecycle reset、API 假成功、产品限制多份真值等。
 
@@ -58,6 +58,87 @@ Merge 后至少审 public API/typedef、fault schema、safety veto、IRQ、build
 
 目标不是越少越好，而是最少且 Owner 清楚。单独 header 的合理理由是打断环、稳定 ABI、独立 Owner、多独立消费者。禁止 main.h 变万能配置桶、安全宏通过多层 include 偶然可见、public 目录残留 private/zombie algorithm header、同名宏多头重复定义、为一行 wrapper 再建一对 `.h/.c`。
 
+## 版本记录
+
+- **V0.3.1（2026-09-23）**：基于 MPPT Charger V0.13.18 暴露的问题，补充冗余审计、时间屏障分层、四层输出语义、证据分级与重构合同收口门禁。
+- **V0.3.0**：补充集成/合并/实时性硬门禁。
+
+## V0.3.1 新增：冗余、时间屏障与合同收口门禁
+
+本节只补充 V0.3.0 未明确的判断边界；不替代已有 Owner、Safety-edge、Snapshot 和证据规则。
+
+### 1. 冗余审计矩阵：先证同义，再谈合并
+
+发现近义参数、字段、宏或 API 时，先建最小矩阵：
+
+| 候选 | 语义 | 单位/量纲 | Owner | Producer/Consumer | 合并结论 |
+|---|---|---|---|---|---|
+| `a` / `b` | ? | ? | ? | ? | 保留/合并/需确认 |
+
+只有**语义、单位/量纲、Owner 三者完全一致**，且 Producer/Consumer 合同不变，才允许合并。**数值相等不等于参数相同**：`300000` 可能分别表示产品上限、当前批准值或硬件绝对上限；必须先确认角色和生命周期。
+
+### 2. 安全复核分层：数值可收口，时间屏障不可去重
+
+- 输出数值清洗、限幅、单位转换可在明确 Owner 下收口，避免多份实现。
+- 采样新鲜度、ISR 竞态、PWM 写前保护、PWM 写后生效、继电器写前条件、继电器写后稳定/反馈，分别是不同**时间屏障**。
+- 禁止以“去重/合并检查”为由删除这些屏障；每个屏障都要在 Safety-edge timeline 标出触发点、保护责任和证据。
+
+### 3. 结构减法判定：四类问题要分别举证
+
+- **Shotgun surgery**：同一规则的修改必须散落多个文件/分支；记录规则 Owner 和受影响合同，不以简单复制代替收口。
+- **规则多份解释**：多个模块对同一事实、阈值或生命周期各自解释；即使当前结果相同，也报 Multiple Sources of Truth。
+- **空 wrapper**：函数只转调、无语义边界、无副作用/所有权/稳定 ABI 价值；可删除或合并，但先查全部调用点。
+- **死字段**：无真实 Producer、无有效 Consumer、只在 DTO/日志中镜像，或值恒定且不影响决策；须给出搜索证据，不能仅凭未读到就删除。
+
+### 4. 输出语义四层：禁止混用
+
+审查和命名必须区分：
+
+```text
+candidate            算法/策略提出的候选值
+approved              Application/Safety 批准后允许的值
+driver_setting       已交给 Driver/Executor 的寄存器或驱动设定
+physically_effective  硬件实际生效的值/状态（需时序或板级证据）
+```
+
+`candidate == approved` 不代表已提交；`driver_setting == physically_effective` 也不代表影子寄存器、更新事件、PWM/Relay 反馈已经生效。报告不得用上一层证据替代下一层结论。
+
+### 5. 结论证据分桶：Host/Keil 不得冒充 BOARD_PASS
+
+每个问题必须归入且只归入一个主桶：
+
+- **可确认 bug**：源码、可复现测试或明确失败证据已闭环。
+- **结构问题**：Owner、边界、重复解释、合同或可维护性已由静态证据确认，但不等同于已发生的板级故障。
+- **需板级证据**：必须用真实 MCU/中断时序/示波器/继电器反馈/故障注入确认；Host、静态分析、Keil 编译只能分别写 `HOST_PASS`、`STATIC_ANALYZER_PASS`、`KEIL_BUILD_PASS`，不得写 `BOARD_PASS`。
+
+输出问题表增加 `结论桶` 列，并在每项后写 `证据层级 + 未验证项`。
+
+### 6. Post-refactor contract closure：收口清单
+
+任何重构不得以“代码已移动/编译通过”结束。完成门必须逐项闭环：
+
+```text
+[ ] headers：public/private、直接 include、include path 无旧合同残留
+[ ] API：声明/定义/调用点、语义/单位/Owner 一致
+[ ] project membership：Keil/CMake/Make/CI 实际包含正确文件，旧文件未被幽灵编译
+[ ] tests：host/静态/Keil/板级测试路径与结果已重新确认
+[ ] docs：README/架构/接口/验证边界反映当前实现
+```
+
+任一项没有证据，输出 `POST_REFACTOR_CONTRACT_PARTIAL`，不得写“重构完成”。
+
+### V0.3.1 最小输出模板
+
+```text
+结论桶：可确认 bug / 结构问题 / 需板级证据
+对象：<参数/字段/API/时间屏障>
+四层状态：candidate=<...> -> approved=<...> -> driver_setting=<...> -> physically_effective=<...>
+冗余矩阵：语义=<...>；单位=<...>；Owner=<...>；结论=<保留/合并/需确认>
+安全屏障：采样新鲜度=<...>；ISR=<...>；PWM写前/写后=<...>；Relay写前/写后=<...>
+证据：SOURCE_CONFIRMED / HOST_PASS / STATIC_ANALYZER_PASS / KEIL_BUILD_PASS / BOARD_PASS
+未验证：<具体缺口>
+收口：headers=<...>；API=<...>；project membership=<...>；tests=<...>；docs=<...>
+```
 ## V0.2.0 新增硬门禁
 
 V0.1.0 已覆盖 Owner、边界、依赖环、DTO、隐藏依赖、状态机、PWM/Relay/Protection 和 ISR 并发；V0.2.0 强制补上此前容易漏掉的“边沿/跨代/生命周期”审查：
