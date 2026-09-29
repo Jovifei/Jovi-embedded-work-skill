@@ -4,17 +4,20 @@
 
 专为嵌入式 C 工程（GD32/STM32/ESP32 + FreeRTOS + Modbus/CAN/UART）设计，开箱即用。
 
-## 当前版本（2026-09-23）
+## 当前版本（2026-09-29）
 
 版本号以各 skill 目录 `SKILL.md` 文首 `**Version:**`（或 `VERSION` 文件）为准；本表必须与之同步。明细见 [`CHANGELOG.md`](CHANGELOG.md)。
 
-### 本轮三技能加强（2026-09-23）
+### 文档技能更新（2026-09-29）
+
+[两种文档技能的分工与验证](DOCUMENTATION-SKILLS.md)。其余技能版本保持不变。
 
 | Skill | 版本 | 说明 |
 |---|---|---|
 | `code_sc` | **V0.3.1** | 在 V0.3.0 基础上增加冗余审计矩阵、时间屏障分层、输出四层语义、证据分桶与重构合同收口 |
 | `code_wrt` | **V0.3.1** | 在 V0.3.0 基础上增加最小改动、单一真源、删除前全量检索、物理行为冻结与重构后闭环 |
-| `code-study` | **V1.3.0** | **新增**：项目内 `docs/code-study/<基线>/` 逐模块/逐函数学习资料 |
+| `code-study` | **V2.0.0** | 按运行阶段与功能写完整口语图文教程；配模块/原函数、参数、状态机及离线阅读器 |
+| `product-doc` | **V1.0.0** | 新增：源码驱动的产品说明、运行逻辑、参数台账、保护恢复与验收清单 |
 | `update-project-docs` | **V1.1.0** | Full Refresh 全树清单 + 介绍面完成门（纯文档不升固件版本） |
 | `code_zl` | **V0.2.1** | 在 V0.2.0 基础上增加注释经济性、事实单一 Owner、候选/设定/物理生效白话化与残留术语检查 |
 | `prj_zl` | **V0.1.0** | Keil `app/driver` 四层；号未升 |
@@ -30,7 +33,8 @@
 | `code_zl` | **V0.2.1** | 注释/分节/格式标准化与注释经济性 |
 | `code_sc` | **V0.3.1** | 架构、所有权、安全边沿、并发与冗余合同审查 |
 | `code_wrt` | **V0.3.1** | 写代码门禁 + 最小改动 + 简化 + 注释 |
-| `code-study` | **V1.3.0** | 项目内源码学习书 |
+| `code-study` | **V2.0.0** | 分阶段口语图文源码学习书 |
+| `product-doc` | **V1.0.0** | 产品说明、运行逻辑与可追溯参数 |
 | `prj_zl` | **V0.1.0** | Keil app/driver 目录重组 |
 | `day_sum` | 未编号 | 开发日报 |
 | `child-claude` | 未编号 | 多模型派发编排 |
@@ -50,7 +54,8 @@ jovi-embedded-work/
 ├── code_zl/                   # C 代码注释标准化（V0.2.1）
 ├── code_sc/                   # 架构 / Owner / 安全时序审查（V0.3.1）
 ├── code_wrt/                  # 写代码门禁：code_sc → 实现 → code_zl → code_sc（V0.3.1）
-├── code-study/                # 项目内源码学习资料（V1.3.0）
+├── code-study/                # 分阶段口语图文学习书（V2.0.0）
+├── product-doc/               # 产品说明与运行参数（V1.0.0）
 ├── prj_zl/                    # Keil 工程 app/driver 目录重组（V0.1.0）
 ├── day_sum/                   # 开发日报生成
 ├── child-claude/              # 多模型派发编排（父规划+审核，子执行）
@@ -258,20 +263,20 @@ V0.3.1 起除原有 Driver/Application 层级和双重 code_sc 门禁外，还�
 
 ---
 
-### 7. code-study — 项目内源码学习资料
+### 7. code-study — 分阶段口语图文学习书
 
-**版本：** V1.3.0
+**版本：** V2.0.0
 
-**触发词：** `/code-study`、`$code-study`、`源码学习`、`代码学习资料`、`制作学习文档`
+**触发词：** `/code-study`、`$code-study`、`源码学习`、`重做learning`、`图文并茂`、`看不懂术语`
 
-**功能：** 在**当前项目**内直接生成/维护 `docs/code-study/<源码基线>/`：逐模块与逐函数 Markdown、SVG/DOT 流程与调用图、核心算法/状态机专题、分阶段学习路线、唯一离线全文搜索页 `index.html`。函数页先展示完整原函数体与原注释，再做解释。
+**功能：** 在当前项目 `docs/code-study/<源码基线>/` 先写按实际运行阶段与功能组织的完整教程：动作、原因、参数与条件、具体例子、失败去向、状态机和答案。模块与函数页是查询层，不用阅读清单代替正文。函数页仍先展示完整原函数体与原注释，再解释。
 
-**硬边界：** 不生成学习资料 ZIP；不修改业务源码；不自动 commit/push；不得把 MPPT 工程的版本/参数/阶段数当成其他工程事实。Codex 推荐安装到 `~/.agents/skills/code-study/`（见 [`code-study/INSTALL.md`](code-study/INSTALL.md)）。
+**配套：** Markdown、SVG/DOT、递归全文索引、唯一离线阅读入口`index.html`，支持图放大和源码行定位。提供机械校验、逐章复审模板、浏览器检查和合成测试；检查通过不等于讲解全对或固件安全。
 
-**示例：**
-```
-/code-study 为当前项目制作完整代码学习资料
-$code-study 增量更新 charge / mppt 模块文章
+**边界：** 默认项目目录交付，不改业务源码、不自动归档或提交。仅本次明确授权才交附件/ZIP或推送；不把前一项目的参数和章数写成通用规定。安装须复制完整目录，见[安装说明](code-study/INSTALL.md)。
+
+```text
+$code-study 基于当前源码重做learning，按运行阶段和功能讲，使用口语、实际参数、例子和流程图，不改固件。
 ```
 
 ---
@@ -392,7 +397,7 @@ Constraint: <约束，如只创建文件不跑命令>
 
 ---
 
-### 12. c-pan-reorganize — C 盘数据整理
+### 12. c-pan-reorganize — C 盘数据迁移与安全清理
 
 **触发词：** `C盘清理`、`C盘空间不足`、`迁移应用数据到D盘`、`清理更新包`、`清理安全缓存`
 
@@ -427,6 +432,22 @@ Constraint: <约束，如只创建文件不跑命令>
 
 ---
 
+### 14. product-doc — 产品说明与运行参数
+
+**版本：** V1.0.0
+
+**触发词：** `/product-doc`、`$product-doc`、`产品说明文档`、`运行逻辑参数写进去`、`启动电压/满功率/限流`
+
+**功能：** 基于当前源码与有效配置，按真实功能组合产品说明、启动和执行、业务档案、功率调节、保护恢复、通信设置保存升级及验收专题。参数既查定义，也追实际使用处，记录条件、单位、比较符和时间。软件默认、活动逻辑、推导、实测与未知分别标明。
+
+**交付：** Markdown、参数/保护/验收CSV、SVG/DOT和离线HTML；需要正式评审或可编辑合订本时再导出Word并逐页检查。默认不改固件、不提交、不把软件预算写成产品实测保证。与code-study独立使用，详见[product-doc](product-doc/SKILL.md)。
+
+```text
+$product-doc 基于当前代码做详细产品说明，把运行参数、预备条件、失败和恢复写进正文与图，附参数台账；不改代码。
+```
+
+---
+
 ## 安装
 
 ### 方式一：git clone（推荐）
@@ -444,6 +465,7 @@ xcopy /E /I code_zl %USERPROFILE%\.claude\skills\code_zl
 xcopy /E /I code_sc %USERPROFILE%\.claude\skills\code_sc
 xcopy /E /I code_wrt %USERPROFILE%\.claude\skills\code_wrt
 xcopy /E /I code-study %USERPROFILE%\.claude\skills\code-study
+xcopy /E /I product-doc %USERPROFILE%\.claude\skills\product-doc
 xcopy /E /I prj_zl %USERPROFILE%\.claude\skills\prj_zl
 xcopy /E /I day_sum %USERPROFILE%\.claude\skills\day_sum
 xcopy /E /I child-claude %USERPROFILE%\.claude\skills\child-claude
@@ -453,8 +475,9 @@ xcopy /E /I android-app-delivery %USERPROFILE%\.claude\skills\android-app-delive
 xcopy /E /I android-build-release %USERPROFILE%\.claude\skills\android-build-release
 xcopy /E /I android-device-verify %USERPROFILE%\.claude\skills\android-device-verify
 
-# Codex / agents 另装 code-study（推荐）
+# Codex / agents 的文档技能（安装前备份个人修改）
 xcopy /E /I code-study %USERPROFILE%\.agents\skills\code-study
+xcopy /E /I product-doc %USERPROFILE%\.agents\skills\product-doc
 
 # macOS / Linux
 cp -r project-init ~/.claude/skills/
@@ -464,6 +487,7 @@ cp -r code_zl ~/.claude/skills/
 cp -r code_sc ~/.claude/skills/
 cp -r code_wrt ~/.claude/skills/
 cp -r code-study ~/.claude/skills/
+cp -r product-doc ~/.claude/skills/
 cp -r prj_zl ~/.claude/skills/
 cp -r day_sum ~/.claude/skills/
 cp -r child-claude ~/.claude/skills/
@@ -472,7 +496,7 @@ cp -r c-pan-reorganize ~/.claude/skills/
 cp -r android-app-delivery ~/.claude/skills/
 cp -r android-build-release ~/.claude/skills/
 cp -r android-device-verify ~/.claude/skills/
-mkdir -p ~/.agents/skills && cp -r code-study ~/.agents/skills/
+mkdir -p ~/.agents/skills && cp -r code-study product-doc ~/.agents/skills/
 ```
 
 ### 方式二：直接下载
@@ -566,9 +590,9 @@ Claude：先跑 code_sc 写前门禁并冻结 Layer/Owner/调用合同
 ```
 你：/code-study 为当前项目制作完整代码学习资料
 
-Claude：在项目 docs/code-study/<基线>/ 落盘模块/函数 Markdown 与 SVG
-→ 函数页先贴完整原函数，再解释；生成唯一 index.html 搜索页
-→ 不打包 ZIP、不改业务源码
+Claude：在项目 docs/code-study/<基线>/ 先写分阶段教程，再链接模块/完整函数
+→ 条件、参数、例子、失败流程和答案写进正文；生成唯一 index.html 阅读搜索页
+→ 递归检查目录和索引；默认不打包、不改业务源码
 ```
 
 ### 场景 8：Keil 工程目录重组
@@ -584,7 +608,7 @@ Claude：列出旧路径清单 → git mv 到 app/driver 四层目录
 ### 场景 9：日报生成
 
 ```
-你：总结今天的开发记录
+你：总结今天的工作
 
 Claude：读取 git log 或开发记录文件 → 按"发现问题/分析/解决"组织
 → 输出结构化日报
@@ -615,7 +639,7 @@ Claude：先只读统计 C 盘数据和进程 → 确认目标目录与用户授
 
 ## 文档命名规范
 
-所有 skill 生成的文档遵循统一命名：
+通用项目文档遵循下列命名；`code-study`和`product-doc`分别使用其基线目录及章节/参数文件约定：
 
 ```
 {NN}-{TYPE}-{中文文档名}.md
