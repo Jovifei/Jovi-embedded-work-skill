@@ -1,7 +1,12 @@
 {
   "skill_name": "code_zl",
-  "version": "V0.2.0",
+  "version": "V0.2.2",
   "evals": [
+    {
+      "id": 18,
+      "prompt": "/code_zl 私有struct依次float gain,uint8_t mode,bool ready,float limit,uint8_t retry,bool valid；另有packed协议struct固定offset。把同类放一起，顺便换函数形参顺序。只许注释整理。",
+      "expected_behavior": "Report interleaved private members for authorized structural code_wrt work, suggest separate float/uint8_t/bool groups preserving within-type order, but do not reorder any member in code_zl. Preserve packed fixed offsets as an exception and do not expand grouping to function parameters. Do not assert fixed RAM savings without target evidence or create nested structs/headers."
+    },
     {
       "id": 1,
       "prompt": "/code_zl src/modbus.c src/host_comm.c",
@@ -15,7 +20,7 @@
     {
       "id": 3,
       "prompt": "/code_zl inc/main.h",
-      "expected_behavior": "Should add // comments to every macro, enum value, struct field, and function declaration. Header sections must use //=================== 标题 ===========================. Should NOT add file header comment to .h file. Should NOT add /* GUARD */ to #endif. Struct fields should have aligned inline comments. Function declarations stay on one line with trailing //."
+      "expected_behavior": "Should explain non-obvious macro/enum/field/API contracts once at their owner, align existing declarations and trailing comments using project style, and avoid repeating obvious facts. Must not reorder struct/enum members, rename APIs, or migrate ownership under a comments request."
     },
     {
       "id": 4,
@@ -66,6 +71,26 @@
       "id": 13,
       "prompt": "/code_zl 把头文件分节整理一下，里面有产品共享参数、Output执行参数和Protection恢复参数",
       "expected_behavior": "Must group comments by true owner/semantic domain, avoid vague ‘公共参数’, and not create more headers or move logic. If mixed ownership is structurally wrong, report it for code_wrt."
+    },
+    {
+      "id": 14,
+      "prompt": "/code_zl 只整理 a.c。f() 后有 #if BOARD_BUILD 下的 static uint32_t seen;，f() 内还有 static int calls;。main.h 的私有类型也顺手挪回 a.c，DRV_Stop 改 drv_stop 吧。",
+      "expected_behavior": "Keep comments-only scope: report type migration and API rename for code_wrt. Exclude function-local calls from file-scope layout check; never move seen across its original guard. Only move a file-scope declaration when same-scope/same-guard dependency equivalence is demonstrated; otherwise report it."
+    },
+    {
+      "id": 15,
+      "prompt": "/code_zl：static bool prepare(uint16_t duty) 总是true但会写零；bool zero_applied(void) 读更新事件；ADC_IRQHandler 一行转发。帮我注释并把短函数都删掉。",
+      "expected_behavior": "Explain that deletion/return-type changes are structural code_wrt work. Document prepare as issuing a request and zero_applied as later evidence, preserve IRQ bridge name and hardware timing barriers. Do not claim physical zero from prepare or delete by line count."
+    },
+    {
+      "id": 16,
+      "prompt": "/code_zl 函数实际为 static uint16_t duty_get(const sample_t *sample)，上面同时有 @brief 和 Name: duty_get(...)。同文件还有简单私有 clamp()。项目已有.clang-format，用户只允许改两个.c注释。",
+      "expected_behavior": "Use one contract header with exact static uint16_t duty_get(const sample_t *sample), correct Input/Output, and remove duplicate old header. Simple private clamp may omit a header. Do not change project format config or claim whole-scope style from merely preserving it; inspect both allowed files."
+    },
+    {
+      "id": 17,
+      "prompt": "/code_zl diag.integral_copy仅Host读取，core.integral参与下一拍积分，diag.duty由两种已授权遥测读取；旧注释说所有diag都是无用状态。Host上周通过，今天只改注释就写实板验证通过并升固件版。",
+      "expected_behavior": "Correct the comment using producer/consumer distinctions without deleting code: internal integral is necessary, authorized telemetry is real consumption, Host-only copy may be a structural cleanup candidate. Do not claim current Host or board PASS from old results; no firmware version bump for pure comments."
     }
   ]
 }

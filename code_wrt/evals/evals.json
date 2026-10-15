@@ -1,11 +1,16 @@
 {
   "skill_name": "code_wrt",
-  "version": "V0.3.0",
+  "version": "V0.3.2",
   "evals": [
+    {
+      "id": 30,
+      "prompt": "/code_wrt 已授权结构整理：私有struct依次float gain,uint8_t mode,bool ready,float limit,uint8_t retry,bool valid，以位置式初始化；packed协议struct同样交错但offset固定，回调ABI引用它。项目无分组顺序约定。",
+      "expected_behavior": "After checking all positional/designated initializers, offsetof/sizeof, raw memcpy/serialization, Flash/protocol/DMA/register/packed/bitfield/ABI/assembly/callback dependencies, group the eligible private members as float gain/limit, uint8_t mode/retry, bool ready/valid, preserving types and within-type order and updating positional initialization safely. Preserve fixed external layout as a documented exception. Verify target layout before RAM claims; do not change function parameter order, add nested structs or create headers."
+    },
     {
       "id": 1,
       "prompt": "/code_wrt src/example.c",
-      "expected_behavior": "Must load code_sc first, freeze Layer/Owner/Caller/Callee/Timing/Data/Side-effect contracts, then implement, apply code_zl V0.1.8, and run code_sc again on the final diff."
+      "expected_behavior": "Read actual flow, use scope-appropriate code_sc pre-write contracts, implement within existing authorization, apply code_zl V0.2.2, and review the final diff. Do not expand a narrow change into unrelated architecture or ask again for already authorized repair."
     },
     {
       "id": 2,
@@ -110,7 +115,7 @@
     {
       "id": 22,
       "prompt": "/code_wrt 为了减少头文件，把 debug/output/protection/version/driver 配置全塞 main.h",
-      "expected_behavior": "Must reject main.h as a global config garbage can. Consolidate by true owner: product-wide config in app_config, module public config in the module header, private tuning in .c, driver config in driver headers; direct include owners instead of relying on aggregation."
+      "expected_behavior": "Must reject main.h as a global config garbage can. Consolidate by actual owner and existing project conventions: product-wide config in its existing owner, module public config in its contract, private tuning in .c/private header, driver config in driver owner. Do not invent app_config or another config header solely to satisfy a template; use direct owner includes."
     },
     {
       "id": 23,
@@ -126,6 +131,26 @@
       "id": 25,
       "prompt": "/code_wrt 新增 power_inhibited()，以后维护 Flash 时会返回 true，先不用接到 charge/output",
       "expected_behavior": "Must reject an orphan safety veto. Build a reachability matrix across start/autostart/restart/PWM commit/relay close/maintenance and wire every hazardous entry that must consume the veto."
+    },
+    {
+      "id": 26,
+      "prompt": "/code_wrt 已授权删除公开PI镜像和空包装：core.integral及last_seq用于算法，diag.integral_copy只被旧Host夹具读，diag.limit_mw被两种路测帧读，Disarm仅调用Stop。保留算法和路测能力。",
+      "expected_behavior": "Trace all consumers; delete only proven redundant public mirrors and Disarm alias, preserve integral/seq and real telemetry. Adapt tests to actual private control state or behavior, not restore a production mirror/compatibility layer. Scope API/layout changes to authorization and keep both output modes."
+    },
+    {
+      "id": 27,
+      "prompt": "/code_wrt 统一自有DRV_PWM_Stop到drv_pwm_stop，算法私有type移回owner。startup引用COMP_IRQHandler，HAL_TIM_Stop为SDK，测试mock和decoder仍引用旧自有名。main.h已有所有配置。",
+      "expected_behavior": "Build and close old-to-new/owner mapping across definitions/declarations/callers/callbacks/project/tests/decoder/docs. Preserve SDK/vector ABI symbols, update active mocks/receiver, move private type/config to true owner without a universal config header or main.h dumping. Distinguish historical frozen names from active stale consumers."
+    },
+    {
+      "id": 28,
+      "prompt": "/code_wrt prepare所有路径true、调用者if(!prepare()) return；prepare会stop写零清标志。zero_applied读后续自然更新，arm在写前/写后/恢复中断后复核pending。用户允许收口冗余。",
+      "expected_behavior": "After verifying full return/caller paths, make prepare void and remove fictitious failure branch, updating signature/comments/tests. Preserve preparation order, asynchronous ZeroApplied, first/last pulse gates and distinct pending checks with an event timeline; do not ignore whole timing functions during equivalence checking."
+    },
+    {
+      "id": 29,
+      "prompt": "/code_wrt 只给最小方案，不落代码：用户先前授权移除某#error；计划用assert恢复同一禁令。要真路测、减包但保留AA56和JustFloat，receiver仍写旧字段英文和错单位。Host只有旧版绿。",
+      "expected_behavior": "Stay read-only for plan-only request; reject disguised compile prohibition restoration, retain runtime/macro-value verification. Propose purpose/owner/budget based minimal fields while preserving both modes and updating actual receiver Chinese labels/units and encoding/decoding checks. Record no implementation/test/board PASS, no automatic firmware or skill version changes; old Host evidence cannot close final verification."
     }
   ]
 }

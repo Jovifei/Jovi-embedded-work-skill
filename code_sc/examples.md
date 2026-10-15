@@ -1,5 +1,15 @@
 # code_sc examples
 
+## 消费者分类与短接口的反例
+
+结构布局也要区分内部和外部：私有结构的 float、uint8_t、bool 交错可建议按声明类型分组，同类原顺序不变；uint8_t 与 bool 不混为一组。若另一个 packed Flash/协议结构由固定 offset、汇编或回调 ABI 消费，保留它并记录例外。审查初始化器、offsetof/sizeof 和 raw 传输路径之后再给整改结论；目标 sizeof/对齐未核实不能保证省多少 RAM，也不因成员分组去改函数形参。
+
+同一算法中，`integral` 参与下一拍回算，`last_seq` 防止重复积分，`cached_duty` 在重复采样时按新 cap 收紧；这些是内部真实消费者，即使没有外部 getter 也保留。`integral_copy` 只有旧 Host 夹具读取时可建议删公开镜像，并将测试改为真实私有状态/输出断言；`limit_mw` 被当前授权的两种路测帧消费时则保留合同，收窄导出面不等于取消帧。只写 `updates` 无消费者要以活动源码/测试/decoder 搜索证据判断，不把 diag 当删除条件。
+
+`prepare_zero()` 所有路径恒 true 可建议 void，但它发出写零请求不代表零已生效；保留后续自然更新确认、首脉冲许可、写前/写后及恢复中断后的否决。`ADC_IRQHandler()` 一行转发属于向量合同，`duty_get()` 为两种模式提供窄只读合同，也不能因短而删除。协议把算法缓存叫实际波形时，报告来源差异；不偷偷增加硬件写入或把遥测改成恒零。
+
+验收要展示真实 final 内容、改名映射与适用检查结果。源码顺序、Host fake 顺序、目标编译和实板更新事件分别提供证据；任一层未执行就明确列出，不用旧 SHA 或只包含断言函数的脚本冒充 HOST_PASS。
+
 ## Example 1 — Controller ownership inversion
 
 ```text

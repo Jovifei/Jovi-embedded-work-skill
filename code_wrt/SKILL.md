@@ -8,9 +8,22 @@ description: "Use when the user invokes /code_wrt or asks to write, simplify, re
 
 # Code WRT
 
-**Version: V0.3.1**
+**Version: V0.3.2**
 
 `code_wrt` 不再只是“ponytail 简化 + code_zl 注释”。它是嵌入式代码的**写入门禁**：先把层级、Owner、调用关系、中断/回调/服务链、API 和参数语义画清楚，再允许写代码；写完还要重新审查一次。
+
+## 本次最小执行与完成门
+
+- 先确定用户写入范围和实际基线，再读真实调用链。下文表格/检查按改动风险采用；只要方案时保持只读，不假装实施或补建框架。已有修复授权贯穿 pre/post `code_sc`，无需重复批准；允许范围内的 API 删除、改名、布局收拢，不以“保留公开接口”阻止用户明确选择。
+- 自有 app_/drv_ 按项目 snake_case；SDK/CMSIS、startup IRQ、外部 callback ABI、协议名保留合同。改前写旧→新→Owner 映射，改后核对定义/声明/all-callers/callback、项目成员、活动测试、decoder/docs；历史冻结材料和 SDK 命中单列，不造旧兼容别名。私有类型/宏回实际 Owner，参数按单位、生命周期、决策点、覆盖位置核对，不为模板新建配置头或全塞 main.h；同真源别名可保留。
+- 当前授权包含结构整理时，struct 成员按相同声明类型集中，同类型保留原相对/用途顺序；float、uint32_t、int32_t、uint16_t、uint8_t、bool 分别成组，bool 与 uint8_t 不因同宽合组。组序优先项目约定，否则通常按目标自然对齐/宽度从大到小。重排前查全部位置式/指定式初始化器、offsetof/sizeof、raw memcpy/序列化、Flash/协议/DMA/寄存器/packed/bitfield/ABI/汇编/回调约束；外部固定布局保留并记录例外。可改内部结构保持字段语义/类型，更新依赖的初始化与检查后验证目标布局；无目标证明不宣称固定 RAM 节省。用户说的是成员，不改函数形参顺序，不为分组新增嵌套 struct 或头文件。
+- 字段/状态/getter/诊断先列 producer 和 consumer：控制必需、协议/存储、当前授权遥测、仅测试观察、只写副本。积分/滤波/回算、缓存、seq 去重、故障代次和时序记忆即使不对外导出仍可能必需。删除导出镜像时同步将测试改为实际内部或行为断言，不恢复生产副本迎合旧夹具，也不一概删除诊断。
+- wrapper/恒 true prepare 先查所有返回路径和 caller 分支，确认无失败合同才收为 void/直接调用；硬件事务、ABI、IRQ 桥和有真实消费者的 getter 不按行数删除。保留准备零→自然更新/ZeroApplied→允许首脉冲，以及末脉冲、PWM 写前/写后/恢复中断否决和失败撤回；按事件时间点对照，不在等价检查里忽略整段时序函数。
+- 路测减包按观测目的、Owner 和实时预算挑最少字段；保留用户已要求的两种输出模式，更新实际 receiver、中文字段/单位和编码/解码测试。发现候选值被叫驱动设定/物理生效时先澄清源码事实，不偷偷改数值来源或删除发送能力；不固化某次路径/包长/产品阈值。
+- 用户明确授权取消某项 `#error` 时，不以 assert/typedef 等替身绕回；这不是一般撤销保护许可。仍核对预处理宏真值、直接依赖和实际运行安全门。
+- 完成证据绑定最终 SHA 或工作树内容 hash、目标及 define/include、命令/退出码、旧名残留分类、测试/项目/文档合同和未运行项。Host/目标编译/架构审查/实板分开，缺证据写未验证。技能版本只在技能维护时升；固件行为变化按项目约定升固件版本，纯注释/文档不升固件版本。
+
+细化反例见 [examples.md](examples.md) 和 `evals/evals.json`；本节限定后文固定流程的适用范围。
 
 固定流程：
 
@@ -32,6 +45,7 @@ code_sc(pre-write design gate)
 
 ## 版本记录
 
+- **V0.3.2**：按实际范围收口消费者、改名和短函数合同；增加结构体同类型分组、初始化与固定布局保护；补路测最小字段、时间点等价证据及授权例外；分离技能与固件版本。
 - **V0.3.0**：加入“工程集成不变量”硬门禁：精确基线/SHA、merge 视为新代码、公共头最小化与 Include-What-You-Use、安全宏显式定义、NVIC→向量→强 handler 完整链、临时停波后的重新发波爬升、授权/禁止功率 veto 可达性、1ms 调度与 WCET/看门狗分离、CI/Keil/Host/Board 分级验收。禁止用“两个分支各自 PASS”“能编译”“看门狗不复位”替代合并后完整验证。
 - **V0.3.1**：针对 V0.13.18 代码整理补充最小改动门禁、单一实现/单一参数真源、删除前全工程检索、生产 API 与测试夹具同步删除、重构后强制多入口复核、版本与文档边界、物理行为保护、简明检查表和失败回滚原则。
 
@@ -83,7 +97,7 @@ code_sc(pre-write design gate)
 
 某个 `.c` 使用跨模块类型/宏，就必须能明确指出该符号 Owner，并直接 include 对应 Owner 头。禁止依赖 `protection.c -> protection.h -> sample.h -> main.h -> SAFETY_MACRO` 这种“碰巧可见”的链。
 
-对会改变保护行为的编译期宏，必须防止“未定义按 0”静默关闭；要么放进双方都直接依赖的唯一共享配置 Owner，要么使用 `#if !defined(...) #error` 明确失败。不能仅靠注释说默认开启。
+对会改变保护行为的编译期宏，必须防止“未定义按 0”静默关闭；默认采用直接依赖唯一配置 Owner 和必要的显式编译检查，不能仅靠注释说默认开启。用户明确授权移除某项编译检查时按文首边界处理，不强制重新加入 `#error` 或其替身，仍核对每个消费单元的实际宏值与运行安全门。
 
 ### D. 接口变更必须做 Consumer Matrix
 
@@ -121,7 +135,7 @@ code_sc(pre-write design gate)
 
 **REQUIRED SUB-SKILL:** 完整加载并应用 `ponytail`，默认 `full` 强度。
 
-**REQUIRED SUB-SKILL:** 完整加载并应用 `code_zl`（当前 V0.2.1）。
+**REQUIRED SUB-SKILL:** 完整加载并应用 `code_zl`（当前 V0.2.2）。
 
 **REQUIRED SUB-SKILL:** 修改后再次应用 `code_sc`，执行 post-write architecture gate。
 
@@ -1176,7 +1190,7 @@ rg --no-ignore -n "<symbol>" .
 
 ## 5. 文件、文档与未验证边界
 
-完成整理时必须同步确认：当前 `SKILL.md` 文件版本、对应 `docs` changelog/版本更改记录，以及仍未验证的 Host、Keil、上板、示波器或边界条件。未验证必须明确写“未验证”，不得用“能编译”“测试未覆盖”或“看门狗未复位”替代证据。
+完成整理时按实际范围确认固件版本及对应文档；不要顺带修改本技能版本。技能维护与固件维护分别验收，纯注释/文档不升固件版本。仍未执行的 Host、Keil、上板、示波器及边界检查明确写“未验证”，不得用“能编译”或“看门狗未复位”替代证据。
 
 ## V0.3.1 简明检查表
 
@@ -1189,7 +1203,7 @@ rg --no-ignore -n "<symbol>" .
 [ ] 删除前已 rg --no-ignore 覆盖源码、tests、Keil/CMake/project/docs
 [ ] 生产 API 删除已同步测试夹具，没有恢复旧兼容层
 [ ] 已完成 preprocessor/API/IRQ/project membership/Host/Keil/diff review
-[ ] 已更新文件版本和 docs changelog；未验证边界已标明
+[ ] 已按实际行为变更及项目约定处理固件版本/文档；未验证边界已标明
 ```
 
 ## 失败回滚原则
@@ -1234,7 +1248,7 @@ rg --no-ignore -n "<symbol>" .
 
 ## Phase C — code_zl
 
-按 code_zl V0.2.1 做函数头、白话注释、分节、格式、先定义再使用和 `// todo:`。
+按 code_zl V0.2.2 做真实完整签名函数头、白话注释、分节、格式、同守护声明布局和 `// todo:`。
 
 函数头 Description 至少能回答：
 
@@ -1286,7 +1300,7 @@ rg --no-ignore -n "<symbol>" .
 
 - 注释不能掩盖坏架构，Owner 错误先整改；
 
-- 凡进入固件镜像的结构/行为变更，按项目约定升 `SOFT_VERSION`、追加同阶段版本文档、同步 docs README；未上板不得写 BOARD_PASS。
+- 固件行为变更按项目约定升 `SOFT_VERSION` 并同步版本/接口文档；纯结构等价变更按项目版本规则处理，纯注释/文档不升固件版本。技能维护只升技能版本；未上板不得写 BOARD_PASS。
 
 # 二十一、验证
 

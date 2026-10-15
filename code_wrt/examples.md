@@ -1,5 +1,39 @@
 # code_wrt 架构写入门禁样例
 
+## 有界收口：生产镜像、恒真准备与命名
+
+当前授权结构整理且无外部布局约束时，按声明类型分组，例如：
+
+```c
+/* 整理前 */
+typedef struct {
+    float gain;
+    uint8_t mode;
+    bool ready;
+    float limit;
+    uint8_t retry;
+    bool valid;
+} control_t;
+
+/* 整理后：同类型内原顺序不变 */
+typedef struct {
+    float gain;
+    float limit;
+    uint8_t mode;
+    uint8_t retry;
+    bool ready;
+    bool valid;
+} control_t;
+```
+
+重排前核查所有初始化器、offsetof/sizeof、raw memcpy/序列化及外部布局消费者；位置式初始化须相应保持原字段值，指定式也要检查依赖。packed Flash/协议/DMA/寄存器、bitfield、ABI/汇编/回调固定布局保持原样并说明例外。优先项目组序，未规定时通常按目标自然对齐/宽度从大到小；bool 不与 uint8_t 混组。不为此改函数形参、另套嵌套结构或新增头，也不在缺目标证据时宣称固定 RAM 收益。
+
+用户授权删除公开 PI 镜像和多余 wrapper 时，先列真实调用：私有积分、采样序号、缓存限幅参与控制应保留；公开 `integral_copy` 仅测试读可删除并调整测试对实际内部状态/行为的断言。当前授权的两种遥测仍读 `limit_mw`，保留输出能力并选择满足观测目的的最少字段，更新实际 receiver 的中文字段、单位及两种解码检查。不能恢复公开镜像迎合旧 fixture，也不能一概删除 diag。
+
+`bool prepare_zero()` 全路径恒真且 caller 只检查假失败，可改 `void` 并更新声明/定义/调用/测试/函数头。其 stop→写零→清旧标志顺序不变，后续 `zero_applied()` 仍等自然更新；arm 写前、写后、恢复中断后否决分开对照。只删无独立合同的 `Disarm→Stop` 别名，保留真正 stop、向量桥和有授权消费者的短 getter。
+
+自有 `DRV_PWM_Stop→drv_pwm_stop` 要检查全部消费者及项目/decoder/docs，保留 `COMP_IRQHandler`、SDK/CMSIS 及外部回调 ABI。私有类型和宏放真实 Owner；同值但不同生命周期的上限不盲合并，同真源别名可保留。最小方案任务只交方案，不声称实际实施、Host、Keil 或实板已经通过；纯注释不升固件版，固件改动也不顺带升技能版。
+
 V0.2.1 起，`code_wrt` 不能只把代码“写得更整齐”。写之前必须先把 **Layer / Owner / Caller / Callee / Timing / Data / Side Effect** 说明白；涉及中断时，还必须画完整 `IRQ -> Driver -> callback/pending -> Application service/task` 链。
 
 ## 例 1：不要让算法 Controller 拥有 Charge Stage
@@ -344,7 +378,7 @@ app_protection_latest();
 
 不能只加注释。先判断这是 hidden dependency 还是 final safety recheck；如果是安全复核，就把它放到 executor/safety-commit 层，并在 API contract 明确。
 
-## 控制流注释仍按 code_zl V0.1.8
+## 控制流注释按 code_zl V0.2.2
 
 ```c
 /* 3. 连续稳定窗口：弱光下可无限等待，掉门限必须整窗重开 */

@@ -1,7 +1,12 @@
 {
   "skill_name": "code_sc",
-  "version": "V0.3.0",
+  "version": "V0.3.2",
   "evals": [
+    {
+      "id": 31,
+      "prompt": "/code_sc 私有struct是float gain,uint8_t mode,bool ready,float limit,uint8_t retry,bool valid，有位置式初始化器；packed Flash结构字段也交错，汇编按固定offset读取。有人建议bool和uint8同宽混组并保证省6字节。",
+      "expected_behavior": "Review private layout for separate declared-type groups preserving gain/limit, mode/retry and ready/valid order; inspect all initialization and raw/offset/size contracts before recommending changes. Preserve external packed/Flash/assembly layout and record exception. Reject same-width bool/uint8 mixing and unproven fixed RAM savings; retain project group order and function parameter contracts. Pure review remains read-only."
+    },
     {
       "id": 1,
       "prompt": "/code_sc 审查这个 MPPT 工程，为什么 mppt_controller 里面有 charge_stage_ctx？",
@@ -30,7 +35,7 @@
     {
       "id": 6,
       "prompt": "/code_sc 只看看代码风格，顺便帮我直接改掉",
-      "expected_behavior": "Should explain that code_sc is review-first and default read-only. It may report naming/readability issues, but it must not silently modify code unless the user explicitly authorizes a repair phase; pure formatting belongs to code_zl/code_wrt."
+      "expected_behavior": "The prompt explicitly authorizes the style fix. State the bounded findings, route comment/format work to code_zl and structural changes to code_wrt as applicable, then continue within that authorization without asking again. A pure review request without the fix instruction would remain read-only."
     },
     {
       "id": 7,
@@ -131,6 +136,26 @@
       "id": 26,
       "prompt": "/code_sc Flash维护时会暂停ADC并设置maintenance_busy，但只在Flash driver里检查PWM=0，恢复后立即允许自动启动",
       "expected_behavior": "Must review the entire maintenance transaction: veto reachability before entry, sample invalidation, watchdog/deadline effects, resume qualification with fresh generations, and restart admission. Local driver checks alone are insufficient."
+    },
+    {
+      "id": 27,
+      "prompt": "/code_sc core.integral用于回算，last_seq防止重复积分，cached_duty在重复样本时按收紧cap重限；diag.integral_copy仅Host读，diag.limit_mw被两种授权路测帧消费，unused_counter只写。均无外部控制调用。只出审查结论。",
+      "expected_behavior": "Stay read-only. Produce file-level producer/consumer evidence and classify internal control state, authorized telemetry, Host-only mirror, and write-only counter separately. Recommend removing or migrating only proven redundant surfaces; preserve seq/cache/relimit and both telemetry modes. Public test-only leakage is structural P2 when ownership/API cost exists, not automatically P3."
+    },
+    {
+      "id": 28,
+      "prompt": "/code_sc 按已授权整改继续：DRV_PWM_Stop改drv_pwm_stop；COMP_IRQHandler和HAL_TIM_Enable也转小写。prepare始终return true，但先stop/clear-update；zero_applied等自然更新，arm在enable前后各读pending。",
+      "expected_behavior": "Continue within repair authorization without a second approval, reject mechanical renaming of external vector/SDK contracts. Require owned-symbol migration across declarations/definitions/callers/callbacks/project/tests/decoder/docs. Allow prepare void after checking all return and caller paths; preserve zero-update gate and both pending barriers, not treating short functions as automatically redundant."
+    },
+    {
+      "id": 29,
+      "prompt": "/code_sc 全面验收：main.h泄露算法私有enum，模块自有大小写混杂，三处重复复制同一策略；Keil当前能编译，Host只有旧SHA绿，当前CI后续skipped，debug函数头Name用(...)。",
+      "expected_behavior": "Report confirmed structure P2 separately from local naming/comment style P3, with file/line evidence and actual source identity. Do not reduce review to protection or accept build as architecture PASS; current tests skipped/old SHA are unresolved. Flag incomplete/mixed function-header contracts and no board evidence."
+    },
+    {
+      "id": 30,
+      "prompt": "/code_sc 用户已授权去掉产品自有#error，又要求真路测但认为139B过大。现两种模式都在用，算法候选duty被receiver标成实际波形。审核建议用typedef负数组恢复检查，删掉全部diag并只留一种帧。",
+      "expected_behavior": "Reject disguised restoration of an explicitly removed compile check while still verifying macro actual values and runtime gates. Choose minimal fields for stated observations and real-time budget, preserve both required modes, inspect actual receiver and Chinese units. Expose candidate/setting/physical mismatch without silently changing value source, deleting observation capability, or inventing a universal packet size."
     }
   ]
 }
