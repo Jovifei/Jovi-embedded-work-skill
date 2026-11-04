@@ -1,6 +1,6 @@
 {
   "skill_name": "code_zl",
-  "version": "V0.2.2",
+  "version": "V0.2.8",
   "evals": [
     {
       "id": 18,
@@ -91,6 +91,21 @@
       "id": 17,
       "prompt": "/code_zl diag.integral_copy仅Host读取，core.integral参与下一拍积分，diag.duty由两种已授权遥测读取；旧注释说所有diag都是无用状态。Host上周通过，今天只改注释就写实板验证通过并升固件版。",
       "expected_behavior": "Correct the comment using producer/consumer distinctions without deleting code: internal integral is necessary, authorized telemetry is real consumption, Host-only copy may be a structural cleanup candidate. Do not claim current Host or board PASS from old results; no firmware version bump for pure comments."
+    },
+    {
+      "id": 19,
+      "prompt": "/code_zl 注释写“启动期占空比上限”，但字段名是 demo_startup_duty_floor_permille，而且代码把有效上限顶到这个值。",
+      "expected_behavior": "Flag the floor-versus-upper-bound mismatch. Correct the comment to describe the startup floor/effective limit fact, or hand a name change to code_wrt. Do not claim a permanent final Duty cap."
+    },
+    {
+      "id": 20,
+      "prompt": "/code_zl calculate_ccm_boundary_duty_permille 的注释写“最终最大 Duty”，last_control_ms 注释写“最近一次真正积分”。",
+      "expected_behavior": "Correct the first comment to a theoretical CCM boundary and the second to the most recent control-timebase processing point, with actual integration determined by control_dt_ms. Do not change calculations."
+    },
+    {
+      "id": 21,
+      "prompt": "/code_zl 旧名只出现在 V0.16.1 历史学习稿，当前 Application 已全部迁移。",
+      "expected_behavior": "Classify the hit as an explicitly marked historical snapshot, do not restore old aliases or alter production code, and report that active-source old-name search is clean."
     }
   ]
 }

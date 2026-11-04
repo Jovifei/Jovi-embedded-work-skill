@@ -2,13 +2,13 @@
 
 name: code_wrt
 
-description: "Use when the user invokes /code_wrt or asks to write, simplify, refactor, organize, or standardize embedded C code while preserving architecture, layer boundaries, call relationships, interrupt/service bridges, naming rules, and hardware-safety constraints. Triggers include code_wrt, 写代码, 代码简化整理, 简化并注释, 重构并整理."
+description: "Use when the user invokes /code_wrt or asks to write, simplify, refactor, organize, standardize, or rename embedded C while preserving architecture, layer boundaries, call relationships, interrupt/service bridges, naming contracts, candidate/approved/committed semantics, and hardware-safety constraints. Triggers include code_wrt, 写代码, 代码简化整理, 简化并注释, 重构并整理, 命名收口, 参数语义, candidate/committed, MPPT命名."
 
 ---
 
 # Code WRT
 
-**Version: V0.3.2**
+**Version: V0.4.0**
 
 `code_wrt` 不再只是“ponytail 简化 + code_zl 注释”。它是嵌入式代码的**写入门禁**：先把层级、Owner、调用关系、中断/回调/服务链、API 和参数语义画清楚，再允许写代码；写完还要重新审查一次。
 
@@ -16,6 +16,7 @@ description: "Use when the user invokes /code_wrt or asks to write, simplify, re
 
 - 先确定用户写入范围和实际基线，再读真实调用链。下文表格/检查按改动风险采用；只要方案时保持只读，不假装实施或补建框架。已有修复授权贯穿 pre/post `code_sc`，无需重复批准；允许范围内的 API 删除、改名、布局收拢，不以“保留公开接口”阻止用户明确选择。
 - 自有 app_/drv_ 按项目 snake_case；SDK/CMSIS、startup IRQ、外部 callback ABI、协议名保留合同。改前写旧→新→Owner 映射，改后核对定义/声明/all-callers/callback、项目成员、活动测试、decoder/docs；历史冻结材料和 SDK 命中单列，不造旧兼容别名。私有类型/宏回实际 Owner，参数按单位、生命周期、决策点、覆盖位置核对，不为模板新建配置头或全塞 main.h；同真源别名可保留。
+- 命名合同必须先取当前项目已经拍板的版本；不能把一次报告、旧 ZIP、历史学习快照或自己的偏好当成新规则。改名矩阵必须分成“当前源码”“历史材料”“SDK/协议/ABI”“测试/decoder”，历史命中不能直接当活动残留，活动残留也不能靠历史别名掩盖。
 - 当前授权包含结构整理时，struct 成员按相同声明类型集中，同类型保留原相对/用途顺序；float、uint32_t、int32_t、uint16_t、uint8_t、bool 分别成组，bool 与 uint8_t 不因同宽合组。组序优先项目约定，否则通常按目标自然对齐/宽度从大到小。重排前查全部位置式/指定式初始化器、offsetof/sizeof、raw memcpy/序列化、Flash/协议/DMA/寄存器/packed/bitfield/ABI/汇编/回调约束；外部固定布局保留并记录例外。可改内部结构保持字段语义/类型，更新依赖的初始化与检查后验证目标布局；无目标证明不宣称固定 RAM 节省。用户说的是成员，不改函数形参顺序，不为分组新增嵌套 struct 或头文件。
 - 字段/状态/getter/诊断先列 producer 和 consumer：控制必需、协议/存储、当前授权遥测、仅测试观察、只写副本。积分/滤波/回算、缓存、seq 去重、故障代次和时序记忆即使不对外导出仍可能必需。删除导出镜像时同步将测试改为实际内部或行为断言，不恢复生产副本迎合旧夹具，也不一概删除诊断。
 - wrapper/恒 true prepare 先查所有返回路径和 caller 分支，确认无失败合同才收为 void/直接调用；硬件事务、ABI、IRQ 桥和有真实消费者的 getter 不按行数删除。保留准备零→自然更新/ZeroApplied→允许首脉冲，以及末脉冲、PWM 写前/写后/恢复中断否决和失败撤回；按事件时间点对照，不在等价检查里忽略整段时序函数。
@@ -46,6 +47,10 @@ code_sc(pre-write design gate)
 ## 版本记录
 
 - **V0.3.2**：按实际范围收口消费者、改名和短函数合同；增加结构体同类型分组、初始化与固定布局保护；补路测最小字段、时间点等价证据及授权例外；分离技能与固件版本。
+- **V0.3.3**：增加可变 `ctx` 生命周期与真实调用域门禁；增加多布尔参数语义矩阵；增加整数提升、计时上限、饱和与回绕边界检查。
+- **V0.3.5**：函数名必须对得上函数体；同一判断只写一次。禁止把不同问题收成同一个 `ok`，禁止 `static` 使用 `app_`，禁止叠模块前缀，禁止为抄一份中间值或永远走不到的编译分支留重复逻辑。
+- **V0.4.0**：增加分层命名合同、同后缀不同职责判定、候选/提交/驱动设定语义复核，以及 `floor/boundary/max`、控制时基和 Demo 专属名称门禁。禁止为了“避免两个函数都叫 step”强行改成不完整的职责名。
+- **V0.3.4**：同步 `code_zl` 依赖版本，并明确 `todo` 规则只描述原则，不固化某个工程的函数、任务或宏名称。
 - **V0.3.0**：加入“工程集成不变量”硬门禁：精确基线/SHA、merge 视为新代码、公共头最小化与 Include-What-You-Use、安全宏显式定义、NVIC→向量→强 handler 完整链、临时停波后的重新发波爬升、授权/禁止功率 veto 可达性、1ms 调度与 WCET/看门狗分离、CI/Keil/Host/Board 分级验收。禁止用“两个分支各自 PASS”“能编译”“看门狗不复位”替代合并后完整验证。
 - **V0.3.1**：针对 V0.13.18 代码整理补充最小改动门禁、单一实现/单一参数真源、删除前全工程检索、生产 API 与测试夹具同步删除、重构后强制多入口复核、版本与文档边界、物理行为保护、简明检查表和失败回滚原则。
 
@@ -135,7 +140,7 @@ code_sc(pre-write design gate)
 
 **REQUIRED SUB-SKILL:** 完整加载并应用 `ponytail`，默认 `full` 强度。
 
-**REQUIRED SUB-SKILL:** 完整加载并应用 `code_zl`（当前 V0.2.2）。
+**REQUIRED SUB-SKILL:** 完整加载并应用 `code_zl`（当前 V0.2.8）。
 
 **REQUIRED SUB-SKILL:** 修改后再次应用 `code_sc`，执行 post-write architecture gate。
 
@@ -589,9 +594,9 @@ typedef struct
 
     uint32_t power_limit_mw;
 
-    uint16_t applied_duty_permille;
+    uint16_t committed_duty_permille;
 
-    uint16_t duty_limit_permille;
+    uint16_t max_duty_permille;
 
 } app_mppt_duty_in_t;
 
@@ -687,7 +692,7 @@ HW command/snapshot   -> output/driver contract
 
 | Service | `app_uart_service` | 消费本模块 pending/queue |
 
-| Algorithm step | `app_mppt_duty_step` | 输入 DTO，输出候选控制量 |
+| Algorithm entry | `mppt_algo_step` / `mppt_search_step` | 分别表示完整算法编排和搜索参考电压；公开 Application 门面仍由 `app_mppt_duty` 提供 |
 
 | Executor | `app_output_apply` / `pwm_apply` | 提交已批准命令 |
 
@@ -732,6 +737,66 @@ app_mppt_restart
 ```
 
 先收敛层级，再命名。
+
+## 8.3 函数名必须对得上函数体，同一判断只写一次
+
+写或改名之前，先看这个函数实际做了什么。名字和函数体不一致，或同一条件写了两份，都要在这次收掉。
+
+名字按实际动作取：
+
+- 公开头里的函数才用 `app_` 或 `drv_`。文件内 `static` 只用该文件一套模块前缀。`static` 函数不要叫 `app_*`。同一文件不要并存 `chg_`、`charge_` 和无前缀。
+- 已有模块词的名字只替换前缀，不要叠成 `charge_stage_stage_*`。硬件动作留在名字里，例如 `output_pwm_apply`，不要收成看不出写什么的 `output_apply`。
+- 纯判断才用 `ok` 或 `valid`。问的不是同一件事，就不能收成同一个尾词。采样够不够格、电池在不在窗口、温度允不允许启动、输出是不是空闲，各自保留对象词。
+- 会改状态的用 `update`、`step`、`enter`、`reset`、`latch`。这种函数不要叫 `ok`。
+- 返回功率、电压、占空比的名字带单位。不要把返回数值的函数改成判断名。
+
+重复逻辑按下面收：
+
+- 写判断前先找本模块或采样模块是否已经回答同一问题。已经包含的有效位、诊断位和新鲜度，调用点不要再写一遍。
+- 只为下一行计算抄一份的中间字段删掉，直接用源字段。产品已经定死、不再关闭的编译分支删掉，不要留永远走不到的 `#else`。
+- 只在这一段只做一件事、并且调用顺序仍能在任务函数里看见时才抽函数。关中断提交、第二次保护快照、读取会被本拍覆盖的上一拍诊断，留在任务里。参数变成一长串互不相关的值，说明还没分成一件事，不要抽。
+- 数值相同的门槛不是同一个参数。预充压差、健康窗摆动、源塌陷各自保留。
+
+## 8.4 已拍板模块的分层命名合同
+
+命名不是字符串替换。先按“层级 + Owner + 动作 + 对象”写出旧名、新名、职责和全部消费者，再改定义、声明、调用、测试、decoder 与当前文档。只有当前活动源码完成迁移后，才允许把旧名从活动命中清单中移除；历史快照可以保留，但必须单独标为历史。
+
+当项目已经明确命名合同，按合同执行；下面是当前 MPPT 合同的示例。它不是所有项目都要复制的前缀，而是说明如何把一套已批准规则落到代码：
+
+| 对象 | 当前合同 | 不能用的替代理由 |
+|---|---|---|
+| 公开 Application 门面 | 保留 `app_`，例如 `app_mppt_duty()` | 私有类型改名不等于公开 ABI 也要去掉 `app_` |
+| 搜索入口 | `mppt_search_*`，例如 `mppt_search_step()` | 不用泛称 `*_step()` 混淆完整算法 |
+| 算法编排 | `mppt_algo_*`，例如 `mppt_algo_control_step()` | 不要因为名称含 `step` 就强行改成不完整的“limits_to_duty” |
+| 功率到 Duty 控制器 | `mppt_algo_duty_controller_step()` | 它包含前馈、功率 PI、候选 Duty 约束；不能只写成预算转换 |
+| 搜索内部 `static` helper | 用短的语义名，例如 `update_vref_step()`、`process_search_average_window()`、`demo_update_search_resume_permission()` | 不再叠加 `mppt_search_mppt_*` 或为了层级前缀破坏内部可读性 |
+| 纯数学 helper | 不加模块前缀，例如 `clamp_float_range()`、`calculate_power_mw()` | 不要给每个数学函数再套一层 `mppt_algo_` |
+| 私有类型 | 使用真实 Owner 前缀，例如 `mppt_search_ctx_t`、`mppt_algo_input_t` | 不用 `app_` 假装是公开接口 |
+| Demo 专属状态/参数 | 带 `demo_`，例如 `demo_startup_duty_floor_permille`、`demo_freeze_normal_search` | `startup_*`、`passive_start` 等没有 Demo 语义时容易被 Battery 路径误用 |
+| Vref | 保留 `vref`，例如 `vref_mv`、`vref_upper_mv`、`update_vref_step()` | 不把参考电压改成泛称 `target_voltage` |
+
+两个函数都出现 `step` 不自动代表命名失败。只有当两个函数职责相同、调用层级相同、返回物相同，才需要收敛后缀；职责分别是“控制编排”和“功率到 Duty 控制器”时，保留两个 `step` 更准确。评审提出的替代名必须先对照函数体，不能为了形式上的唯一后缀把真实职责删掉。
+
+参数和字段继续遵守控制流水线：
+
+```text
+candidate_duty_permille  -> 算法/策略提出的候选
+approved_duty_permille   -> Application/Safety 批准后允许的值
+committed_duty_permille  -> 已交给 Output/Driver 的设定
+hardware_duty_permille   -> 定时器/硬件实际生效值（需硬件证据）
+```
+
+`drv_pwm_get_duty()` 返回的已提交设定不能命名为 `candidate_*`；理论 CCM 边界不能叫最终 `max_*`；`demo_startup_duty_floor_permille` 是启动地板值，不能在注释里写成永久上限；`last_control_ms` 是控制时基处理点，是否真的积分必须结合 `control_dt_ms` 判断。发现这些语义冲突时，优先修正命名或交给 `code_zl` 修正注释，不能用注释掩盖错误命名。
+
+## 8.5 命名迁移完成门
+
+命名改动完成前必须逐项检查：
+
+1. 活动源码中旧名的定义、声明、调用、回调、初始化器、测试和 decoder 已迁移；历史文档命中单列。
+2. 新名没有把函数层级、Owner、动作、对象或单位说错；返回数值的函数带单位或明确的结果角色。
+3. `static` helper 没有不必要的叠层前缀；公开 API、模块编排和纯数学 helper 的前缀边界清楚。
+4. 命名变化没有改变候选/批准/提交/硬件生效的事实来源；改名后至少做一次严格编译和已有 Host/行为对照。
+5. 当前文档、学习索引和活动测试使用新名；旧名只在明确标注的历史基线、SDK/协议 ABI 或兼容适配层保留。
 
 # 九、函数参数命名与放置必须符合语义
 
@@ -783,7 +848,7 @@ pv_power_mw
 
 power_limit_mw
 
-duty_limit_permille
+max_duty_permille
 
 candidate_duty_permille
 
@@ -908,6 +973,32 @@ relay_contact_closed # 真实反馈
 - `pending`：尚未消费的异步事实。
 
 Driver API 不得拿 `app_*_ctx_t *`；Algorithm API 不得拿 Driver ctx。
+
+## 9.5 可变 ctx 的生命周期与并发合同
+
+凡函数接收 `module_ctx_t *ctx`，写入前必须查清并记录：
+
+- Owner 是谁；初始化/重置入口是什么；首次合法调用和失效条件是什么；
+- ctx 在哪个会话或任务周期内保持有效；函数会改写哪些字段；
+- 实际调用域是主循环、任务、ISR、回调还是多线程；谁是唯一写者，谁只读。
+
+初始化、重置和状态切换还要列出“清零/保留字段矩阵”：局部去抖、采样端点、尾流计时、会话累计、故障代次分别在哪个入口清除，哪些跨阶段保留。不能只写一个笼统的 `reset`。
+
+不能仅凭“可能多线程”就要求加锁。若源码证明是单一主循环/任务单写者，应保留单写模型并在函数合同中写明；若 ISR 只产生事件，使用 pending、快照或队列桥接到前台。确有共享读写时才选最短临界区、互斥或原子快照；ISR 不取阻塞锁，临界区内不做阻塞 I/O。`ctx` 不得保存调用者栈上或短生命周期对象的裸指针。
+
+## 9.6 多布尔参数必须有语义矩阵
+
+同一函数有 3 个以上 `bool` 参数时，先列出“名称 → true/false 含义 → 来源/采样时点 → 消费决策 → 类型（事实、资格、命令、事件、否决或一次性跳过）”。必须区分资格链和原因链，不能把多个布尔值合并成“状态标志”一句话；还要写清它们影响哪个计时器、状态迁移或安全复核。若组合仍靠读 `if` 猜语义，改用枚举或窄 DTO，并把命令与事实分开。
+
+## 9.7 整数提升与计时上界门禁
+
+审查计数器、时间宏、定点量的乘法、强转和累加时，按 C 整数提升规则逐项核对：强转必须发生在乘法前，不能把 `(uint32_t)(a * b)` 当成防溢出；推导操作数最大值、最大乘积、饱和点和回绕边界。区分允许的无符号 `now - then` 时间回绕与无界累计计时；长会话计数应有饱和或明确上限。宏或字段类型变化后必须重新计算边界，不能沿用旧结论。
+
+连续时间必须绑定正确的端点身份：样本有效时间、真实传能时间和尾流资格时间各自记录 sequence/时间戳，首帧只立端点，重复样本和坏间隔不能拼接连续资格；不能用主循环调用次数代替生产者时间。
+
+## 9.8 候选、最终复核与提交必须分层
+
+完成、判满、故障恢复等会改变阶段或执行意图的结果，先写候选状态，再由安全 Owner 在同一采样、命令代次、保护代次和硬件回执仍有效时最终复核并提交。复核失败只撤销候选，不复制整份 ctx 做猜测回滚，也不能把 `pending` 注释成“已经完成”。
 
 # 十、参数一个值只表达一个语义
 
@@ -1248,7 +1339,7 @@ rg --no-ignore -n "<symbol>" .
 
 ## Phase C — code_zl
 
-按 code_zl V0.2.2 做真实完整签名函数头、白话注释、分节、格式、同守护声明布局和 `// todo:`。
+按 code_zl V0.2.8 做真实完整签名函数头、白话注释、分节、格式、同守护声明布局、命名语义核对和 `// todo:`。
 
 函数头 Description 至少能回答：
 

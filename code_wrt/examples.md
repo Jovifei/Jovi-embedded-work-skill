@@ -85,7 +85,7 @@ L3 Domain:
 
   app_task_charge()
       reads: sample + safety snapshot
-      calls: charge policy + app_mppt_duty_step()
+      calls: charge policy + app_mppt_duty()
       outputs: approved charge command
 
 L2 Executor:
@@ -204,8 +204,8 @@ typedef struct
     int32_t pv_power_mw;
     int32_t bat_mv;
     uint32_t power_limit_mw;
-    uint16_t applied_duty_permille;
-    uint16_t duty_limit_permille;
+    uint16_t committed_duty_permille;
+    uint16_t max_duty_permille;
 } app_mppt_duty_in_t;
 ```
 
@@ -222,19 +222,21 @@ process(ctx, data, value, flag, state);
 好：
 
 ```c
-uint16_t app_mppt_duty_step(app_mppt_ctx_t *ctx,
-                            const app_mppt_duty_in_t *in,
-                            uint32_t now_ms,
-                            app_mppt_diag_t *out_diag);
+mppt_search_result_t mppt_search_step(mppt_search_ctx_t *ctx,
+                                      const mppt_measurement_t *meas,
+                                      bool demo_freeze_normal_search);
+
+bool mppt_algo_step(mppt_algo_ctx_t *ctx,
+                    const mppt_algo_input_t *input,
+                    mppt_algo_output_t *output);
 ```
 
 角色一眼能看懂：
 
 ```text
-app_       -> Application owner
-mppt_      -> MPPT domain
-_duty_     -> 对象
-a_step     -> 单次推进
+mppt_search_ -> MPPT 搜索层入口
+mppt_algo_   -> MPPT 算法编排层入口
+_step        -> 单次确定性推进
 ctx        -> Owner state
 in         -> 只读 DTO
 now_ms     -> 时间单位明确
@@ -378,7 +380,7 @@ app_protection_latest();
 
 不能只加注释。先判断这是 hidden dependency 还是 final safety recheck；如果是安全复核，就把它放到 executor/safety-commit 层，并在 API contract 明确。
 
-## 控制流注释按 code_zl V0.2.2
+## 控制流注释按 code_zl V0.2.8
 
 ```c
 /* 3. 连续稳定窗口：弱光下可无限等待，掉门限必须整窗重开 */

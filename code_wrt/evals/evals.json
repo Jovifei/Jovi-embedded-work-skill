@@ -1,6 +1,6 @@
 {
   "skill_name": "code_wrt",
-  "version": "V0.3.2",
+  "version": "V0.4.0",
   "evals": [
     {
       "id": 30,
@@ -10,7 +10,7 @@
     {
       "id": 1,
       "prompt": "/code_wrt src/example.c",
-      "expected_behavior": "Read actual flow, use scope-appropriate code_sc pre-write contracts, implement within existing authorization, apply code_zl V0.2.2, and review the final diff. Do not expand a narrow change into unrelated architecture or ask again for already authorized repair."
+      "expected_behavior": "Read actual flow, use scope-appropriate code_sc pre-write contracts, implement within existing authorization, apply code_zl V0.2.8, and review the final diff. Do not expand a narrow change into unrelated architecture or ask again for already authorized repair."
     },
     {
       "id": 2,
@@ -65,7 +65,7 @@
     {
       "id": 12,
       "prompt": "/code_wrt 写函数 process(ctx, data, value, flag, state)",
-      "expected_behavior": "Must reject ambiguous naming. The function name must expose owner/action/object, and parameters must express role and units, e.g. app_mppt_duty_step(ctx, in, now_ms, out), pv_mv, power_limit_mw, sample_valid, charge_state."
+      "expected_behavior": "Must reject ambiguous naming. The function name must expose owner/action/object, and parameters must express role and units, e.g. mppt_algo_step(ctx, input, output), mppt_search_step(search_ctx, meas, demo_freeze_normal_search), pv_mv, power_limit_mw, sample_valid, charge_state."
     },
     {
       "id": 13,
@@ -151,6 +151,21 @@
       "id": 29,
       "prompt": "/code_wrt 只给最小方案，不落代码：用户先前授权移除某#error；计划用assert恢复同一禁令。要真路测、减包但保留AA56和JustFloat，receiver仍写旧字段英文和错单位。Host只有旧版绿。",
       "expected_behavior": "Stay read-only for plan-only request; reject disguised compile prohibition restoration, retain runtime/macro-value verification. Propose purpose/owner/budget based minimal fields while preserving both modes and updating actual receiver Chinese labels/units and encoding/decoding checks. Record no implementation/test/board PASS, no automatic firmware or skill version changes; old Host evidence cannot close final verification."
+    },
+    {
+      "id": 31,
+      "prompt": "/code_wrt 当前 MPPT 已拍板：搜索入口用 mppt_search_*，算法编排用 mppt_algo_*，搜索内部 static 用短名；现有 mppt_algo_control_step 和 mppt_algo_duty_controller_step 都叫 step，是否强制改成 mppt_algo_limits_to_duty？",
+      "expected_behavior": "Reject mechanical suffix deduplication. Verify each function body and responsibility first: control orchestration may remain mppt_algo_control_step, power-to-duty controller may remain mppt_algo_duty_controller_step. Do not invent mppt_algo_limits_to_duty if it would omit CV/Demo/PI responsibilities. Preserve the approved project naming contract."
+    },
+    {
+      "id": 32,
+      "prompt": "/code_wrt protection.c 的局部变量名叫 candidate_duty_permille，但值来自 drv_pwm_get_duty()，请整理命名。",
+      "expected_behavior": "Rename the local/parameter to committed_duty_permille or driver_duty_permille, update the full declaration/definition/call chain and comments, and keep the data source and protection logic unchanged. Do not rename the source value into an MPPT candidate."
+    },
+    {
+      "id": 33,
+      "prompt": "/code_wrt 批量清理旧 MPPT 名称，历史学习稿、SDK/ABI 和当前 Application 都有命中。",
+      "expected_behavior": "Build an active-versus-history mapping. Migrate current definitions, declarations, callers, tests, decoders and current docs; preserve SDK/protocol/ABI names and explicitly marked historical snapshots. Do not create compatibility aliases just to hide stale active consumers."
     }
   ]
 }

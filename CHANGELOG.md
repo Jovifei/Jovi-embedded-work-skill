@@ -2,6 +2,16 @@
 
 版本号写在各 skill 的 `SKILL.md` 文首 `**Version:**` 或对应版本声明，以及本文件。README「当前版本」表应与之一致。
 
+## 2026-11-04
+
+| Skill | 从 | 到 | 说明 |
+|---|---|---|---|
+| code_wrt | V0.3.2 | **V0.4.0** | 增加已拍板模块命名合同、搜索/编排/数学 helper 分层、candidate/approved/committed/driver 语义、floor/boundary/max 与控制时基门禁；补命名迁移完成门和 MPPT 压力场景。 |
+| code_zl | V0.2.2 | **V0.2.8** | 增加命名与注释真实性联审：floor/boundary/max、候选/提交/驱动设定、last_control_ms/control_dt_ms、Demo/Vref 前缀和历史旧名分类。 |
+| clangd_init | V1.1.0 | **V1.1.1** | 同步发布说明：Ctrl+S 必须使用 clangd formatter，`.clang-format` 为唯一格式来源，code_zl 模板和 VS Code 设置作为可复现资源。 |
+
+本次同步只更新 skill 规则、示例、eval 和 clangd/格式化资源，不改固件源码。
+
 ## 2026-10-15
 
 | Skill | 从 | 到 | 说明 |
@@ -58,4 +68,4 @@
 | code_zl | V0.1.0 | **V0.1.8** | 白话注释、先定义再使用、`// todo:`、任务目录/1ms 标志注释口径 |
 | prj_zl | V0.1.0 | V0.1.0 | 号未升；与本地 Keil `app/driver` 规则核对后同步 |
 
-未改：`clangd_init` V1.1.0、`project-init`、`day_sum`、`child-claude`、`codex-memory`、`c-pan-reorganize`、Android 三件套 v0.1.0。
+未改：`clangd_init` V1.1.0、`project-init`、`day_sum`、`child-claude`、`codex-memory`、`c-pan-reorganize`、Android 三件套 v0.1.0。\n

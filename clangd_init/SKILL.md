@@ -8,17 +8,18 @@ disable-model-invocation: true
 
 # clangd_init
 
-**Version: V1.1.0**
+**Version: V1.1.1**
 
 为当前工作区建立可验证的 clangd 函数跳转、查找引用和保存格式化。配置必须来自当前工程；不改生产固件逻辑，不全仓格式化。
 
 完成条件：一个跨文件调用点的 `F12` 返回实际定义位置；保存一个手工维护的源文件时，格式遵循已有 `.clang-format`，且没有无关文件被改写。
 
-模板见 [templates.md](templates.md)。Jovi 默认 `.clang-format` 与 **code_zl V0.1.0** 共用。
+模板见 [templates.md](templates.md)。Jovi 默认 `.clang-format` 与 **code_zl V0.2.8** 共用；`code_zl/references/clang-format` 和 `vscode-settings.json` 随 skill 仓库发布，保证 Ctrl+S 配置可复现。
 
 ## 版本记录
 
 - **V1.1.0**：保存格式化与 code_zl 对齐。无 `.clang-format` 且用户确认 Jovi 规范时，使用 code_zl 模板（`ColumnLimit: 0`、宏/行尾注释对齐、控制语句 `{` 换行）。格式化器必须是 clangd；`*.h` 关联为 `c`。已有 `.clang-format` 仍不覆盖。
+- **V1.1.1**：同步当前 code_zl V0.2.8 的命名/注释门禁说明，明确 `code_zl/references/clang-format`、VS Code clangd formatter 设置和 Ctrl+S 验证链随仓库交付。
 - **V1.0.0**：首次发布。F12 跳转 + format-on-save 最小配置。
 
 ## 原则

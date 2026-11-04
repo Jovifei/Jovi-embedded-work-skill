@@ -1,11 +1,11 @@
 ---
 name: code_zl
-description: "Use when adding or fixing code comments in embedded C files, syncing clang-format/clangd save rules, aligning #define and trailing // comments, marking unverified code with // todo: for board test or follow-up confirmation, or when the user says code_zl, 代码整理, 注释整理, 添加注释, 格式化, 对齐, clang-format, todo. Comments must use plain Chinese anyone on the team can understand—no unexplained jargon (Arm, 夹窝, 功率帽, pending, etc.). Triggers: code_zl, 代码整理, 注释整理, 添加注释, 代码注释, 批量注释, 格式化规则, 宏对齐, 待测, 待确认, todo, 故障拆分, 1ms标志, 微逆保护, 任务目录, 函数书写, 白话注释."
+description: "Use when adding or fixing code comments in embedded C files, auditing name/comment truth, syncing clang-format/clangd save rules, aligning #define and trailing // comments, or marking unverified code with // todo: for board test or follow-up confirmation. Check candidate/approved/committed/driver setting, floor/boundary/max, last_control_ms/control_dt_ms, Demo/Vref naming, and historical old-name classification. Triggers: code_zl, 代码整理, 注释整理, 添加注释, 命名语义, candidate/committed, floor, boundary, last_control_ms, 格式化, 对齐, todo, 待测, 白话注释. Comments must use plain Chinese anyone on the team can understand—no unexplained jargon."
 ---
 
 # Code_ZL 代码注释整理技能
 
-**Version: V0.2.2**
+**Version: V0.2.8**
 
 为嵌入式C工程添加标准化代码注释，遵循 `docs/代码规范.md` 和 Jovi 实际代码风格。支持单文件处理和多文件并行子Agent批量处理。
 
@@ -15,14 +15,34 @@ description: "Use when adding or fixing code comments in embedded C files, synci
 - 检查 struct 成员是否按相同声明类型集中，分别形成 float、uint32_t、int32_t、uint16_t、uint8_t、bool 等组，同类型保留原相对/用途顺序；bool 与 uint8_t 即使同宽也不混组。组序优先项目约定，否则通常按目标自然对齐/宽度从大到小。这里只检测并报告交错，不能重排；固定 Flash/协议/DMA/寄存器/packed/bitfield/ABI 布局记录例外。分组不扩展到函数形参，不为分组新增嵌套结构或头文件，未测目标布局不宣称节省固定 RAM。
 - 公开、任务、IRQ、复杂或有安全副作用的函数统一使用下文唯一 `Name/Input/Output/Description` 函数头；简单私有 helper 可省略。`Name` 必须与实际完整签名一致（含返回类型、限定词、完整参数），禁止 `(...)`，不并存第二套旧函数头；头文件声明仍使用行尾合同说明。
 - 一处事实由一个注释 Owner 解释；调用处只写本处非显然原因，不逐行翻译代码。诊断名称不能证明无用：只报告 producer/真实 consumer、必要控制状态和授权遥测的区别，不借注释任务删镜像或 wrapper。短 getter、IRQ 桥和硬件事务也不能按行数判冗余。
+- 核对函数名是否说中了函数体。名字写成判断、函数却改状态，名字只写电压、函数还查电流，注释里的百分比和宏不一致，或紧挨着的检查已经被上一个函数覆盖：在报告里标「名字不符」或「逻辑重复」，交给 `/code_wrt`。本技能不改名，也不删重复判断。
 - 先采用项目已有分节、声明和格式配置；按本次完整范围核对函数头、声明、分节、宏和行尾对齐。仅保留 `.clang-format` 或只格式化一个文件，不能声称全范围风格统一；配置同步须属于用户范围。
 - 完成时给出实际文件/行证据、注释及声明位置变化、源码 token/声明守护等价核对和相关可运行检查。静态、Host、目标编译、实板证据分别报告；未执行的检查写未执行，不能用旧 SHA 或 Host 通过宣称实板安全。纯注释/文档不升固件版本。
 
 本节裁决后文旧模板的范围；可判断反例见 `evals/evals.json`。
 
+## 注释只描述本函数，不复述代码
+
+整理范围内按下面改注释。只改文字，不改代码。对不上函数体、又看不出原作者想表达的安全意图时，标给 `/code_wrt`，不要编一句看起来通顺的话。
+
+- 函数头只描述紧挨着的这个函数。`Description` 里的步骤必须能在本函数体内找到。`Input` 里每个参数的含义必须是这个函数怎么用它，不能抄上一个函数或调用方的参数说明。头里出现「先读回执、再问算法、然后再调用本函数」而本函数并没有这些步骤，就是贴错了，按本函数重写。
+- 会改充电状态或发波、合闸命令的 `static` 函数必须有函数头。缺了就按函数体补，不要把旁边函数的头搬过来。
+- 参数定义必须有注释。结构体字段、宏、函数参数和承担单位或门槛的局部变量，写清是什么、单位、谁写入。定义处没有注释就补上，不要留到使用处才第一次解释。
+- 会改变去向的判断必须有注释。`if` 决定状态切换、发波、合闸、冷却或清零时，写清这条条件成立后发生什么，以及不成立时为什么留下。门槛要带上比较的量和单位。
+- 同一字段再赋一次、定义处已经写过含义的，不要再抄一句。`flag = in->flag; // 标志是否为真` 这种删掉。判断注释和参数定义注释不在此列。
+- 同一事实只留一处。相邻两行用两句注释说同一件「压差已经出窗」时，留下写出后果的那句。判断本身的那句必须留下。
+- 注释里的动作必须是代码真的做了的。写「再次检查」时，本函数必须真的又读了一次；参数里已经带好的结论不能写成再次检查。写「本拍不发波」时，要能指出是本函数写了关闭，还是调用方进来之前已经清过命令。对不上就改注释。
+- 故意什么都不做的分支留下注释，写清故意不改什么、为什么。这种空分支注释不能当成复述删掉。
+
 ## 版本记录
 
 - **V0.2.2**：统一纯注释范围、同守护声明布局、完整真实签名和简单私有函数头例外；增加结构体同类型分组检查及固定布局例外，修正配置同步与重复注释要求，补充范围完成证据。
+- **V0.2.3**：增加上下文生命周期与真实调用域注释门禁；增加多布尔标志语义和计时/整数边界说明；扩展并发与溢出 `// todo:` 模板。
+- **V0.2.7**：参数定义，以及会改变状态、发波或合闸去向的判断，必须有注释，写清含义、单位和这条判断的后果。已经在定义处写过的，赋值时不要再抄一句。
+- **V0.2.8**：增加命名与注释的语义一致性门禁：核对 `floor/boundary/max`、candidate/approved/committed/driver setting、控制时基与实际积分、Demo/Vref 层级前缀；发现函数名或参数名不符时交给 `code_wrt`，不能用注释把错误命名说圆。
+- **V0.2.6**：函数头只能描述紧挨着的这个函数。禁止把调用方或其他函数的流程贴过来。注释里的动作必须是本函数真的做了的。故意空着的分支要写清故意不做什么。
+- **V0.2.5**：注释整理时核对函数名是否说中函数体，以及同一条件是否紧挨着写了两遍。只报告「名字不符」或「逻辑重复」，交给 `/code_wrt`。本技能不改名，也不删重复判断。
+- **V0.2.4**：移除工程专属的 `todo` 示例，改为只描述待验证对象、验证动作和通过标准的原则性规则。
 - **V0.2.1**：补充“注释经济性”门禁：函数头只写接口合同，行内只写非显然原因；同一事实只保留一个注释 Owner；删除或改名代码时同步删除失效注释；固定候选值/已批准值/驱动设定值/物理已生效值的白话表达；对 `Arm`、`pending`、`dirty`、`snapshot` 等术语必须写中文含义；整理后必须做术语残留、源码事实和测试不变性检查。
 - **V0.2.0**：新增“注释真实性 + 结构经济性”门禁：数字/单位/状态/硬件能力必须与代码一致；禁止把 ODR 写成物理触点、把 bool 1ms 标志写成绝对实时周期、把未上板路径写成已验证；发现安全宏靠传递 include、注释与实现 75%/80% 漂移、已删除 API/旧头复活时必须报告，不允许用漂亮注释掩盖。新增公共头/一行 wrapper 仍属于结构改动，转 `/code_wrt`。
 - **V0.1.8**：强化「注释必须看得懂」：禁止未解释专业名词；执行流程增加白话自检；给出本工程常用替换对照表。结构改写仍由 `/code_wrt`。
@@ -43,6 +63,35 @@ description: "Use when adding or fixing code comments in embedded C files, synci
 - 行内注释只解释“为什么这样做”，不要把每一行 C 代码翻译成中文。
 - 同一个参数、状态、故障位或安全门只设一个注释 Owner；其他位置只说明本处与它的关系，不重新定义含义。
 - 删除、合并、改名或改变状态含义时，必须同步删除旧注释；禁止保留“看起来还有这个功能”的历史说明。
+
+### 1.1 上下文指针与调用域
+
+凡接收可变 `T *ctx` 的函数，函数头或上下文真源处必须说明：初始化/重置入口、ctx 的有效生命周期、会改写的状态、真实调用域和唯一写者。先查全部调用者再写注释；同时列出关键字段在哪些入口清零、哪些跨阶段保留。只有源码证实存在 ISR/多任务共享时，才写锁或临界区要求。单一主循环/任务单写者要明确写出“不在 ISR 调用”或等价事实，不能臆写“必须加锁”。若保存外部指针，还要说明被指对象的有效期。
+
+### 1.2 布尔标志位语义
+
+同一函数有多个 `bool` 参数时，每行只解释一个参数的 true/false 物理含义、来源时点和消费决策，并区分事实、资格、命令、事件、否决和一次性跳过。要说明标志变化影响哪个计时器或状态迁移；不要只写“标志位”或把 `recover_ok`、`voltage_hold`、`xfer` 等不同条件合并成一句。结构体中的布尔字段在真源处写含义，调用点只写本处关系。
+
+### 1.3 整数提升、单位与边界
+
+凡计数器/时间宏相乘、强制类型转换或累加，注释写明单位、参与类型、最大值、饱和点和允许回绕。必须确认转换发生在乘法前；`(uint32_t)(a * b)` 不能写成“已防溢出”。静态能证明上限时写出边界，不能证明时才在相关代码行加 `// todo:`；不要把正常的无符号时间差回绕和无界累计溢出混为一谈。
+
+涉及连续资格时，注明时间端点属于样本有效、真实传能还是尾流资格，并写清 sequence/时间戳如何防止首帧补算、重复样本重复累计和坏间隔拼接。
+
+### 1.4 候选与最终提交
+
+阶段完成、判满或恢复结果若要改变状态，注释必须区分“候选已足时长”和“最终安全复核后已提交”。复核失败只清候选；`pending` 不能写成已经完成，也不要用“回滚整个上下文”掩盖实际只撤销局部候选。
+
+### 1.5 命名与注释必须互相证明
+
+`code_zl` 不负责改名，但必须检查名字和注释是否共同描述了真实代码。发现不一致时，先按源码事实改注释；如果名字本身不准确，标记“名字不符”并交给 `code_wrt`，不能只写一段漂亮注释继续保留误导性标识符。
+
+- `candidate_duty_permille` 只能表示算法/策略候选；`committed_duty_permille` 才能表示已经交给 Output/Driver 的设定；`drv_pwm_get_duty()` 的结果不能注释成 MPPT 候选。
+- `approved_duty_permille`、`committed_duty_permille`、`hardware_duty_permille` 分别说明批准、驱动设定、硬件实际生效；没有时序/示波器证据时不能把前一层写成后一层。
+- 名字含 `floor` 时，注释写“最低允许值/地板值”；名字含 `boundary` 时，注释写“理论边界/计算基准”；名字含 `max` 时，必须确认它确实是最终上限或明确写成“中间上限”，不能把理论 CCM 边界注释成最终 Duty 硬顶。
+- `last_control_ms`、`last_update_ms` 只能写实际记录的事件。若长间隔会更新时刻但 `dt=0`，注释应写“最近一次处理控制时基/更新时间”，不能写“最近一次真正积分”。
+- 已批准的项目命名合同优先于旧学习稿。当前 MPPT 合同示例：搜索入口用 `mppt_search_*`，算法编排用 `mppt_algo_*`，搜索内部静态 helper 用短名，纯数学 helper 不叠模块前缀，Demo 专属状态带 `demo_`，Vref 保留 `vref`。历史快照中的旧名必须标为历史，不能混入当前函数头或行内说明。
+- 两个职责不同的函数可以共享 `step` 后缀；不要为了避免重复后缀把“控制编排”和“功率到 Duty 控制器”改成一个不完整的职责名。`code_zl` 只核对这种命名是否与函数体相符，不自行替换 API。
 
 ### 2. 输出与异步状态使用固定白话
 
@@ -72,6 +121,8 @@ description: "Use when adding or fixing code comments in embedded C files, synci
 2. 检查数字、单位、时序、ODR/触点、驱动设定/物理生效等表述是否与当前源码一致。
 3. 运行最小语法检查或已有 Host 测试，证明整理没有改变代码行为。
 4. 报告新增、替换、删除的注释数量；如果只是白话化而没有逻辑改动，明确写“行为未修改”。
+5. 对命名迁移按“活动源码 / 当前文档 / 历史快照 / SDK-协议-ABI”分类旧名；历史命中不能当作活动残留，活动残留也不能用历史兼容别名掩盖。
+6. 对 `floor/boundary/max`、`candidate/approved/committed/driver setting`、`last_control_ms/control_dt_ms` 做成对核对；任何一处名字和事实不一致都必须报告给 `code_wrt` 或修正本处注释。
 
 ## V0.2.0 — 注释先求真，再求好看
 
@@ -113,7 +164,7 @@ description: "Use when adding or fixing code comments in embedded C files, synci
 
 ### 6. todo 必须可验收
 
-硬件/实时性/首拍保护 todo 必须写“测什么 + 怎么判通过”。例如：`// todo: 示波器确认首次非零 PWM 后 COMP2 下降沿到 MOE 关闭的延迟；判据：故障脉冲期间不得出现下一颗危险 PWM 脉冲。` 禁止只写“后面看看/待上板”。
+硬件/实时性/首拍保护 todo 必须写“测什么 + 怎么判通过”；具体对象由当前源码、硬件合同或测试协议确定，禁止只写“后面看看/待上板”。
 
 ## 触发条件
 
@@ -488,18 +539,10 @@ void BSP_PWM_Init(void)
 **写法**：
 
 ```c
-// todo: 上板确认 PA15 关断态为低且 Relay 不吸合
-if (!drv_system_wait_for_supply_stable())
+// todo: [待验证对象]；验证动作：[如何验证]；通过标准：[可观察结果]
 ```
 
-```c
-DDL_FLASH_SetLatency(DDL_FLASH_LATENCY3); // todo: 64MHz 下 Latency3 是否满足数据手册 tWR
-```
-
-```c
-// todo: 与 mb_isr_handler 对比——此处缺 tx_busy 丢 RX，需实测半双工回声
-while (USART_STAT0_RBNE)
-```
+对象名称必须来自当前工程的源码、硬件合同或测试协议；本技能不预设具体函数名、任务名、宏名、引脚名或协议字段名。
 
 **规则**：
 - 固定前缀 **`// todo:`**（小写 `todo`；不用 `TODO`/`FIXME`/`待办`/`// todo：` 全角冒号）
