@@ -1,6 +1,6 @@
 {
   "skill_name": "code_sc",
-  "version": "V0.3.2",
+  "version": "V0.3.3",
   "evals": [
     {
       "id": 31,
@@ -156,6 +156,21 @@
       "id": 30,
       "prompt": "/code_sc 用户已授权去掉产品自有#error，又要求真路测但认为139B过大。现两种模式都在用，算法候选duty被receiver标成实际波形。审核建议用typedef负数组恢复检查，删掉全部diag并只留一种帧。",
       "expected_behavior": "Reject disguised restoration of an explicitly removed compile check while still verifying macro actual values and runtime gates. Choose minimal fields for stated observations and real-time budget, preserve both required modes, inspect actual receiver and Chinese units. Expose candidate/setting/physical mismatch without silently changing value source, deleting observation capability, or inventing a universal packet size."
+    },
+    {
+      "id": 32,
+      "prompt": "/code_sc 临近发布。preview(&scratch) 看似无副作用，但 scratch.filter 指向正式状态，阶段推进后还会 update 一次。cache 用 seq+min，两个有效性和限制来源不同的输入都得 0。只有上一版 Host 轨迹通过。请审查。",
+      "expected_behavior": "Trace alias and writes through preview, compare stage-switch qualification and approval data, identify cache dependencies when the zero causes change, and provide reproduction or evidence with severity. Old Host evidence cannot pass this diff. Review remains read-only."
+    },
+    {
+      "id": 33,
+      "prompt": "/code_sc 只审核复位路径。参数切换、采样失败和升级使用不同软件复位入口，量产看门狗也可复位。合闸运行态断言软件 Duty 清零即可保证重启 PWM 无脉冲。",
+      "expected_behavior": "Trace all equivalent reset entrances, actuator commands and protection timing before reset, isolate watchdog/power-loss defaults and boot enable sequence, distinguish set values from physical pins/contacts, and state board evidence still needed. Do not add new behavior in review."
+    },
+    {
+      "id": 34,
+      "prompt": "/code_sc 当前工单只改接收字段单位。报告声称两个一行的模式入口已分层，实际 shared(mode) 持模式状态；Host shadow 不同就置 inhibit，且解码时拒收协议允许但超过板卡执行上限的值。",
+      "expected_behavior": "Trace actual owners and state writers and show where shadow becomes a production veto. Check receiver behavior against the wire contract and keep board limit at the existing executor. Separate findings from authorized remediation scope and distinguish confirmed code behavior from unverified physical effects."
     }
   ]
 }

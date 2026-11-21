@@ -1,6 +1,6 @@
 {
   "skill_name": "code_wrt",
-  "version": "V0.4.0",
+  "version": "V0.4.2",
   "evals": [
     {
       "id": 30,
@@ -166,6 +166,46 @@
       "id": 33,
       "prompt": "/code_wrt 批量清理旧 MPPT 名称，历史学习稿、SDK/ABI 和当前 Application 都有命中。",
       "expected_behavior": "Build an active-versus-history mapping. Migrate current definitions, declarations, callers, tests, decoders and current docs; preserve SDK/protocol/ABI names and explicitly marked historical snapshots. Do not create compatibility aliases just to hide stale active consumers."
+    },
+    {
+      "id": 34,
+      "prompt": "/code_wrt MPPT改名：把只负责mode分发的 mppt_algo_control_step 改成 mppt_algo_apply_power_limits_and_duty，并把 process_search_average_window 改成 update_vref_from_average_window。",
+      "expected_behavior": "拒绝机械改名。先按函数体识别分发、窗口消费、共享控制和候选Duty职责；为分发函数选择 dispatch/evaluate 名称，为窗口处理保留 process/consume 语义，不能漏掉暂停、启动降压、积分和诊断副作用。"
+    },
+    {
+      "id": 35,
+      "prompt": "/code_wrt 将 app_mppt_duty 改为 app_mppt_evaluate_candidate_duty，同时把 in/alg_in/meas/out/allow/cap_mw 参数一并改名。",
+      "expected_behavior": "建立旧到新矩阵，核对所有声明、定义、调用方、测试、decoder和当前文档；参数名必须表达角色和单位，区分 stage allowed、approved、pre-MOS、request、candidate/committed。"
+    },
+    {
+      "id": 36,
+      "prompt": "/code_wrt Charge/MPPT改名：approved_power、pre_mos、requested_power、candidate_duty混用，要求只改名字。",
+      "expected_behavior": "先指出语义冲突并冻结字段Owner；不能把改名当作行为修复。分别使用 approved_power_mw、pre_mos_derating_power_mw、requested_power_mw、candidate_duty_permille，并检查 Charge/MPPT/Output 全链。"
+    },
+    {
+      "id": 37,
+      "prompt": "/code_wrt 批量改MPPT和Charge函数名，历史V0.12/V0.15文档、当前docs、Host工具都有旧名。",
+      "expected_behavior": "Classify active source, current docs, tests/decoders, and historical snapshots. Preserve historical identifiers and external contracts. Close active names and update current version records only when the project policy and current scope call for it."
+    },
+    {
+      "id": 38,
+      "prompt": "/code_wrt 将 charge_stage_fill_budget 改成 charge_stage_update_power，原函数还写目标电压和电流帽。",
+      "expected_behavior": "拒绝不完整名称；函数名必须覆盖功率预算、阶段电流帽和目标电压产物，或先拆职责再命名。"
+    },
+    {
+      "id": 39,
+      "prompt": "/code_wrt 整理 NORMAL/LOAD 控制以减 Flash。两入口只包装 core(mode)，起动、直通接续、限压恢复仍在 core。启动下限为 0 代表 NORMAL；同块采样功率两条路径各算一次。建议新建 math.c，删写驱动前的第二道检查并把 Host 双算失配接成关波。协议与保护照旧。",
+      "expected_behavior": "Preserve the real write-time safety recheck, use explicit mode, put mode-only orchestration/state in the paths, and share the sample fact and truly common calculation in a suitable existing module. Keep the comparison outside production approval. Preserve protocol and control timing and compare target map under matching build settings."
+    },
+    {
+      "id": 40,
+      "prompt": "/code_wrt 只做等价去重。预览用临时 ctx 但滤波指针指向正式状态，阶段推进后同拍再算批准预算。cache 只比采样序号和最后 min。限制没使能、无效与要求零输出都可能是 0。先列怎么改和对照哪些结果。",
+      "expected_behavior": "Trace and isolate writes through aliases, separate preview and one formal update, and tie approval and qualifications to the correct phase inputs. Define zero/disabled/invalid/stop and reasons from actual contracts, check all affected cache inputs, preserve repeated-sample tightening/timing, and compare first mismatch against the frozen baseline before starting another batch."
+    },
+    {
+      "id": 41,
+      "prompt": "/code_wrt 只允许改接收帧字段的显示名。有人要按板卡额定值在解包处拒收协议允许的值，并直接暂存本批文件。用户说继续完成当前改动。",
+      "expected_behavior": "Complete the authorized rename with current consumers and documentation, preserve wire value domain and behavior, leave execution limits at their actual owner, and explain/propose any additional validation separately. Continue implementation within scope with no Git index write."
     }
   ]
 }

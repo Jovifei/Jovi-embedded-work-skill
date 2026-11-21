@@ -1,6 +1,6 @@
 {
   "skill_name": "code_zl",
-  "version": "V0.2.8",
+  "version": "V0.2.10",
   "evals": [
     {
       "id": 18,
@@ -106,6 +106,21 @@
       "id": 21,
       "prompt": "/code_zl 旧名只出现在 V0.16.1 历史学习稿，当前 Application 已全部迁移。",
       "expected_behavior": "Classify the hit as an explicitly marked historical snapshot, do not restore old aliases or alter production code, and report that active-source old-name search is clean."
+    },
+    {
+      "id": 22,
+      "prompt": "/code_zl 给暂存区变更补中文逐行注释。同文件的未暂存变更把 target=0 从未启用改成停机。暂存版只有 cv_enabled=true 时 0 才否决。还要让新人从当前架构文档找到函数。",
+      "expected_behavior": "Read cached diff and indexed source separately from worktree. Cover all relevant function heads and per-line control logic, using names, units and actual validity/zero semantics. Do not write notes inconsistent with local code or overwrite overlapping changes, and leave index untouched. Sync authorized architecture entries with the matching source only."
+    },
+    {
+      "id": 23,
+      "prompt": "/code_zl 函数 preview 读写经指针传入的正式状态，缓存只按序号和最小值，shadow 错误会返回 0。本轮只加注释。旧注释说只读、同一采样复用、仅测试日志。",
+      "expected_behavior": "Show actual state writes, cache keys, and consumer of the shadow mismatch in clear Chinese. Report inaccurate names, missing key or hidden stop as review findings for code_sc/code_wrt. No new guard, macro removal, or fabricated read-only behavior."
+    },
+    {
+      "id": 24,
+      "prompt": "/code_zl 只补本次单语句 if 的注释，项目原样这样写，未授权格式配置。另一处涉及未实测的复位后引脚，应解释判据。",
+      "expected_behavior": "Keep C tokens and format config unchanged for comments-only work. Use scoped plain Chinese, and a generic observable todo at the relevant line only when needed. Never conclude hardware state from a driver or relay command alone. Preserve project brace policy if formatting is separately requested."
     }
   ]
 }

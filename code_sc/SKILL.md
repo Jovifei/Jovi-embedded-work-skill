@@ -1,25 +1,27 @@
 ---
 name: code_sc
-description: "Use when the user invokes /code_sc or asks for a deep embedded-C code review focused on architecture, ownership, layering, call relationships, API/parameter placement, state machines, concurrency, PWM/relay/protection safety, safety-edge timing, ISR/main TOCTOU, snapshot consistency, actuator single-writer ownership, or maintainability defects. Triggers include code_sc, 代码审查, 架构审查, 调用关系审查, 模块边界审查, ownership review, PWM安全审查, 中断竞争审查."
+description: "Use when reviewing embedded C architecture, state ownership, call paths, snapshot consistency, control timing, or protection and actuator safety. Triggers: code_sc, 代码审查, 架构审查, 调用关系审查, 模块边界审查, ownership review, PWM安全审查, 中断竞争审查."
 ---
 
 # Code SC
 
-**Version: V0.3.2**
+**Version: V0.3.3**
 
 `code_sc` 是嵌入式 C 的“结构 + 行为 + 安全时序”代码审查 skill。它不只找空指针、越界和语法问题，而是专门发现“代码能跑、测试能过，但 Owner / 状态机 / 安全提交时序已经写歪”的问题：Owner 不唯一、Controller 越权、Application 内部环依赖、整个上下文对象乱传、算法层知道硬件/充电阶段、同一状态被多个模块解释、硬件多写点、隐藏全局依赖、参数语义重载、死接口、ISR/主循环竞争、首拍保护空窗、TOCTOU、跨代 snapshot、重复 lifecycle reset、API 假成功、产品限制多份真值等。
 
-默认 **只审查、不改代码**。用户明确要求“修复/整改/提交”时，先说明结论和整改边界后继续已授权工作，不要求二次批准；写入范围变化时才重新判断授权。
+默认只读。用户同时授权修复时，先核实问题并说明边界，再交 `code_wrt` 实施已授权的部分。Git 写操作按当次指定的仓库、操作和范围单独判断授权。
 
 ## 范围与完成证据
 
 先确认目标版本/工作树内容和审查范围，按风险检查以下适用项；小范围审查可标明不适用，不凭模板扩大整改。详细判断例见 [examples.md](examples.md)。
 
+外部审核逐条对照目标基线、调用者和可达路径，说明哪些成立、哪些证据不足。按用户的验收目标区分本批引入的问题、已存在的问题、计划中尚未完成的项和未实测的项。定点审查可以沿必要调用链取证，整改仍限于已授权的位置、字段或位段。
+
 1. **结构减法也要审**：列受影响字段、状态、getter、诊断的 Owner、producer 和真实 consumer，区分控制/保护/存储协议、当前获授权遥测、测试观察、纯写副本。无外部运行消费者不等于无用：积分、滤波、缓存、采样身份/去重、回算、故障代次和事务记忆可在内部消费。仅测试镜像可收口并适配真实内部/行为断言；不为旧夹具恢复生产镜像，也不按 diag 名称删除全部观测。
 2. **命名与布局有边界**：自有 app_/drv_ 使用项目约定 snake_case；SDK/CMSIS、startup IRQ、回调 ABI、协议外部名按合同保留。改名建议须给旧→新→Owner→声明/定义/所有调用/回调/项目/测试/decoder/docs 映射；历史基线、SDK 与活动旧名命中分别归类。私有类型/宏回真实 Owner，不以 main.h 聚合或新建配置头代替归属判断。
    struct 成员按相同声明类型集中，各 float、uint32_t、int32_t、uint16_t、uint8_t、bool 分组，同类型保留原相对/用途顺序；bool 与 uint8_t 不因同宽合组。组序优先项目约定，否则通常按目标自然对齐/宽度从大到小。区分可整理内部结构和需保护的外部固定布局：追踪位置式/指定式初始化、offsetof/sizeof、raw memcpy/序列化、Flash/协议/DMA/寄存器、packed/bitfield、ABI/汇编/回调依赖；有固定布局合同则保留并记录例外。此规则不改变函数形参合同，不要求嵌套 struct/新头；没有目标布局证据不能声称固定 RAM 收益。
 3. **短函数按责任判断**：检查所有 return 路径和 caller 分支；恒 true 且无失败合同的 prepare 可改 void，无价值别名可合并。但 ZeroApplied/自然更新、首末脉冲、IRQ 桥、稳定 ABI、集中硬件写点及 PWM 写前/写后/恢复中断屏障须分别举证保留，不能按行数或数值相同去重。
-4. **观测合同与预算**：用户要求路测又要求减包时，按观测目的、字段 Owner 和实时预算选最少字段；保留明确要求的两种模式，核对实际 receiver、中文字段/单位和编码解码一致性。值是候选、驱动设定还是物理生效必须如实说明；协议与源码不符要报告，不偷偷换源或删能力。不把某次路径、包长或功率阈值当通用要求。
+4. **观测合同与预算**：用户要求路测又要求减包时，按观测目的、字段 Owner 和实时预算选最少字段，保留用户要求的模式和开关，核对真实接收端、默认配置、单位及编解码。退役测试资产、现场调试和正式控制分别追消费者，未确认删留时报告影响。区分候选、提交、驱动设定和物理生效，不把一次项目决定推广成统一策略。
 5. **可复核结论**：每项给文件/行、源码事实及影响，区分可确认 bug、结构 P2、风格 P3、待确认；更高安全级别按实际后果判。结构问题不能都降为风格，待测不能伪装 bug。最终证据绑定实际 final SHA/内容 hash、目标/define/include、命令与退出码、旧名允许残留及未运行项；编译、旧 SHA、Host PASS 均不代表架构或实板合格。
 
 安全编译检查默认保留；用户明确授权移除某项 `#error` 时，不用 assert/typedef 偷偷恢复同一禁令，仍验证实际宏值和运行安全门。一次授权不能推广为通用撤保护规则。
@@ -41,7 +43,7 @@ V0.3.0 专门补足“单个模块看起来正确，但工程一合并就裂脑�
 
 ### 0.x 当前代码身份必须可复现
 
-最终报告开头必须写 Repository、Target ref、HEAD、Compared base（如有）、Build file、CI run/status、Worktree 状态。用户说“本地已修”但只给远端 URL，而远端 SHA 没变化时，要明确说本地修改未出现在远端。
+给出本次结论对应的源码身份。集成、发布或跨版本验收同时记录相关仓库、分支、提交或工作树内容、对照基线、目标及 CI。只有片段或缺少版本资料时写明所见范围。只有旧远端 SHA 时不能据此验收尚未提供的本地变更。
 
 ### 0.y Merge Contract Matrix
 
@@ -73,6 +75,8 @@ Merge 后至少审 public API/typedef、fault schema、safety veto、IRQ、build
 
 ## 版本记录
 
+- **V0.3.3**：检查真实的模式路径、预览写点、同拍资格与批准、缓存输入和诊断对照，并补齐复位时的执行器审查及范围、协议、验收证据要求。
+
 - **V0.3.2**：补全消费者分类、命名/Owner 迁移、结构体同类型分组及固定布局例外、短函数完成证据，修正日志镜像死字段误判、结构与风格分级、授权修复和路测预算边界。
 - **V0.3.1（2026-09-23）**：基于 MPPT Charger V0.13.18 暴露的问题，补充冗余审计、时间屏障分层、四层输出语义、证据分级与重构合同收口门禁。
 - **V0.3.0**：补充集成/合并/实时性硬门禁。
@@ -85,11 +89,11 @@ Merge 后至少审 public API/typedef、fault schema、safety veto、IRQ、build
 
 发现近义参数、字段、宏或 API 时，先建最小矩阵：
 
-| 候选 | 语义 | 单位/量纲 | Owner | Producer/Consumer | 合并结论 |
+| 候选 | 角色和单位 | Owner 与消费者 | 输入身份和时点 | 运算与副作用 | 合并结论 |
 |---|---|---|---|---|---|
 | `a` / `b` | ? | ? | ? | ? | 保留/合并/需确认 |
 
-只有**语义、单位/量纲、Owner 三者完全一致**，且 Producer/Consumer 合同不变，才允许合并。**数值相等不等于参数相同**：`300000` 可能分别表示产品上限、当前批准值或硬件绝对上限；必须先确认角色和生命周期。
+需证明语义、单位、输入身份、时点、有效性、整数运算及副作用相同，并维持生产方和消费方的合同。测量值和限幅后的值、即时测量和算法历史、产品上限和硬件绝对上限分别核对。单次数值相等不足以判冗余。
 
 ### 2. 安全复核分层：数值可收口，时间屏障不可去重
 
@@ -104,32 +108,34 @@ Merge 后至少审 public API/typedef、fault schema、safety veto、IRQ、build
 - **空 wrapper**：函数只转调、无语义边界、无副作用/所有权/稳定 ABI 价值；可删除或合并，但先查全部调用点。
 - **死字段候选**：无真实 Producer、无有效 Consumer 或仅写副本；先按文首区分内部控制状态、授权遥测和仅测试观察。DTO/日志有真实合同就不是死字段；值恒定也可能是协议/ABI要求，须给出实际搜索与合同证据。
 
-### 4. 输出语义四层：禁止混用
+### 4. 区分控制输出的各个阶段
 
 审查和命名必须区分：
 
 ```text
 candidate            算法/策略提出的候选值
 approved              Application/Safety 批准后允许的值
-driver_setting       已交给 Driver/Executor 的寄存器或驱动设定
+committed            执行层已提交的命令或回执
+driver_setting       驱动保存或寄存器已写入的设定
 physically_effective  硬件实际生效的值/状态（需时序或板级证据）
 ```
 
-`candidate == approved` 不代表已提交；`driver_setting == physically_effective` 也不代表影子寄存器、更新事件、PWM/Relay 反馈已经生效。报告不得用上一层证据替代下一层结论。
+按执行动作与证据区分批准、提交、驱动设定和实际生效。项目若把提交和写驱动合为一步，说明实际合同即可，无须增加字段。数值相同仍要检查写寄存器、定时器更新与硬件反馈。
 
 ### 5. 结论证据分桶：Host/Keil 不得冒充 BOARD_PASS
 
-每个问题必须归入且只归入一个主桶：
+问题按当前证据分类：
 
 - **可确认 bug**：源码、可复现测试或明确失败证据已闭环。
 - **结构问题**：Owner、边界、重复解释、合同或可维护性已由静态证据确认，但不等同于已发生的板级故障。
+- **需补证据**：缺源码、调用链、当前测试、协议或产品约定，说明缺哪项和会影响什么结论。
 - **需板级证据**：必须用真实 MCU/中断时序/示波器/继电器反馈/故障注入确认；Host、静态分析、Keil 编译只能分别写 `HOST_PASS`、`STATIC_ANALYZER_PASS`、`KEIL_BUILD_PASS`，不得写 `BOARD_PASS`。
 
 输出问题表增加 `结论桶` 列，并在每项后写 `证据层级 + 未验证项`。
 
 ### 6. Post-refactor contract closure：收口清单
 
-任何重构不得以“代码已移动/编译通过”结束。完成门必须逐项闭环：
+按重构范围核对以下适用项，并说明仍缺的证据：
 
 ```text
 [ ] headers：public/private、直接 include、include path 无旧合同残留
@@ -139,14 +145,14 @@ physically_effective  硬件实际生效的值/状态（需时序或板级证据
 [ ] docs：README/架构/接口/验证边界反映当前实现
 ```
 
-任一项没有证据，输出 `POST_REFACTOR_CONTRACT_PARTIAL`，不得写“重构完成”。
+任一必要的适用项缺证据时，输出 `POST_REFACTOR_CONTRACT_PARTIAL` 并列出缺口。
 
 ### V0.3.1 最小输出模板
 
 ```text
-结论桶：可确认 bug / 结构问题 / 需板级证据
+结论桶：可确认 bug / 结构问题 / 需补证据 / 需板级证据
 对象：<参数/字段/API/时间屏障>
-四层状态：candidate=<...> -> approved=<...> -> driver_setting=<...> -> physically_effective=<...>
+输出阶段：candidate=<...> -> approved=<...> -> committed=<...> -> driver_setting=<...> -> physically_effective=<...>
 冗余矩阵：语义=<...>；单位=<...>；Owner=<...>；结论=<保留/合并/需确认>
 安全屏障：采样新鲜度=<...>；ISR=<...>；PWM写前/写后=<...>；Relay写前/写后=<...>
 证据：SOURCE_CONFIRMED / HOST_PASS / STATIC_ANALYZER_PASS / KEIL_BUILD_PASS / BOARD_PASS
@@ -375,6 +381,8 @@ Inputs / Hidden Inputs / Outputs / State Mutation / HW Side Effects / Caller / T
 
 隐藏输入若会影响控制结果，通常至少 P2；涉及 PWM/保护时提高到 P1。
 
+核对名称和注释是否说清主要动作、输入单位、输出和真实副作用。按项目命名识别公开/私有、编排/纯计算和模式专属角色。分发入口、同样本收紧、时基处理、积分、理论边界和有效限值分别按实际行为判断。名称相同的后缀或某个局部词不足以判违规。命名或注释有误而代码行为正确时，按各自问题给出证据。
+
 ## Phase 6 — 状态机、会话边界与重复生命周期动作
 
 检查是否存在多个模块对同一事件给出不同生命周期解释。
@@ -417,9 +425,15 @@ FAULT -> RECOVERY/WAIT
 
 **幂等不等于架构正确。** `reset()` 被连续调用三次虽然当前无功能差异，仍说明 lifecycle Owner 不唯一。
 
+### 6.2 模式路径、预览与单拍状态
+
+- 从入口到真实状态写点追模式来源、初始化、运行和切换清理。若两个入口都只转发到带模式分支的公共函数，继续找专属状态和编排实际在哪里推进。公共数学可共用，模式拆分以写点和运行路径为证据。
+- 列出同一采样或控制事件内的预览、阶段推进、正式更新、候选、资格和批准所用数据，至少核对一条阶段切换路径。检查预览的共享指针、全局变量和调用副作用。临时结构体含正式状态的可写引用时仍可能推进正式状态。
+- 若同拍使用不同策略输入，核对这是定义清楚的预览与正式边界，还是资格、批准和诊断混用前后阶段状态。核对重复采样只收紧/保持的合同、积分实际间隔和搜索/暂停/恢复状态的更新次数。
+
 ## Phase 7 — Safety-edge Timeline：必须审“第一拍/最后一拍”
 
-这是 V0.2.0 的核心门禁。对所有危险动作画有序时间线，而不是只看稳态。
+涉及危险执行器动作时，按本次证据和审查范围画有序时间线，从触发一直核对到物理可能生效或禁止输出的时点。
 
 ### 7.1 PWM 上电/发波边沿
 
@@ -464,6 +478,10 @@ Shadow/preload takes effect on which update event ?
 - ODR request 与真实触点反馈是否混淆
 - relay settle/debounce 与 MPPT session reset 是否一致
 - fault 时先 PWM 还是先 relay，是否符合硬件安全顺序
+
+### 7.4 复位入口与重启
+
+涉及复位或执行器安全时，沿实际入口搜索配置切换、采样异常、故障、OTA 和其他相关复位路径。对软件可控复位，查复位请求之前是否按硬件合同关波、禁止新命令和处理继电器，并检查中断重入或超时是否绕过该次序。独立看门狗、掉电等路径不能假定会执行软件清理。查定时器、引脚和外部驱动的复位默认态、继电器状态、Boot 到应用的初始准入。区分源码可达路径、设备资料所证实的默认态及板上实际波形。缺硬件证据时记录验证点，不推断 PWM 必然钉高或复位必然安全。
 
 ## Phase 8 — ISR / Main 并发、TOCTOU 与原子握手
 
@@ -603,6 +621,12 @@ bat_mv * 6000
 
 “数值目前相同”不是通过理由；将来 6A→6.6A 只改一处就会分叉。
 
+### 10.2 接口语义、缓存与诊断回流
+
+- 从生产者到实际消费者查合法零、未启用、无效、明确停机及限制来源。相同最小值可能来自不同限制，亦可能改变资格、诊断或恢复。逐项对照缓存键与所缓存的字段，验证同序号但有效位、采集时刻、模式、策略值或来源改变时，哪些能留用、哪些需要失效或收紧。
+- 追踪 shadow 对照、遥测和测试标志的实际消费者。发现它们进入生产批准、候选发布、停机或恢复决策时，列出触发路径和依据。迁移对照可在 Host 双算，生产采用已批准的正式路径。
+- 检查协议接收、转发与界面是否保持约定值域和编码，本地执行约束是否在明确的责任方生效。新增拒收/限幅/停机需有协议、产品需求或既有保护依据，依据不足时报告具体场景，按范围请用户定夺。
+
 ## Phase 11 — Producer / Consumer / Recovery Reachability
 
 对每个 safety-relevant enum、fault bit、action、event 建表：
@@ -734,7 +758,7 @@ Peer module <-> peer module 双向修改状态
 
 # 审查完成门：没有完成这些，不得下“没问题”结论
 
-至少输出或内部完成以下 9 项：
+按审查范围核对以下适用项。全面审查逐项给出证据或缺口，局部审查说明查到的路径和边界：
 
 1. **Owner 表**：包含 session、stage、algorithm、fault、PWM/Relay、lifecycle reset、COMP live window
 2. **依赖图 + SCC**：同时检查 `app↔app` 和 `driver→app` 逆向边
@@ -745,6 +769,8 @@ Peer module <-> peer module 双向修改状态
 7. **Lifecycle side-effect 表**：init/reset/start/stop 是否多 Owner/重复调用
 8. **Producer-consumer reachability 表**：fault/action/event 是否有真实 producer
 9. **Multiple Sources of Truth 搜索**：产品功率/电流/Duty/OV 等关键约束
+
+对改动声明逐项核对实际行为。等价重构使用指定基线和当前目标的同输入对照，覆盖发生变化的状态、时序、限制来源和异常分支。Flash 收益须注明目标、工具链、构建选项与镜像或 MAP 的前后差值，源码行数、Host 对象大小和旧目标记录各有自己的证据边界。区分确认通过、证据不足、已失败和未运行。
 
 如果用户要求“全面复核”，**只跑单元测试或只看几个头文件不足以判 PASS**。
 
@@ -813,7 +839,7 @@ sample -> protection -> charge -> algorithm -> application validation
 
 ## 5. Safety-edge Timeline
 
-至少画一个真正的边沿：
+涉及执行器且能从现有证据还原边沿时，至少画出一条实际路径。缺证据时标出无法确认的步骤：
 
 ```text
 Task tick N:
@@ -866,13 +892,13 @@ Task tick N+1:
 
 # 边界
 
-- 默认只读审查；没有用户明确授权，不改代码、不提交。
+- 默认只读审查。暂存、取消暂存、停止跟踪、提交、改提交说明、切换或创建分支、合并、变基、推送及等效操作都要求当次明确授权，实施授权不能代替 Git 授权。
 - 不为了“架构漂亮”改变保护阈值、硬件时序、协议或产品行为。
 - 无法确认业务语义时标记“需要产品确认”，不得自行发明。
 - 发现 P0/P1 时优先报告，不能被注释/格式问题淹没。
 - 对安全时序没有证据时，不得用“应该没问题”“看起来没问题”收尾。
 
-# 报告结尾必须回答
+# 报告按实际审查范围回答
 
 1. 这是功能 bug、并发 bug、时序 bug，还是架构/设计 bug？
 2. 哪个状态/决策/lifecycle 的 Owner 错了？

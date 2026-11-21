@@ -2,7 +2,7 @@
 #
 # .h：函数声明 + 行尾中文注释保持单行（ColumnLimit: 0，不拆参数）
 # .h/.c：连续 #define 宏名/数值列对齐，行尾 // 注释对齐
-# .c：if / while / for / else 后左大括号换行并缩进
+# .c：if / while / for / else 后左大括号换行并缩进。模板不自动插入大括号。
 ---
 BasedOnStyle: LLVM
 ColumnLimit: 0
@@ -35,4 +35,5 @@ BraceWrapping:
 
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortBlocksOnASingleLine: false
-AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false

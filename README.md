@@ -4,7 +4,7 @@
 
 专为嵌入式 C 工程（GD32/STM32/ESP32 + FreeRTOS + Modbus/CAN/UART）设计，开箱即用。
 
-## 当前版本（2026-11-04）
+## 当前版本（2026-11-22）
 
 版本号以各 skill 目录 `SKILL.md` 文首 `**Version:**`（或 `VERSION` 文件）为准；本表必须与之同步。明细见 [`CHANGELOG.md`](CHANGELOG.md)。
 
@@ -18,12 +18,12 @@
 
 | Skill | 版本 | 说明 |
 |---|---|---|
-| `code_sc` | **V0.3.2** | 真实消费者分类、命名与结构布局审查、时间屏障和最终内容证据 |
-| `code_wrt` | **V0.4.0** | 分层命名合同、消费者迁移、候选/提交语义和最小改动完成门 |
+| `code_sc` | **V0.3.3** | 审查真实职责、同拍状态、缓存、复位与证据 |
+| `code_wrt` | **V0.4.2** | 分阶段做等价重构，收口职责、重复计算、命名和验证 |
 | `code-study` | **V2.0.0** | 按运行阶段与功能写完整口语图文教程；配模块/原函数、参数、状态机及离线阅读器 |
 | `product-doc` | **V1.0.0** | 新增：源码驱动的产品说明、运行逻辑、参数台账、保护恢复与验收清单 |
 | `update-project-docs` | **V1.1.0** | Full Refresh 全树清单 + 介绍面完成门（纯文档不升固件版本） |
-| `code_zl` | **V0.2.8** | 完整真实签名、命名/注释真实性、控制时基语义和纯注释边界 |
+| `code_zl` | **V0.2.10** | 完整函数头、逐行说明、暂存范围和注释真实性 |
 | `prj_zl` | **V0.1.0** | Keil `app/driver` 四层；号未升 |
 | `clangd_init` | **V1.1.1** | clangd 跳转、Ctrl+S 保存格式化和可复现配置资源 |
 
@@ -34,9 +34,9 @@
 | `project-init` | 未编号 | 工程工具链一键 init |
 | `update-project-docs` | **V1.1.0** | 文档 bootstrap + Full Refresh |
 | `clangd_init` | **V1.1.1** | clangd 跳转与 Ctrl+S 格式化 |
-| `code_zl` | **V0.2.8** | 注释、签名、声明布局和命名语义检查 |
-| `code_sc` | **V0.3.2** | 架构、命名、布局、消费者与安全时序审查 |
-| `code_wrt` | **V0.4.0** | 写代码门禁、分层命名与布局收口及最小改动 |
+| `code_zl` | **V0.2.10** | 注释、签名、声明布局和命名语义检查 |
+| `code_sc` | **V0.3.3** | 架构、状态、消费者与安全时序审查 |
+| `code_wrt` | **V0.4.2** | 按范围完成编码、等价重构与验证 |
 | `code-study` | **V2.0.0** | 分阶段口语图文源码学习书 |
 | `product-doc` | **V1.0.0** | 产品说明、运行逻辑与可追溯参数 |
 | `prj_zl` | **V0.1.0** | Keil app/driver 目录重组 |
@@ -55,9 +55,9 @@ jovi-embedded-work/
 ├── project-init/              # 一键初始化工程工具链
 ├── update-project-docs/       # 文档 bootstrap + 日常维护（V1.1.0）
 ├── clangd_init/               # clangd 函数跳转 + 保存格式化（V1.1.1）
-├── code_zl/                   # C 代码注释标准化（V0.2.8）
-├── code_sc/                   # 架构 / Owner / 安全时序审查（V0.3.2）
-├── code_wrt/                  # 写代码门禁：code_sc → 实现 → code_zl → code_sc（V0.4.0）
+├── code_zl/                   # C 代码注释标准化（V0.2.10）
+├── code_sc/                   # 架构 / Owner / 安全时序审查（V0.3.3）
+├── code_wrt/                  # 写代码门禁：code_sc → 实现 → code_zl → code_sc（V0.4.2）
 ├── code-study/                # 分阶段口语图文学习书（V2.0.0）
 ├── product-doc/               # 产品说明与运行参数（V1.0.0）
 ├── prj_zl/                    # Keil 工程 app/driver 目录重组（V0.1.0）
@@ -156,7 +156,7 @@ docs/
 
 **触发词：** `/clangd_init`
 
-**功能：** 为当前嵌入式 C/C++ 工作区配置可验证的 clangd 函数跳转、查找引用和保存格式化。只读探查后按当前工程生成最小配置；不改生产固件逻辑，不全仓格式化。无 `.clang-format` 且确认 Jovi 规范时，使用 **code_zl V0.2.8** 模板（`ColumnLimit: 0`、宏对齐、控制语句 `{` 换行）；格式化器必须是 clangd。
+**功能：** 为当前嵌入式 C/C++ 工作区配置可验证的 clangd 函数跳转、查找引用和保存格式化。只读探查后按当前工程生成最小配置；不改生产固件逻辑，不全仓格式化。无 `.clang-format` 且确认 Jovi 规范时，使用当前 `code_zl` 模板（`ColumnLimit: 0`、宏对齐、控制语句 `{` 换行）；格式化器必须是 clangd。
 
 **验收：**
 
@@ -183,13 +183,13 @@ docs/
 
 ### 4. code_zl — 代码注释标准化
 
-**版本：** V0.2.8
+**版本：** V0.2.10
 
 **触发词：** `/code_zl`、`代码整理`、`注释整理`、`添加注释`、`批量注释`、`白话注释`
 
 **功能：** 为嵌入式 C 工程添加标准化注释，遵循 Jovi 代码规范。支持单文件和多文件并行处理。V0.2.1 起除 Comment-to-Code 真值核对外，增加注释经济性：函数头只写接口合同，行内只写非显然原因，同一事实只保留一个注释 Owner；候选值、已批准值、驱动设定值、物理已生效值必须分开表述，结构改写仍走 `/code_wrt`。
 
-V0.2.8 在完整真实签名和唯一合同头基础上，增加命名与注释真实性门禁：核对 candidate/approved/committed/driver setting、floor/boundary/max、last_control_ms/control_dt_ms、Demo/Vref 前缀和历史旧名分类。声明前置必须保持作用域、条件守护和依赖；结构体同类型分组只检查并报告，不在注释任务中重排成员。
+按实际差异补齐合同头和关键逻辑行。明确指定逐行时按给定粒度处理。暂存版与工作区分别核对。用实际条件、读写和消费者解释有效位、零值、预览、缓存与候选结果。声明和大括号的等价整理适用于明确允许格式或布局调整的范围。
 
 **Ctrl+S 格式化：** 配合 `clangd_init` 和 `llvm-vs-code-extensions.vscode-clangd` 使用。工程已有 `.clang-format` 时保留并直接作为唯一格式来源；`code_zl/references/clang-format` 与 `vscode-settings.json` 作为可复现模板。启用 `editor.formatOnSave`、C/C++ 默认 formatter 为 clangd，并关闭 Microsoft C/C++ IntelliSense formatter；修改后 Reload Window，再用一份手工维护的 `.c/.h` 文件验证保存格式化。
 
@@ -224,13 +224,15 @@ V0.2.8 在完整真实签名和唯一合同头基础上，增加命名与注释�
 
 ### 5. code_sc — 架构与所有权审查
 
-**版本：** V0.3.2
+**版本：** V0.3.3
 
 **触发词：** `/code_sc`、`代码审查`、`架构审查`、`调用关系审查`、`模块边界审查`、`ownership review`、`PWM安全审查`、`中断竞争审查`
 
 **功能：** 嵌入式 C 的「结构 + 行为 + 安全时序 + 工程集成」审查。默认**只审查、不改代码**。V0.3.1 在 V0.3.0 基础上增加冗余审计矩阵、数值清洗与安全时间屏障分层、输出四层语义、证据分桶和重构后 headers/API/project membership/tests/docs 合同收口。
 
 V0.3.2 补充内部控制状态、授权遥测、仅测试镜像和只写副本的分类，核查自有符号改名闭环、结构体同类型分组及固定布局例外；短函数按责任和时序保留，结论绑定最终内容与实际执行的验证。
+
+V0.3.3 还追踪模式专属写点、预览通过指针修改正式状态、同拍资格与批准是否一致、缓存少看了什么输入，以及诊断是否进入生产许可。涉及复位时分别核查各个入口、外设默认态和重启条件。
 
 **流程摘要：** 事实基线 → Owner 表 → 依赖/SCC/逆向边 → Actuator writer 表 → DTO/API/隐藏依赖 → 状态机/lifecycle → Safety-edge timeline → ISR/TOCTOU → Snapshot generation → Producer/Consumer → Multiple Sources of Truth → 静态/Host/Keil/Board 验证分级。用户明确要求「修复/整改」时，先给边界再改。
 
@@ -246,7 +248,7 @@ V0.3.2 补充内部控制状态、授权遥测、仅测试镜像和只写副本�
 
 ### 6. code_wrt — 写代码门禁（审查 → 实现 → 注释 → 再审查）
 
-**版本：** V0.3.2
+**版本：** V0.4.2
 
 **触发词：** `/code_wrt`、`写代码`、`代码简化整理`、`简化并注释`、`重构并整理`
 
@@ -256,11 +258,11 @@ V0.3.2 补充内部控制状态、授权遥测、仅测试镜像和只写副本�
 code_sc(pre-write design gate)
   → 冻结 Layer / Owner / Caller / Callee / Timing / Data / Side Effect
   → ponytail / 实现
-→ code_zl（当前 V0.2.8）
+  → code_zl（函数合同、逐行逻辑与项目格式）
   → code_sc(post-write architecture gate)
 ```
 
-V0.3.1 起除原有 Driver/Application 层级和双重 code_sc 门禁外，还强制：最小改动、单一真源和单点清洗边界、删除前全量检索、禁止无意义 wrapper/状态复制、不得未经确认改变物理行为，且重构后必须重新闭环 API、工程成员、测试和文档。触碰会进镜像的行为时，**随代码提交收口**升 `SOFT_VERSION` 并追加 `docs/版本更改/`；纯文档不升固件版本。
+等价重构按改动风险冻结实际基线，分批收口事实、策略职责和消费者，保留硬件复核时点。Flash 优化按相同构建配置对比目标镜像或 MAP。固件版本和文档遵守项目规则与当次范围，Git 写操作需要明确授权。
 
 V0.4.0 增加已拍板命名合同、搜索/编排/数学 helper 分层、candidate/approved/committed/driver 语义、floor/boundary/max 和控制时基门禁；明确不同职责可以共享 `step` 后缀，不强行改成不完整职责名。自有名按项目 snake_case，SDK/向量/外部回调合同保留；授权结构整理时按声明类型分组，先核查全部初始化器和布局消费者；保留必要控制状态与安全时间屏障，技能版本与固件版本分别处理。
 
@@ -593,7 +595,7 @@ Claude：读规范与调用链 → 画 Owner 表、依赖/SCC 与 writer 表
 你：/code_wrt Application/app/src/mppt.c
 
 Claude：先跑 code_sc 写前门禁并冻结 Layer/Owner/调用合同
-→ ponytail/实现 → code_zl V0.2.8 注释、完整签名与布局检查
+→ ponytail/实现 → code_zl 注释、完整签名与关键逻辑行检查
 → 再跑 code_sc 写后门禁 → 输出两阶段审查与变更摘要
 ```
 
