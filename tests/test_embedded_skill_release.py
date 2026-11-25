@@ -5,8 +5,10 @@ The established underscore command names are intentional compatibility names.
 """
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
+import shutil
 import tempfile
 import unittest
 
@@ -14,8 +16,12 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SKILLS = ("code_zl", "code_sc", "code_wrt")
-OFFICIAL = Path.home() / ".codex/skills/.system/skill-creator/scripts/quick_validate.py"
+SKILLS = ("code_zl", "code_sc", "code_wrt", "prj_zl")
+VALIDATORS = [Path.home() / ".codex/skills/oai/skill-creator/scripts/quick_validate.py",
+              Path.home() / ".codex/skills/.system/skill-creator/scripts/quick_validate.py"]
+if os.environ.get("SKILL_CREATOR_VALIDATOR"):
+    VALIDATORS.insert(0, Path(os.environ["SKILL_CREATOR_VALIDATOR"]))
+OFFICIAL = next((p for p in VALIDATORS if p.is_file()), None)
 
 
 def read_skill(name):
@@ -100,7 +106,38 @@ class EmbeddedSkillRelease(unittest.TestCase):
                 with self.subTest(path=path.relative_to(ROOT)):
                     json.loads(path.read_text(encoding="utf-8-sig"))
 
-    @unittest.skipUnless(OFFICIAL.is_file(), "optional installed skill-creator validator unavailable")
+    def test_core_budget_and_independently_copied_resources(self):
+        for name in SKILLS:
+            text, _, _ = read_skill(name)
+            self.assertLessEqual(len(text.splitlines()), 500, name)
+            with tempfile.TemporaryDirectory(prefix="embedded-skill-package-") as directory:
+                isolated = Path(directory) / name
+                shutil.copytree(ROOT / name, isolated)
+                for path in isolated.rglob("*.md"):
+                    for target in re.findall(r"\[[^\]\n]*\]\(([^)\n]+)\)", prose_without_fences(path.read_text(encoding="utf-8-sig"))):
+                        target = target.strip("<>").split("#", 1)[0]
+                        if not target or re.match(r"[a-zA-Z][a-zA-Z0-9+.-]*:", target):
+                            continue
+                        resolved = (path.parent / target).resolve()
+                        self.assertTrue(resolved.is_relative_to(isolated), f"{name}: external resource {target}")
+                        self.assertTrue(resolved.is_file(), f"{name}: missing isolated resource {target}")
+
+    def test_refactoring_documents_are_portable_and_indexed(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        for name in ("Embedded_Refactoring_Principles.md", "AGENTS_Refactoring_Template.md"):
+            path = ROOT / "docs/refactoring" / name
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("docs/refactoring/" + name, readme)
+            self.assertNotIn("sandbox:", text)
+            self.assertNotIn("/workspace/scratch/", text)
+            self.assertNotIn("chatgpt.com/library?", text)
+            for target in re.findall(r"\[[^\]\n]*\]\(([^)\n]+)\)", prose_without_fences(text)):
+                target = target.strip("<>").split("#", 1)[0]
+                if not target or re.match(r"[a-zA-Z][a-zA-Z0-9+.-]*:", target):
+                    continue
+                self.assertTrue((path.parent / target).is_file(), target)
+
+    @unittest.skipUnless(OFFICIAL is not None, "optional installed skill-creator validator unavailable")
     def test_official_other_rules_with_explicit_legacy_name_projection(self):
         spec = importlib.util.spec_from_file_location("skill_creator_validation", OFFICIAL)
         validator = importlib.util.module_from_spec(spec)

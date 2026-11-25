@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "scope": "Independent synthetic cases for skill behavior; not product firmware, real vendor ABI, or board evidence. Materialize each case in its own disposable directory and apply the named skill.",
+  "cases": [
+    {
+      "id": "comments",
+      "skill": "code_zl",
+      "request": "为本目录工程整理注释。先读 README，按实际源码写清运行条件和作用。只修改注释，保持全部 C token，不改其他项目，不提交 Git；完成必要验证和摘要。",
+      "files": {
+        "README.md": "本目录是独立嵌入式 C 示例。目标板未连接，外设函数由工程其他位置实现，未提供寄存器模式或触点传感器。只有调用接口和本文件可以确认。项目只要求本次注释整理，保留 C token。\n",
+        "control.c": "#include <stdint.h>\nextern void protect_numeric(void);\nextern void write_pb4(uint8_t value);\nextern void write_pwm_compare(uint16_t value);\nstatic uint32_t s_last_ms;\nstatic uint8_t s_count;\n/* 每次调用都精确执行 1ms 保护，主机编译通过证明板上时序正确。 */\nvoid service(uint32_t now_ms)\n{\n    if (now_ms != s_last_ms)\n    {\n        s_last_ms = now_ms;\n        if (++s_count == 10U)\n        {\n            s_count = 0U;\n            protect_numeric();\n        }\n    }\n}\n/* 写 PB4 后已确认继电器触点闭合。 */\nvoid relay_request(void)\n{\n    write_pb4(1U);\n}\n/* compare / 1200 就是任意硬件的实际导通比例，写入后当拍已经生效。 */\nvoid submit_candidate(uint16_t compare)\n{\n    write_pwm_compare(compare);\n}\n"
+      }
+    },
+    {
+      "id": "writer",
+      "skill": "code_wrt",
+      "request": "按 README 完成三个平台 Demo 目标独立配置，保持当前默认值、普通档案、既有公共签名和供应商库调用。以后怎样设置还没确定，本次不增加交互协议。直接完成修改和必要验证，不提交 Git。",
+      "files": {
+        "README.md": "这是独立示例，vendor_mppt.h 是本例的既有接口，不是真实闭源库 ABI。现有工程采用六任务组织，示例只给 charge；其他模块不需要增加。本次需求：三个平台 Demo 目标独立配置，当前默认值保持；普通档案、charge.h 公共签名、原库调用和越界返回都保持。未来通过什么界面改目标还没确定，不实现动态设置协议。\n",
+        "charge.c": "#include \"charge.h\"\n#include \"vendor_mppt.h\"\nstatic const uint16_t s_normal_cc_cv_10mv[3] = {5780U, 7230U, 8680U};\nuint16_t charge_target(unsigned platform, bool demo)\n{\n    if (platform >= 3U) return 0U;\n    if (demo) return s_normal_cc_cv_10mv[platform];\n    return s_normal_cc_cv_10mv[platform];\n}\nuint16_t charge_track(uint16_t input)\n{\n    return vendor_track(input);\n}\n",
+        "charge.h": "#ifndef CHARGE_H\n#define CHARGE_H\n#include <stdint.h>\n#include <stdbool.h>\nuint16_t charge_target(unsigned platform, bool demo);\nuint16_t charge_track(uint16_t input);\n#endif\n",
+        "check.c": "#include <assert.h>\n#include \"charge.h\"\nuint16_t vendor_track(uint16_t input) { return input; }\nint main(void) { const uint16_t values[3]={5780U,7230U,8680U}; for (unsigned i=0;i<3;++i) { assert(charge_target(i,false)==values[i]);assert(charge_target(i,true)==values[i]);}assert(charge_target(9U,true)==0U);assert(charge_track(200U)==200U);return 0;}\n",
+        "vendor_mppt.h": "#ifndef VENDOR_MPPT_H\n#define VENDOR_MPPT_H\n#include <stdint.h>\nuint16_t vendor_track(uint16_t input);\n#endif\n"
+      }
+    },
+    {
+      "id": "review",
+      "skill": "code_sc",
+      "request": "审查本目录的嵌入式控制代码和 README，给出问题事实、触发条件、影响、最小修复方向及验证边界；只读。",
+      "files": {
+        "README.md": "独立审查示例。目标说明：单核 MCU，比较器中断可以在前台两条 C 语句之间发生；output_enabled 是简化的功率使能命令模型，不是触点或门极测量。毫秒由另一个定时器 ISR 更新。能量统计以名义每十个1ms服务点累加，read_power_units是新读值。没有完整 startup、芯片手册、真实功率级、目标构建或实板记录。产品采用简单前台任务和保留原供应商 MPPT 库，本片段未提供库实现。\n",
+        "control.c": "#include <stdint.h>\n#include <stdbool.h>\nvolatile uint32_t milliseconds;\nvolatile uint32_t fault_events;\nvolatile bool output_enabled;\nstatic uint32_t s_last_ms;\nstatic uint32_t s_service_count;\nstatic uint32_t s_energy_units;\nextern void wdt_feed(void);\nextern uint32_t read_power_units(void);\nvoid comparator_irq(void)\n{\n    output_enabled = false;\n    fault_events |= 1U;\n}\nvoid control_loop_once(void)\n{\n    wdt_feed();\n    uint32_t events = fault_events;\n    fault_events = 0U;\n    if (events) output_enabled = false;\n    if (milliseconds != s_last_ms)\n    {\n        s_last_ms = milliseconds;\n        if (++s_service_count == 10U)\n        {\n            s_service_count = 0U;\n            s_energy_units += read_power_units();\n        }\n    }\n}\nvoid pwm_apply(bool permitted)\n{\n    if (permitted && fault_events == 0U)\n        output_enabled = true;\n}\n"
+      }
+    },
+    {
+      "id": "project",
+      "skill": "prj_zl",
+      "request": "按 README 整理 Application 文件归属与构建路径，保持业务、全部目标设置及工厂输出合同。保留 Bootloader、Libraries 和其他文件。执行可用验证，不提交 Git。",
+      "files": {
+        "Application/Config/Source/bsp_pwm.c": "#include \"board.h\"\nunsigned bsp_pwm_address(void) { return PWM_REGISTER_BASE; }\n",
+        "Application/Include/board.h": "#ifndef BOARD_H\n#define BOARD_H\n#define BOARD_TAG 300\n#define PWM_REGISTER_BASE 0x40000000U\n#endif\n",
+        "Application/Project/MDK/IAP_Application1.uvoptx": "<ProjectOpt><Target><TargetName>Release</TargetName><PathWithFileName>..\\..\\Source\\main.c</PathWithFileName><DebugOption>keep-me</DebugOption></Target></ProjectOpt>",
+        "Application/Project/MDK/IAP_Application1.uvprojx": "<Project><Targets><Target><TargetName>Release</TargetName><TargetOption><TargetCommonOption><OutputName>IAP_Application1</OutputName><Device>FixtureMCU</Device></TargetCommonOption><TargetArmAds><Cads><VariousControls><Define>PRODUCT_300W</Define><IncludePath>..\\..\\Include;..\\..\\..\\Libraries</IncludePath></VariousControls></Cads></TargetArmAds></TargetOption><Groups><Group><GroupName>Source</GroupName><Files><File><FileName>main.c</FileName><FileType>1</FileType><FilePath>..\\..\\Source\\main.c</FilePath></File><File><FileName>bsp_pwm.c</FileName><FileType>1</FileType><FilePath>..\\..\\Config\\Source\\bsp_pwm.c</FilePath></File></Files></Group></Groups></Target><Target><TargetName>Debug</TargetName><TargetOption><TargetCommonOption><OutputName>IAP_Application1</OutputName><Device>FixtureMCU</Device></TargetCommonOption><TargetArmAds><Cads><VariousControls><Define>PRODUCT_300W</Define><IncludePath>..\\..\\Include;..\\..\\..\\Libraries</IncludePath></VariousControls></Cads></TargetArmAds></TargetOption><Groups><Group><GroupName>Source</GroupName><Files><File><FileName>main.c</FileName><FileType>1</FileType><FilePath>..\\..\\Source\\main.c</FilePath></File><File><FileName>bsp_pwm.c</FileName><FileType>1</FileType><FilePath>..\\..\\Config\\Source\\bsp_pwm.c</FilePath></File></Files></Group></Groups></Target></Targets></Project>",
+        "Application/Source/main.c": "#include \"../Include/board.h\"\nint main(void) { return BOARD_TAG; }\n",
+        "Bootloader/main.c": "int boot_main(void) { return 0; }\n",
+        "Libraries/LICENSE.txt": "fixture dependency license marker\n",
+        "Libraries/vendor.lib": "fixture dependency, not an executable library\n",
+        "README.md": "只迁移 Application 到合适的 app/driver 结构，保留所有业务和目标设置。现有工程/输出名字 IAP_Application1 属工厂合同，本次不改名；Bootloader、Libraries 和工厂脚本保留。修正受影响的路径引用，执行可用验证。该独立示例不提供 Keil 或实板。\n",
+        "tools/factory.txt": "Factory consumes IAP_Application1.axf; keep this output contract.\n"
+      }
+    }
+  ]
+}

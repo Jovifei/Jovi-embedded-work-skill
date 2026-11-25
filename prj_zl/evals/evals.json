@@ -1,26 +1,46 @@
 {
   "skill_name": "prj_zl",
-  "version": "V0.1.0",
+  "version": "V0.2.0",
   "evals": [
     {
       "id": 1,
-      "prompt": "/prj_zl Application Bootloader",
-      "expected_behavior": "Should inventory .c/.h/.s and Keil uvprojx, plan app/driver mapping, git mv files into app/inc app/src driver/inc driver/src, update IncludePath and FilePath in each uvprojx/uvoptx, remove empty Config/Include/Source, and report a summary table. Must not change #include strings or code logic."
+      "prompt": "/prj_zl Application Bootloader，整理现有 Config/Include/Source。保持功能与工程目标设置。",
+      "expected_behavior": "Inventory both roots and actual targets, classify by source responsibility rather than names, form old/new/target/reference mapping, use tracked-file moves without overwriting dirty work, update affected project/include/linker/script references and preserve unrelated options. Verify current membership and paths; distinguish missing dependencies from logic bugs and directory migration from hardware isolation."
     },
     {
       "id": 2,
-      "prompt": "把 IAP_Application1 改成 IAP_Application，并修正 Keil 路径",
-      "expected_behavior": "Should git mv IAP_Application1.uvprojx to IAP_Application.uvprojx, sync uvoptx and OutputName, and fix any stale FilePath after folder moves without committing unless asked."
+      "prompt": "把 IAP_Application1 改成 IAP_Application，并修正相关 Keil 路径。",
+      "expected_behavior": "Determine whether file, target and output names are each in scope; trace actual build, download and OTA consumers. Perform the authorized rename and required consumer updates, preserving other targets, SDK and settings; do not assume every post-build command follows automatically. Do not commit or push unless covered by user authorization."
     },
     {
       "id": 3,
-      "prompt": "工程整理后帮我加注释",
-      "expected_behavior": "Directory work is prj_zl; comments-only work should use code_zl after prj_zl completes. Must not mix directory moves with comment rewrites in one undifferentiated step."
+      "prompt": "工程整理后帮我加注释。",
+      "expected_behavior": "Use prj_zl for path/membership work and code_zl for the separately authorized comments. Maintain reviewable changes; neither is permission to rewrite business logic or change timing. Continue already authorized phases without another blanket approval."
     },
     {
       "id": 4,
-      "prompt": "/prj_zl Application",
-      "expected_behavior": "Should only reorganize Application when Bootloader is omitted, still update .gitignore for MDK Objects/Listings if missing, and grep for leftover Config/Include/Source paths in project XML."
+      "prompt": "/prj_zl Application；Bootloader 不动，保留用户已有未提交文件。",
+      "expected_behavior": "Work within Application and its necessary references. Do not reorganize Bootloader or discard dirty content. Keep shared definitions coherent and report any cross-target dependency. Adjust artifact ignores only when needed, never ignore all SDK/Libraries or untrack deliberate release files."
+    },
+    {
+      "id": 5,
+      "prompt": "已经有 app/driver 目录，app_hw_config.h 定义 GPIO 寄存器，system.c 在厂商目录。只做归属核对，文件数越少越好。",
+      "expected_behavior": "Remain read-only for this request; classify the hardware definitions by contents, preserve vendor startup/system contracts, explain true MCU isolation vs folder appearance, and avoid forcing six total files, more wrapper modules, a new layout or moving system.c merely for symmetry."
+    },
+    {
+      "id": 6,
+      "prompt": "main.c 从 Source 移到 app/src，仍 include ../Include/board.h。工程还有 Libraries/Driver/Include 和两个 targets。",
+      "expected_behavior": "Re-evaluate the relative include from the new source location and minimally correct it to the same header when needed. Update both affected target references without blind global replacement or changing SDK paths; compare membership, defines, options and linker settings."
+    },
+    {
+      "id": 7,
+      "prompt": "迁移后只 grep 不到旧 Source 就宣称完成；本机没有 Keil，uvprojx 有 C:\\\\SDK、$(DevicePack) 和 ../driver/src/pwm.c。",
+      "expected_behavior": "Run available static/path checks; classify host-inaccessible/dynamic references as manual verification and inspect literal paths. Report target build not run/blocked and provide reproduction steps, without claiming bug, build PASS or board PASS from grep or old output."
+    },
+    {
+      "id": 8,
+      "prompt": "按已确认映射整理并提交本仓库。IAP_Application1 被工厂工具引用，但没有要求改输出名。Libraries 下有闭源库和许可证。",
+      "expected_behavior": "Use existing migration and commit authorization without asking again. Preserve the established project/output naming contract unless the approved mapping changes it; retain dependency reproducibility and licenses, update only necessary references, verify and commit scoped changes. Do not ignore Libraries wholesale."
     }
   ]
 }

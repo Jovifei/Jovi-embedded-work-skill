@@ -1,911 +1,160 @@
 ---
 name: code_sc
-description: "Use when reviewing embedded C architecture, state ownership, call paths, snapshot consistency, control timing, or protection and actuator safety. Triggers: code_sc, 代码审查, 架构审查, 调用关系审查, 模块边界审查, ownership review, PWM安全审查, 中断竞争审查."
+description: "Use when reviewing embedded C firmware, architecture, state ownership, refactoring equivalence, ISR and power safety, sampling and timing, configuration transactions, protocol boundaries, or APP/BL integration. Triggers: code_sc, 代码审查, 架构审查, 调用关系审查, 重构复审, PWM安全审查, 中断竞争审查."
 ---
 
 # Code SC
 
-**Version: V0.3.3**
+**Version: V0.3.4**
 
-`code_sc` 是嵌入式 C 的“结构 + 行为 + 安全时序”代码审查 skill。它不只找空指针、越界和语法问题，而是专门发现“代码能跑、测试能过，但 Owner / 状态机 / 安全提交时序已经写歪”的问题：Owner 不唯一、Controller 越权、Application 内部环依赖、整个上下文对象乱传、算法层知道硬件/充电阶段、同一状态被多个模块解释、硬件多写点、隐藏全局依赖、参数语义重载、死接口、ISR/主循环竞争、首拍保护空窗、TOCTOU、跨代 snapshot、重复 lifecycle reset、API 假成功、产品限制多份真值等。
+以当前源码和已确认产品合同审查嵌入式 C 的结构、行为及安全时序。找出真实的责任冲突、状态分叉、并发、边界与部署问题；用尽量小的整改保持已经正确的实现。目录、模块名、函数长短和某种架构形状都只是取证线索，不能单独证明 BUG 或严重度。
 
-默认只读。用户同时授权修复时，先核实问题并说明边界，再交 `code_wrt` 实施已授权的部分。Git 写操作按当次指定的仓库、操作和范围单独判断授权。
+默认只读。用户已经授权修复时，核实问题后承接已授权范围，可结合 `code_wrt` 实施；不为每个阶段重复请求确认。没有其他 skill 时按本文合同完成审查或已授权修复。提交、推送和部署依据当前会话已有授权及指定范围执行；不把纯审查扩成写入任务，也不把一次授权扩大到无关仓库或产品行为。
 
-## 范围与完成证据
+## 按问题加载参考
 
-先确认目标版本/工作树内容和审查范围，按风险检查以下适用项；小范围审查可标明不适用，不凭模板扩大整改。详细判断例见 [examples.md](examples.md)。
+以下文件随本 skill 提供，可独立拷贝使用；不依赖仓库外的原则文件。先读本页，再按实际范围加载适用项。全面复核读取前五项；仅在项目确为 C300 时读取其约束示例。
 
-外部审核逐条对照目标基线、调用者和可达路径，说明哪些成立、哪些证据不足。按用户的验收目标区分本批引入的问题、已存在的问题、计划中尚未完成的项和未实测的项。定点审查可以沿必要调用链取证，整改仍限于已授权的位置、字段或位段。
+| 参考 | 何时读取 |
+|---|---|
+| [职责、接口与结构审计](references/architecture-and-contracts.md) | Owner、依赖方向、原库/ABI、命名、结构体、冗余、诊断或文件拆分 |
+| [功率与中断时序](references/power-and-interrupts.md) | PWM、CBC、继电器、故障恢复、复位、ISR/前台竞争或快速链 |
+| [采样、时间与状态](references/sampling-time-and-state.md) | ADC/校准/功率一致性、缓存、模式切换、积分、超时、WDT 或 deadline |
+| [配置、通信与部署](references/config-protocol-deployment.md) | 配置事务、Flash、UART、APP/BL、OTA、首装或兼容性 |
+| [证据、合并与报告](references/evidence-and-integration.md) | 外部审核、跨版本验收、合并、构建、严重度、验证与最终报告 |
+| [C300 约束示例](references/c300-context.md) | 审查当前 C300 的六类职责、原 HT32 库、参数保留与参考 B 工程吸收 |
+| [审查例子](examples.md) | 校准审查尺度，尤其是形状误报、批准语义、时间屏障与证据不足 |
+| [行为评估用例](evals/evals.json) | 修改或验证本 skill 时；它不是用户项目的通过记录 |
 
-1. **结构减法也要审**：列受影响字段、状态、getter、诊断的 Owner、producer 和真实 consumer，区分控制/保护/存储协议、当前获授权遥测、测试观察、纯写副本。无外部运行消费者不等于无用：积分、滤波、缓存、采样身份/去重、回算、故障代次和事务记忆可在内部消费。仅测试镜像可收口并适配真实内部/行为断言；不为旧夹具恢复生产镜像，也不按 diag 名称删除全部观测。
-2. **命名与布局有边界**：自有 app_/drv_ 使用项目约定 snake_case；SDK/CMSIS、startup IRQ、回调 ABI、协议外部名按合同保留。改名建议须给旧→新→Owner→声明/定义/所有调用/回调/项目/测试/decoder/docs 映射；历史基线、SDK 与活动旧名命中分别归类。私有类型/宏回真实 Owner，不以 main.h 聚合或新建配置头代替归属判断。
-   struct 成员按相同声明类型集中，各 float、uint32_t、int32_t、uint16_t、uint8_t、bool 分组，同类型保留原相对/用途顺序；bool 与 uint8_t 不因同宽合组。组序优先项目约定，否则通常按目标自然对齐/宽度从大到小。区分可整理内部结构和需保护的外部固定布局：追踪位置式/指定式初始化、offsetof/sizeof、raw memcpy/序列化、Flash/协议/DMA/寄存器、packed/bitfield、ABI/汇编/回调依赖；有固定布局合同则保留并记录例外。此规则不改变函数形参合同，不要求嵌套 struct/新头；没有目标布局证据不能声称固定 RAM 收益。
-3. **短函数按责任判断**：检查所有 return 路径和 caller 分支；恒 true 且无失败合同的 prepare 可改 void，无价值别名可合并。但 ZeroApplied/自然更新、首末脉冲、IRQ 桥、稳定 ABI、集中硬件写点及 PWM 写前/写后/恢复中断屏障须分别举证保留，不能按行数或数值相同去重。
-4. **观测合同与预算**：用户要求路测又要求减包时，按观测目的、字段 Owner 和实时预算选最少字段，保留用户要求的模式和开关，核对真实接收端、默认配置、单位及编解码。退役测试资产、现场调试和正式控制分别追消费者，未确认删留时报告影响。区分候选、提交、驱动设定和物理生效，不把一次项目决定推广成统一策略。
-5. **可复核结论**：每项给文件/行、源码事实及影响，区分可确认 bug、结构 P2、风格 P3、待确认；更高安全级别按实际后果判。结构问题不能都降为风格，待测不能伪装 bug。最终证据绑定实际 final SHA/内容 hash、目标/define/include、命令与退出码、旧名允许残留及未运行项；编译、旧 SHA、Host PASS 均不代表架构或实板合格。
+## 1. 固定输入与本轮目标
 
-安全编译检查默认保留；用户明确授权移除某项 `#error` 时，不用 assert/typedef 偷偷恢复同一禁令，仍验证实际宏值和运行安全门。一次授权不能推广为通用撤保护规则。
+先读项目规则、README/架构、版本记录和任务表，再核对实际文件及构建入口。记录实际所见的 repo/ref/SHA、工作树内容或文件 hash、MCU/硬件、APP/BL、目标/defines/include 路径与可用验证条件；只有片段就注明片段边界。
 
-## V0.3.0 新增：集成/合并/实时性硬门禁
+分别标识三种来源：
 
-V0.3.0 专门补足“单个模块看起来正确，但工程一合并就裂脑”的漏洞。以下检查在全面复核时不可跳过：
+- **原工程/在役基线**：应保留的功能、参数、单位、协议、存储格式、生产部署和依赖。
+- **参考工程**：拟吸收的实现及其拓扑、极性、器件、时序和适用范围。
+- **当前修改版**：这次实际审查的源码、构建配置、库版本/hash 和产物。
 
-1. **Exact-baseline gate**：报告必须写 repo/ref/SHA/工作树状态；本地未 push、远端旧 SHA、旧 ZIP 不得混为“当前代码”。
-2. **Merge-is-new-code gate**：merge/rebase/conflict resolution 后重新审 API、头文件、ISR、项目文件、CI；父分支各自 PASS 不继承到 merge commit。
-3. **Public-contract resurrection gate**：搜索被删 public header、旧 typedef/API/fault bit 是否被 merge 恢复；检查新旧消费者是否同时进入 Keil/CMake target。
-4. **Critical-preprocessor gate**：安全开关不得靠传递 include；核对预处理后的实际值。未定义安全宏在 `#if` 中按 0 静默关闭，按 P1 处理。
-5. **IRQ completeness gate**：每个 `NVIC_EnableIRQ` 必须追到 startup vector、强 `Xxx_IRQHandler`、driver handler、foreground consumer；落到 weak Default_Handler 视为运行卡死 P1。
-6. **Re-arm stale-command gate**：检查临时停波/样本 stale/HOLD 后 `0 -> 旧大 Duty`。物理 OFF→ON 必须有 executor-owned first-duty cap/rebuild/ramp。
-7. **Veto reachability gate**：`power_inhibited/maintenance_busy/settings_pending/storage_blocked` 等禁止动作必须在 start/autostart/restart/PWM commit/Relay close 等危险入口有消费者。
-8. **Liveness != deadline gate**：看门狗票据只证明还能跑，不能证明 1ms deadline。检查 tick 合并、WCET、float/sqrt、Flash stall、日志和最长临界区。
-9. **Header economy + IWYU gate**：公共头数量要克制，但不能靠 main.h 聚合或传递 include。检查符号 Owner、直接 include、private/public 边界和无意义“一文件一 DTO”。
-10. **Evidence integrity gate**：CI failure、关键 job skipped、测试路径失效、仅旧 SHA Keil PASS，都不能写成当前 PASS。
+不能把参考工程当产品基线，不能用旧 SHA/ZIP/本地口述修复验收当前代码。历史问题和 todo 必须重查；旧报告既不证明问题仍在，也不证明已经修复。
 
-### 0.x 当前代码身份必须可复现
+把本批声明分成四类，并检查记录是否反映实际变化：
 
-给出本次结论对应的源码身份。集成、发布或跨版本验收同时记录相关仓库、分支、提交或工作树内容、对照基线、目标及 CI。只有片段或缺少版本资料时写明所见范围。只有旧远端 SHA 时不能据此验收尚未提供的本地变更。
+| 类型 | 审查重点 |
+|---|---|
+| 结构整理 | 函数映射、调用时机、状态/硬件副作用、初始化/中断入口、工程引用；保持可观察行为及既有合同 |
+| BUG 修复 | 当前可达触发条件、因果链、修复前反例、最小修复和相邻路径 |
+| 已批准功能变化 | 明确新行为、正常/边界/失败/恢复、旧配置/客户端/部署影响 |
+| 性能或空间优化 | 当前瓶颈、本版前后 map/耗时/栈、相同目标与构建选项；不以行数替代资源证据 |
 
-### 0.y Merge Contract Matrix
+改变首拍、斜率、CBC、预充、Demo 或 OTA 时，不能只标“结构整理”。已确认 BUG 不应为了名义等价保留；未明确的新产品行为不能靠审查者猜测补齐。
 
-Merge 后至少审 public API/typedef、fault schema、safety veto、IRQ、build membership、tests 六类合同。每类都要找到 Producer/Owner、Consumer 和 merge 后证据。任何一条断裂，都不能用“能 merge/能看懂”判通过。
+## 2. 审清 Owner 与接口，保持结构克制
 
-### 关键安全配置的预处理检查
+列关键状态、规则和动作的 Producer、Owner、允许 Writer、Consumer、清除/失效条件及执行上下文。包含 session、阶段、库状态、故障、输出候选、采样身份、配置版本及 lifecycle。
 
-对保护开关检查唯一 Owner、当前 `.c` 是否直接 include、是否依赖多级传递 include、Keil/project define 是否另行覆盖及现有编译检查。默认保留必要的显式定义检查；已授权取消的检查按文首例外处理，不要求换壳复活。安全开关注释写 1 不算证据，translation unit 实际预处理值才算。
+Owner 是职责，不等于文件。优先保留现有可工作的目录与模块；独立职责、状态归属或验证收益成立才建议拆文件。逻辑上的策略、算法、批准、执行可以放在同一模块内，不强制新增 manager、coordinator、独立 MPPT 层或一文件一 DTO。
 
-### IRQ/向量闭环审查
+| 对象 | 审查边界 |
+|---|---|
+| 充电/算法 | 找到业务阶段和计算状态各自的真实 Owner；库调用/复位集中在项目约定位置 |
+| 保护 | 故障判定、锁止及恢复资格来源唯一；其他模块不能随意清内部故障或绕过许可 |
+| 正常功率输出 | 前台 PWM/功率继电器动作经 output 或项目明确的执行 Owner 审核、调用驱动 |
+| 紧急关断 | 硬件和驱动 ISR 可立即关断并留下最小事件，不等待前台，也不运行完整业务状态机 |
+| 采样 | sample 拥有原码交接、校准、换算、滤波、功率和快照；不因日志反向解释充电/输出 |
+| 观测/交互 | debug 读取观测合同；mmi 处理命令语义并提出请求，不直接开功率 |
 
-每个已启用中断列完整路径：peripheral IT enable -> NVIC enable -> startup vector -> strong handler -> driver handler -> pending/ring/latch -> main/task consumer。启动文件 weak handler 会让缺失实现“链接成功但第一次中断就卡死”，按 P1。
+C300 的 `sample/charge/protection/output/debug/mmi` 是特定的简洁职责划分，既不限制全工程只有六个 C 文件，也不要求把它们再机械拆成多层。保留其 HT32 原库及 ABI；不得为套通用算法架构重写私有布局、删除库要求的字段或引入仅转发的包装。
 
-### 重新发波 Safety Edge
+区分接口两个方向：硬件事件由驱动 ISR 经有界回调/事件/快照上行，复杂业务在前台消费；普通控制命令由应用通过驱动接口下行。**不要求普通调用经过 ISR。** 中立回调合同不是驱动依赖应用私有状态；应检查回调真实执行上下文和副作用。
 
-除了第一次上电发波，还必须检查第二次发波：ACTIVE 高 Duty -> temporary fault/stale/hold -> MOE=0,Duty=0 -> algorithm memory 保留 -> 条件恢复 -> WAIT_ZERO -> Arm -> first nonzero。若 executor 可直接恢复旧高 Duty，即使算法内存保留合理，也要判定 re-arm 斜坡缺失。修复优先归 Output/Executor 生命周期，不要重新让 MPPT 拥有 Arm 状态。
+同时查 include、call、write 和 callback 边，不能只看目录或 include SCC。追到同一规则被多个模块重解释、互改私有状态或驱动依赖应用业务时，给具体路径与影响。公共接口按需要使用标量、窄 DTO 或完整一致快照；不能因只用几个字段就自动认定现有快照非法。
 
-### Veto 可达性矩阵
+保留 SDK/CMSIS、startup IRQ、协议、持久格式、回调和闭源库 ABI。自有名称迁移、同声明类型成员分组、参数去重、短 wrapper 删除都先查真实消费者和外部布局。不可通过多建头文件、main.h 聚合或重排 ABI 来“修好”表面结构。
 
-对 `power_inhibited/storage_blocked/settings_pending/...` 至少审 Start、AutoStart、Restart、PWM commit、Relay close、Maintenance 六个入口。只有 producer 没 consumer，属于 Zombie Safety Gate。
+## 3. 追状态、真实副作用与生命周期
 
-### 实时性：看门狗不等于周期正确
+对关键函数核对输入/隐藏输入、输出、状态写点、硬件副作用、caller 和时点。getter、preview、临时结构中的共享指针、全局 latest、诊断对照及缓存都要追实际调用链。
 
-检查 1ms tick 是 counter 还是 bool、CONTROL ticket 是否只证明函数返回、M0/M0+ 是否无 FPU却在控制路径使用 float/sqrtf、Flash 是否可能 stall/暂停 ADC、printf 是否阻塞、最长关中断区间、missed-tick/max-exec-time 诊断。没有 WCET/示波器/目标测量时必须写“deadline 未验证”。
+- 区分本拍停能与整个会话失效；同一事实的 debounce/reset/恢复解释应一致。
+- 对 init/reset/start/stop/restart 列触发者、Owner 和副作用。幂等不能证明多个生命周期决策者正确；同一 Owner 下有理由的重复安全否决、重试和硬件时间屏障也不能机械删掉。
+- 区分候选、批准、已提交、驱动设定、物理生效。合同合并某些阶段时可如实描述，不强制增加镜像字段；数值相等不能证明硬件已经生效。
+- `try_start/enable/commit` 的 true 应与其声明的“发生转移”“请求已接受”或“已经满足目标”相符。已有目标状态返回成功可以合法；只有与约定或 caller 所需语义冲突时才判 API bug。
+- 每个关键 fault/action/event/veto 查生产者、消费者、清除/恢复者及危险入口。只有定义不代表功能已实现，ABI 保留值或规划项也不自动是运行 BUG。
+- 对近义参数/字段/公式，先比语义、单位、输入身份、时点、有效性、运算和副作用。内部积分、去重、缓存、回算和事务记忆是消费者；授权遥测与测试镜像分别判断。
+- 合法零、无效、未启用、停机、限制来源不能混用。缓存键覆盖影响值与资格的输入，模式/平台/配置/校准变化应有失效规则。
 
-### 头文件收拢的审查尺度
+## 4. 审功率边沿与并发
 
-目标不是越少越好，而是最少且 Owner 清楚。单独 header 的合理理由是打断环、稳定 ABI、独立 Owner、多独立消费者。禁止 main.h 变万能配置桶、安全宏通过多层 include 偶然可见、public 目录残留 private/zombie algorithm header、同名宏多头重复定义、为一行 wrapper 再建一对 `.h/.c`。
+涉及危险执行器时，至少还原一条实际有序路径：首次可能输出能量的语句/硬件事件、保护窗口/ISR guard、首个非零提交、故障硬停、前台归档及重新启用。稳态存在 ISR 不能证明首拍/末拍安全。
 
-## 版本记录
+核对正常 writer 与紧急 hard-trip 的职责分工；不能把 ISR 立即关断误报为多写者违规，也不能为统一出口而延迟硬停。非功率 LED 等 GPIO 不受功率统一提交规则限制。
 
-- **V0.3.3**：检查真实的模式路径、预览写点、同拍资格与批准、缓存输入和诊断对照，并补齐复位时的执行器审查及范围、协议、验收证据要求。
+检查读硬件后置 armed 的 TOCTOU、ISR early-return guard 的置位时机、fault 清除/重启竞态、DMA buffer 交接、多字段 snapshot、一拍重复 protection 后的整代刷新。`volatile` 不代替原子性、互斥或代次一致性。临界区保存并恢复进入前中断状态，范围和耗时须有界。
 
-- **V0.3.2**：补全消费者分类、命名/Owner 迁移、结构体同类型分组及固定布局例外、短函数完成证据，修正日志镜像死字段误判、结构与风格分级、授权修复和路测预算边界。
-- **V0.3.1（2026-09-23）**：基于 MPPT Charger V0.13.18 暴露的问题，补充冗余审计、时间屏障分层、四层输出语义、证据分级与重构合同收口门禁。
-- **V0.3.0**：补充集成/合并/实时性硬门禁。
+最终提交检查采样有效性、当前故障/事件/代次、维护状态、仍有效的候选和硬件许可。写前、写后、自然更新确认及恢复中断后的检查可能是不同时间屏障；不能按数值相同去重。
 
-## V0.3.1 新增：冗余、时间屏障与合同收口门禁
+分别审首次发波与 fault/stale/HOLD 后重新发波，检查旧候选/旧合闸请求是否可复活。首拍限制、斜率、CBC、预充和恢复按**本项目合同**判断；新增限制会改变闭环行为时必须单列行为变化，不把一种控制器的 ramp 推广成所有硬件的硬规则。
 
-本节只补充 V0.3.0 未明确的判断边界；不替代已有 Owner、Safety-edge、Snapshot 和证据规则。
+复位审软件可控入口、看门狗/掉电默认态和 BL→APP 初始准入。GPIO ODR、CCR 写入和源码顺序不等于继电器触点或波形证据。缺硬件依据时列具体待测，不推断必然失控或必然安全。
 
-### 1. 冗余审计矩阵：先证同义，再谈合并
+## 5. 审采样、真实时间、进展与实时预算
 
-发现近义参数、字段、宏或 API 时，先建最小矩阵：
+核对原码、单位、seq、采集时间、有效性、校准条件及同窗统计来源。只有新采样刷新新鲜度；复采替换某通道时检查功率、极值和样本数是否仍相容。校准由 sample 实现并由明确流程调用，不在普通采样中反复执行。
 
-| 候选 | 角色和单位 | Owner 与消费者 | 输入身份和时点 | 运算与副作用 | 合并结论 |
-|---|---|---|---|---|---|
-| `a` / `b` | ? | ? | ? | ? | 保留/合并/需确认 |
+区分三种依据：超时/冷却/充电时长/上报使用单调时间或实际 elapsed；连续证据/滤波使用新且有效的样本数；容量/能量使用有效测量与明确时间跨度，并定义缺样策略。漏服务不能补造 ADC 样本，也不能无限用旧功率补积分。
 
-需证明语义、单位、输入身份、时点、有效性、整数运算及副作用相同，并维持生产方和消费方的合同。测量值和限幅后的值、即时测量和算法历史、产品上限和硬件绝对上限分别核对。单次数值相等不足以判冗余。
+WDT 要观察关键生产者和控制流程在窗口内推进，不能只凭 main 循环或函数返回。启动、校准、维护/Flash 可有预算内策略，不要求每圈都齐备新样本；不能用已经停走的同一时间源自证健康。活性票据不证明 1ms deadline。
 
-### 2. 安全复核分层：数值可收口，时间屏障不可去重
+检查 tick 合并、ADC 有界等待、ISR 嵌套/优先级、float/sqrt、Flash stall、UART/日志预算和最长临界区。没有目标 WCET/波形或负载测量就写 deadline 未验证，不仅因使用浮点或 bool tick 自动判故障。
 
-- 输出数值清洗、限幅、单位转换可在明确 Owner 下收口，避免多份实现。
-- 采样新鲜度、ISR 竞态、PWM 写前保护、PWM 写后生效、继电器写前条件、继电器写后稳定/反馈，分别是不同**时间屏障**。
-- 禁止以“去重/合并检查”为由删除这些屏障；每个屏障都要在 Safety-edge timeline 标出触发点、保护责任和证据。
+## 6. 审配置、通信及 APP/BL 部署
 
-### 3. 结构减法判定：四类问题要分别举证
+配置请求应先校验并形成完整候选，持久化/校验按项目策略完成后发布有效版本，或具有明确原子切换和回滚合同。失败不得混合新平台与旧阈值；记录不存在、格式不兼容、介质损坏和有效旧配置分别处理。计量保存失败不能提前清 dirty、推进已保存值或索引。
 
-- **Shotgun surgery**：同一规则的修改必须散落多个文件/分支；记录规则 Owner 和受影响合同，不以简单复制代替收口。
-- **规则多份解释**：多个模块对同一事实、阈值或生命周期各自解释；即使当前结果相同，也报 Multiple Sources of Truth。
-- **空 wrapper**：函数只转调、无语义边界、无副作用/所有权/稳定 ABI 价值；可删除或合并，但先查全部调用点。
-- **死字段候选**：无真实 Producer、无有效 Consumer 或仅写副本；先按文首区分内部控制状态、授权遥测和仅测试观察。DTO/日志有真实合同就不是死字段；值恒定也可能是协议/ABI要求，须给出实际搜索与合同证据。
+UART 同时检查容量边界和字段长度关系、完整帧冻结/消费、校验与溢出策略。命令语义与 Flash/OTA 在前台执行；ISR 可做预算内组帧。ACK 入队、发送完成与对端收到不能混同，保护关断不等 ACK。
 
-### 4. 区分控制输出的各个阶段
+APP/BL 共用格式、分区、页大小、镜像范围和 CRC 必须有一致来源并核对实际链接/镜像。OTA 审准备、持久化状态、擦写、校验、commit、结果发送和跳转顺序及失败恢复；APP OTA 不自动更新 BL。
 
-审查和命名必须区分：
+新 BL 增加有效完成记录等冷启动条件时，一并检查工厂首装、烧录工具/镜像、旧 APP/BL 组合、配置迁移与回退。不能只证明 OTA 成功而宣布该版本可部署；记录格式和具体校验按工程定义，不套 C300 专用格式。
 
-```text
-candidate            算法/策略提出的候选值
-approved              Application/Safety 批准后允许的值
-committed            执行层已提交的命令或回执
-driver_setting       驱动保存或寄存器已写入的设定
-physically_effective  硬件实际生效的值/状态（需时序或板级证据）
-```
+## 7. 审集成与完成证据
 
-按执行动作与证据区分批准、提交、驱动设定和实际生效。项目若把提交和写驱动合为一步，说明实际合同即可，无须增加字段。数值相同仍要检查写寄存器、定时器更新与硬件反馈。
+合并、变基和冲突解决后的内容重新作为审查对象。检查 public API/typedef、fault schema、veto、IRQ、build membership 与 tests；父分支各自 PASS 不传递给新内容。
 
-### 5. 结论证据分桶：Host/Keil 不得冒充 BOARD_PASS
+对安全宏追 Owner、实际 translation unit 的预处理值、project define 和可达分支。缺直接 include 是线索，不能仅据此固定 P1；稳定公共合同或明确构建定义可能合法。未定义导致关闭时还须说明真实功能后果。默认保留必要编译检查；用户已授权移除某项 `#error` 时不以 assert/typedef 换壳恢复，仍核实宏值和运行安全门。
 
-问题按当前证据分类：
+对启用 IRQ 追外设源、NVIC、startup 向量、实际链接 handler、driver 交接与前台消费者。只有 weak 声明不代表实际落到 Default_Handler；用当前目标源文件/map 和开启条件证明。可达中断造成挂死才按实际影响定级。
 
-- **可确认 bug**：源码、可复现测试或明确失败证据已闭环。
-- **结构问题**：Owner、边界、重复解释、合同或可维护性已由静态证据确认，但不等同于已发生的板级故障。
-- **需补证据**：缺源码、调用链、当前测试、协议或产品约定，说明缺哪项和会影响什么结论。
-- **需板级证据**：必须用真实 MCU/中断时序/示波器/继电器反馈/故障注入确认；Host、静态分析、Keil 编译只能分别写 `HOST_PASS`、`STATIC_ANALYZER_PASS`、`KEIL_BUILD_PASS`，不得写 `BOARD_PASS`。
+按风险使用现有静态搜索、严格编译、analyzer、Host、目标构建及板测。纯文档/机械低影响修改不堆叠无意义测试；功率/ISR/存储/OTA 改动需要对应反例和回归。测试只镜像实现、脚本成功复现问题或退出 0，不能自动记 PASS。
 
-输出问题表增加 `结论桶` 列，并在每项后写 `证据层级 + 未验证项`。
+收口适用的 headers/API/工程成员/测试/文档/部署合同。发现缺口继续完成其余已授权可做工作；硬件或依赖确实缺失时记录阻塞和复现入口，不反复索取已有许可。
 
-### 6. Post-refactor contract closure：收口清单
+## 8. 结论、严重度与报告
 
-按重构范围核对以下适用项，并说明仍缺的证据：
+先给主要结论及其边界。每项问题写明位置、当前事实、触发条件、因果链、实际影响、复现/证据、最小修复方向和验证标准，并标记来源：继承问题 / 本批引入 / 已批准变化 / 需求未完成 / 尚未验证。
 
-```text
-[ ] headers：public/private、直接 include、include path 无旧合同残留
-[ ] API：声明/定义/调用点、语义/单位/Owner 一致
-[ ] project membership：Keil/CMake/Make/CI 实际包含正确文件，旧文件未被幽灵编译
-[ ] tests：host/静态/Keil/板级测试路径与结果已重新确认
-[ ] docs：README/架构/接口/验证边界反映当前实现
-```
+结论类别独立于严重度：**可确认 BUG / 结构问题 / 需补证据 / 需板级证据**。结构问题不能被“只是风格”抹掉，但架构名称、未直接 include、重复调用或缺一份波形也不自动升级为 P0/P1。
 
-任一必要的适用项缺证据时，输出 `POST_REFACTOR_CONTRACT_PARTIAL` 并列出缺口。
+| 等级 | 依据 |
+|---|---|
+| P0 | 有证据支持、可达的硬件损坏或人身风险链；不靠多重未经证实假设堆级别 |
+| P1 | 核心使用功能或关键数据完整性失效，例如正常部署无法启动/恢复 |
+| P2 | 局部功能、计量、计时、恢复或有具体影响的合同缺陷 |
+| P3 | 维护、兼容、诊断、可读性问题；若在目标环境阻断交付则按真实影响重评 |
+| 证据缺口 | 未提供当前构建/完整源码/协议/板测；列验收待办，不自动称 BUG |
 
-### V0.3.1 最小输出模板
+按已证明的后果和可达性定级；缺证据时说明假设，不把最坏想象写成已确认事实。测试绿不能抵消已证实的问题，静态风险也不能冒充已发生的硬件故障。
 
-```text
-结论桶：可确认 bug / 结构问题 / 需补证据 / 需板级证据
-对象：<参数/字段/API/时间屏障>
-输出阶段：candidate=<...> -> approved=<...> -> committed=<...> -> driver_setting=<...> -> physically_effective=<...>
-冗余矩阵：语义=<...>；单位=<...>；Owner=<...>；结论=<保留/合并/需确认>
-安全屏障：采样新鲜度=<...>；ISR=<...>；PWM写前/写后=<...>；Relay写前/写后=<...>
-证据：SOURCE_CONFIRMED / HOST_PASS / STATIC_ANALYZER_PASS / KEIL_BUILD_PASS / BOARD_PASS
-未验证：<具体缺口>
-收口：headers=<...>；API=<...>；project membership=<...>；tests=<...>；docs=<...>
-```
-## V0.2.0 新增硬门禁
+最终报告根据范围保留必要内容，不强迫小任务输出全部大表：
 
-V0.1.0 已覆盖 Owner、边界、依赖环、DTO、隐藏依赖、状态机、PWM/Relay/Protection 和 ISR 并发；V0.2.0 强制补上此前容易漏掉的“边沿/跨代/生命周期”审查：
+1. 源码身份、对照/参考身份、目标、审查与修复授权边界。
+2. 结论及问题表：`ID | 来源 | 类别 | 严重度 | 位置 | 触发/证据 | 影响 | 修复/验证`。
+3. 关键 Owner、调用/写点、状态迁移、safety-edge 和事务关系；全面审查说明所有适用领域的结果或缺口。
+4. 验证表：检查对象、当前内容 hash/SHA、命令/条件、预期、实际、退出码、状态及未覆盖范围。
+5. 必要合同收口：headers、API、project membership、tests、docs、部署配套；不完整标 `POST_REFACTOR_CONTRACT_PARTIAL`。
+6. 已关闭问题、剩余实际风险/阻塞、下一步可执行验证；已有修复授权则继续执行范围内事项。
 
-1. **Safety-edge timeline**：不能只看最终 steady-state；必须检查 PWM `OFF→ARMED→ACTIVE`、Duty `0→非0`、Relay `OFF→ON`、Fault `safe→unsafe` 等关键边沿的逐步顺序。
-2. **First/last-cycle protection window**：保护门、比较器 live window、Break/COMP ISR guard 必须在危险能量路径生效前建立；不能下一拍才武装。
-3. **ISR/main TOCTOU**：主循环“先读硬件、后置 armed 标志”之间若 ISR 能插入，必须按竞态分析，不可因 `volatile` 就判安全。
-4. **Snapshot generation coherence**：`fault_mask / disposition / epoch / pending / hw state` 必须来自同一代；发生二次 protection service/recheck 后必须整体刷新，不得只刷新一个 bool。
-5. **Lifecycle single-owner**：`init/reset/start/stop/session invalidation` 同样属于状态，必须有唯一 Owner；“函数幂等，所以重复 reset 没关系”不算通过。
-6. **API truthfulness**：`try_start()/enable()/commit()` 返回 success 必须与真实状态转移/硬件提交一致；只通过前置条件但什么都没做，属于逻辑 bug。
-7. **Producer-consumer reachability**：每个 fault bit / enum action / recovery path 都要查生产者、消费者、清除者；只有定义和消费者、没有生产者，是 Zombie Contract。
-8. **Cross-layer reverse edge**：必须扫 `driver -> app/main`、`sample -> charge/output/protection` 这类反向依赖，不能只看 app 内部。
-9. **Product envelope single truth**：Application 已算 `power_limit/duty_limit` 后，下游算法不能再复制 300W/8A/6A 业务公式，除非明确是独立、命名清晰的 safety validator。
-10. **Evidence gate**：能编译/能跑静态分析时必须尝试；不得仅凭“测试 PASS”宣称架构/台架 PASS。
+证据分别标 `SOURCE_CONFIRMED`、`HOST_PASS`、`STATIC_ANALYZER_PASS`、`TARGET_BUILD_PASS`（使用 Keil 时可写 `KEIL_BUILD_PASS`）、`BOARD_PASS`，状态分别标通过 / 失败 / 未执行 / 受阻 / 已知限制。每层只证明自身覆盖项；**受测、Host PASS、编译链接成功都不等于板测通过**。`BOARD_PASS` 也须注明板卡、条件与覆盖场景，不等于绝对无 BUG。
 
-## 核心原则
-
-审查时先问 7 个问题：
-
-1. **谁拥有这个状态？** 同一个状态/策略只能有一个 Owner。
-2. **谁决定？谁执行？** Policy/Algorithm 产生候选，Application/Safety 仲裁，Executor/Driver 执行；不能互相越权。
-3. **谁允许危险动作发生？** PWM 发波、Relay 吸合、功率上升前，哪个 safety gate 必须已经建立？
-4. **依赖方向是否单向？** 高层可以依赖低层接口；同层模块不得互相修改内部状态形成环；Driver 不得反向依赖 Application。
-5. **接口是否只暴露必要语义？** 跨模块优先窄 DTO/标量；禁止把整个 `sample/profile/protection/controller` 上下文扔给下游让它自己挑字段。
-6. **函数签名是否说出真实依赖？** 函数不能表面吃 DTO，内部又偷偷读硬件、全局单例、另一个模块状态。
-7. **本拍所有决策是否基于同一代事实？** 二次保护检查、ISR pending、硬件 commit 之后，不能混用旧 mask/旧 disposition/新 fault bool。
-
-## 严重度
-
-| 级别 | 含义 | 典型问题 |
-|---|---|---|
-| **P0** | 可能直接导致失控/损坏/安全故障 | Break/COMP 已触发但能被错误重新发波；保护窗口在危险输出后才建立；竞态可绕过硬停 |
-| **P1** | 行为或架构高风险，已可能造成实际错误 | Owner 倒置、分布式状态机、跨代 safety snapshot、重复 lifecycle owner、算法绕过/重算安全包络、API 假成功 |
-| **P2** | 明显技术债，持续增加维护和移植风险 | 环依赖、隐藏依赖、类型放错模块、参数重载、公共头泄漏内部结构、Zombie private contract |
-| **P3** | 可读性/一致性问题 | 局部命名不一致、无行为影响的注释/格式漂移；死存储和重复镜像若造成 Owner/API 泄漏按 P2 |
-
-**不要因为“当前测试能过”把 P1 架构或时序缺陷降成 P3。** 架构/边沿问题常在下一次改需求、换 MCU、换算法、真实 ISR 抢占时触发。
-
-# 审查流程
-
-## Phase 0 — 事实基线与可验证范围
-
-先读取：
-
-- 项目规范：`AGENTS.md` / `CLAUDE.md` / README / 架构文档
-- 构建入口：Keil `.uvprojx`、CMake、Makefile、CI
-- 用户指定目标文件及其直接调用者/被调用者/公共头
-- 关键硬件路径：PWM/Relay/ADC/DMA/COMP/Break/Flash/UART/Watchdog
-- Driver ISR、Application task/service、callback/pending 桥接链
-
-有 CodeGraph / code-review-graph / clangd 时可辅助生成调用图，但最终结论必须回到源码证据。
-
-### 0.1 必须先声明验证边界
-
-报告中区分：
-
-- **SOURCE_CONFIRMED**：源码静态证据已证实
-- **HOST_PASS**：Host test 已跑
-- **STATIC_ANALYZER_PASS**：clang/gcc analyzer 已跑
-- **KEIL_BUILD_PASS**：目标工具链编译/链接已跑
-- **BOARD_PASS**：真实板卡/示波器/故障注入已验证
-
-缺厂商库、无板卡或无法运行某工具时直接写“未验证”，禁止把静态检查写成 BOARD_PASS。
-
-## Phase 1 — Owner 表：状态、决策、生命周期都要有 Owner
-
-对所有关键事实和状态列唯一 Owner：
-
-| 对象 | 应有 Owner | 其他模块允许做什么 |
-|---|---|---|
-| Charge session：OFF/WAIT/PRECHARGE/RUN/FAULT | `charge` | 只读状态/提交事件 |
-| TC/CC/CV/FC | `charge_stage` / `charge_policy` | 只接收其输出约束 |
-| MPPT search/PI/Vref/算法状态 | `mppt` | 只通过公共算法接口调用 |
-| Fault active/latched/recovery | `protection` | 消费 safety decision，不直接改内部位图 |
-| PWM/Relay 正常硬件提交 | `output executor`/driver 唯一出口 | 其他模块只提交命令 |
-| Emergency HardTrip | ISR/Driver safety path | 只做最短硬停 + pending，主循环归档 |
-| ADC measurement snapshot | `sample` | 其他模块读批准后的快照/DTO |
-| Telemetry/debug | `debug` | 只读 snapshot，不反向控制策略 |
-| MPPT session init/reset | `charge session transition owner` 或明确 coordinator | 其他模块只提交 invalidate/exit 事件 |
-| COMP live protection window | PWM executor/driver | Application 不得下一拍才补 armed |
-
-如果发现两个模块都在决定同一个状态，标记 **Distributed State Machine / Multiple Owners**。
-
-**特别检查 lifecycle：** `init/reset/start/stop/restart/park/recover`。这些不是“工具函数”，也是状态转移。重复调用即使幂等，也要追问为什么存在多个 Owner。
-
-## Phase 2 — 依赖图、调用图与反向边
-
-至少检查：
-
-- `.c/.h` include 方向
-- A 调 B，同时 B 又调 A
-- A 通过 getter 读 B，B 又主动修改 A
-- Debug/Telemetry 反向被业务模块 include
-- Algorithm include Charge/Protection/Driver
-- Output/Protection/Charge 同层相互调用
-- **Driver include `main.h` / `app_*.h` / policy header**
-- **Measurement/sample 为打印日志反向读取 charge/output/protection/driver**
-
-重点找强连通分量（SCC）。目录分成 `app/driver` 不代表真正分层；如果 `charge ↔ protection ↔ output` 形成环，仍然是不合格。
-
-### 2.1 不只扫 include，还要扫 write/call sites
-
-对以下 API/寄存器必须列所有写点：
-
-```text
-PWM Arm/Disarm/SetDuty/HardTrip/MOE/CCR
-Relay GPIO write
-Fault latch/clear
-Charge state transition
-Algorithm reset/init
-Protection epoch/pending
-```
-
-“只有一个 include”不能证明“只有一个 writer”。宏、ISR、helper、callback 都要算。
-
-## Phase 3 — Ownership / Boundary 缺陷
-
-### 3.1 Ownership Inversion — 所有权倒置
-
-红旗：
-
-```c
-struct mppt_controller {
-    mppt_ctx_t algorithm;
-    charge_stage_ctx_t charge_stage; // 错：算法控制器拥有充电策略状态
-};
-```
-
-如果模块名叫 MPPT/Algorithm，却拥有 Battery Profile、Charge Stage、Relay session、Fault session，它通常已经变成 God Controller。
-
-### 3.2 Bidirectional Semantic Coupling — 双向语义耦合
-
-例如：
-
-- `charge_stage` 命令“清 MPPT integral”
-- MPPT 的 `search.state` 又决定 `charge_stage` 是否允许 CV→CC
-
-应改为业务事件/约束，由各自 Owner 解释。
-
-### 3.3 Fat Interface / Overexposed Context
-
-红旗：
-
-```c
-foo(const app_sample_t *sample,
-    const app_battery_profile_t *profile,
-    const app_protection_t *prot,
-    const app_charge_ctx_t *charge);
-```
-
-审查它实际读取几个字段。若只需 `pv_mv/pv_i_ma/bat_mv/power_limit`，要求改成窄 DTO/标量。**跨模块 DTO 表示批准后的合同，不是把所有状态复制一遍。**
-
-### 3.4 Type Ownership Error — 类型放错位置
-
-例如完整 Charge Session enum 却定义在 `charge_stage.h`，导致别的模块为了 `RUN` 被迫 include Stage。类型应该放在真正 Owner 的公共合同或独立最小 contract header。
-
-### 3.5 Implementation Detail Leakage
-
-红旗字段/接口：
-
-- `clear_power_integral`
-- `reset_tracking`
-- `search_state` 被业务层直接判断
-- Application 直接访问算法 ctx 内部积分器
-
-高层只表达业务语义，例如 `control_session_invalidated`、`mode=HOLD`；算法内部是否 PI/P&O/IncCond 不能泄漏。
-
-## Phase 4 — API、参数、命名与“硬件能力真实性”
-
-逐函数检查：
-
-1. 参数是否都是函数真正需要的？
-2. 参数名是否表达单位和语义（`*_mv`, `*_ma`, `*_mw`, `*_permille`, `*_ms`）？
-3. 一个值是否被赋予两种语义？例如 `power_allow=0` 有时表示 hard-stop、有时表示 soft-zero。
-4. `candidate/approved/committed/hardware` 是否被混叫成 `duty`？
-5. `relay_applied/relay_closed` 是否其实只是 GPIO ODR 镜像？如果没有触点反馈，不得命名成物理闭合。
-6. init/reset/start/stop 是否存在多套近义 API，调用者不知道层级？
-7. 公共头是否暴露私有 ctx、PI integral、search internals？
-8. DTO 是否包含不相关 stage/fault/relay/profile 等上层概念？
-9. `try_start()/enable()/commit()` 返回 true 时，是否真的发生了状态转移或提交？
-10. Fault 名称是否暗示了硬件实际上并不存在的检测能力？
-
-推荐命名流水线：
-
-```text
-candidate_duty -> approved_duty -> committed_duty -> hardware_duty
-relay_request_on -> relay_odr_on -> relay_contact_closed(只有真实辅助触点反馈时才可用)
-```
-
-### 4.1 API truthfulness 规则
-
-```c
-bool try_start(void)
-```
-
-若当前已经 RUN，内部 `start()` 什么都没做，但仍返回 true，属于**逻辑 bug**，不是命名问题。返回值必须说明：
-
-- transition happened
-- command accepted and queued
-- already in requested state
-
-三者不能混成一个 `true`。
-
-## Phase 5 — 函数真实副作用与隐藏依赖
-
-函数签名和注释必须与实现一致。重点抓：
-
-- 注释写“本函数不访问硬件”，内部却 `DRV_*()`
-- 已传 `hw_snapshot`，内部又重新读硬件，形成 mixed snapshot
-- 已传 protection decision，内部又 `app_protection_latest()`
-- helper 无参数，却依赖一堆 file-static `s_sample/s_run_mode/s_duty`
-- getter 名义只读，实际触发状态更新
-- policy 函数内部直接 latch fault / arm PWM / write relay
-
-对每个核心函数记录：
-
-```text
-Inputs / Hidden Inputs / Outputs / State Mutation / HW Side Effects / Caller / Timing
-```
-
-隐藏输入若会影响控制结果，通常至少 P2；涉及 PWM/保护时提高到 P1。
-
-核对名称和注释是否说清主要动作、输入单位、输出和真实副作用。按项目命名识别公开/私有、编排/纯计算和模式专属角色。分发入口、同样本收紧、时基处理、积分、理论边界和有效限值分别按实际行为判断。名称相同的后缀或某个局部词不足以判违规。命名或注释有误而代码行为正确时，按各自问题给出证据。
-
-## Phase 6 — 状态机、会话边界与重复生命周期动作
-
-检查是否存在多个模块对同一事件给出不同生命周期解释。
-
-典型例子：
-
-- Charge FSM 对 Relay Lost 做 100ms debounce
-- MPPT wrapper 一帧 `relay=false` 就 `reset_tracking()`
-
-这属于实际行为冲突，不只是代码风格。
-
-必须区分：
-
-```text
-本拍必须 Duty=0 / 停能
-vs
-整个 control session 已失效，需要 reset algorithm state
-```
-
-### 6.1 每个 transition 必须列 Side Effect
-
-至少列：
-
-```text
-OFF -> PRECHARGE
-PRECHARGE -> RELAY_SETTLE
-RELAY_SETTLE -> RUN
-RUN -> WAIT/OFF/FAULT
-FAULT -> RECOVERY/WAIT
-```
-
-每条边检查：
-
-- 谁触发？
-- 谁修改 state？
-- 谁 reset/init algorithm？
-- 谁控制 relay？
-- 谁 arm/disarm PWM？
-- 同一 side effect 是否在 transition 前、transition helper、外层 wrapper 重复执行？
-
-**幂等不等于架构正确。** `reset()` 被连续调用三次虽然当前无功能差异，仍说明 lifecycle Owner 不唯一。
-
-### 6.2 模式路径、预览与单拍状态
-
-- 从入口到真实状态写点追模式来源、初始化、运行和切换清理。若两个入口都只转发到带模式分支的公共函数，继续找专属状态和编排实际在哪里推进。公共数学可共用，模式拆分以写点和运行路径为证据。
-- 列出同一采样或控制事件内的预览、阶段推进、正式更新、候选、资格和批准所用数据，至少核对一条阶段切换路径。检查预览的共享指针、全局变量和调用副作用。临时结构体含正式状态的可写引用时仍可能推进正式状态。
-- 若同拍使用不同策略输入，核对这是定义清楚的预览与正式边界，还是资格、批准和诊断混用前后阶段状态。核对重复采样只收紧/保持的合同、积分实际间隔和搜索/暂停/恢复状态的更新次数。
-
-## Phase 7 — Safety-edge Timeline：必须审“第一拍/最后一拍”
-
-涉及危险执行器动作时，按本次证据和审查范围画有序时间线，从触发一直核对到物理可能生效或禁止输出的时点。
-
-### 7.1 PWM 上电/发波边沿
-
-至少追踪：
-
-```text
-Duty shadow = 0 ?
-Clear pending fault ?
-Comparator/Break live window ready ?
-ISR guard/seen_high/armed ready ?
-MOE/Timer Arm ?
-First non-zero Duty commit ?
-Shadow/preload takes effect on which update event ?
-```
-
-必须回答：
-
-> **从哪一条语句开始，功率级第一次可能真的输出能量？在它之前，所有必须的快速保护是否已经生效？**
-
-如果 Protection/COMP live window 要等下一次 1ms task 才武装，而 PWM 已经开始非零发波，按 P1 起报；若可导致硬件失控，提升 P0。
-
-### 7.2 PWM 收波/故障边沿
-
-检查顺序：
-
-```text
-禁止继续增功率
--> Duty 归零/HardTrip
--> MOE OFF
--> 关闭/重置 live window
--> Relay policy
--> 清 pending/允许恢复
-```
-
-不能在还可能有脉冲时先关闭唯一快速保护。
-
-### 7.3 Relay 上下电边沿
-
-检查：
-
-- precharge 条件和时间
-- ODR request 与真实触点反馈是否混淆
-- relay settle/debounce 与 MPPT session reset 是否一致
-- fault 时先 PWM 还是先 relay，是否符合硬件安全顺序
-
-### 7.4 复位入口与重启
-
-涉及复位或执行器安全时，沿实际入口搜索配置切换、采样异常、故障、OTA 和其他相关复位路径。对软件可控复位，查复位请求之前是否按硬件合同关波、禁止新命令和处理继电器，并检查中断重入或超时是否绕过该次序。独立看门狗、掉电等路径不能假定会执行软件清理。查定时器、引脚和外部驱动的复位默认态、继电器状态、Boot 到应用的初始准入。区分源码可达路径、设备资料所证实的默认态及板上实际波形。缺硬件证据时记录验证点，不推断 PWM 必然钉高或复位必然安全。
-
-## Phase 8 — ISR / Main 并发、TOCTOU 与原子握手
-
-必须检查：
-
-- ISR 是否只做必要搬运/快故障；业务解析是否跑进 ISR
-- `volatile` 是否被错误当作原子性/互斥
-- ISR 与 main 对多字节/结构体/位图是否有撕裂风险
-- DMA buffer 双缓冲 ownership
-- ADC sample sequence / captured time / freshness
-- PWM shadow/preload 与“当前 Duty”的语义
-- Break/COMP 后 Application 是否可能重新 enable PWM
-- fault epoch 在算法计算前后是否复核
-- Relay/PWM 是否存在多个写硬件出口
-- STOP/recovery 是否同拍互相覆盖
-- Watchdog 是否掩盖死循环或长临界区
-
-### 8.1 强制 TOCTOU 检查
-
-看到这种模式必须展开时序：
-
-```c
-if (COMP_IsHigh()) {
-    edge_armed = true;
-}
-```
-
-若 ISR 可能发生在“读到 HIGH”和“写 `edge_armed=true`”之间，检查 ISR 的 guard：
-
-```text
-Main: read HIGH
-          |
-          +---- ISR falling edge ----> sees armed==false -> return
-          |
-Main: armed=true
-```
-
-这就是可能丢事件的 TOCTOU。修复应考虑由 Driver/Executor 原子建立窗口、临界区、硬件 latch 或单向握手，而不是只加 `volatile`。
-
-### 8.2 扫 ISR early-return guard
-
-对每个 COMP/ADC/Break ISR，列出所有早退条件：
-
-```text
-initialized?
-window_open?
-seen_high?
-armed?
-pwm_active?
-```
-
-然后反向追踪每个 guard **何时由谁置位/清零**，并与 PWM/Relay 真正生效时间对齐。
-
-## Phase 9 — Safety Snapshot / Generation Coherence
-
-当一拍里 protection 会运行两次或发生 epoch recheck 时，不能只更新一个 bool。
-
-### 9.1 统一 safety snapshot
-
-推荐把同一代事实打包：
-
-```c
-typedef struct {
-    uint32_t epoch;
-    uint32_t fault_mask;
-    app_fault_disposition_t disposition;
-    bool unsafe;
-    bool stop_pending;
-} app_safety_snapshot_t;
-```
-
-如果执行：
-
-```text
-protection_service_runtime()
--> algorithm step
--> protection_service_runtime() again
-```
-
-第二次之后必须重新获取**完整** snapshot。以下情况必须报 Mixed Snapshot：
-
-```text
-protection_fault = 新一代
-fault_mask       = 旧一代
-disposition      = 旧一代
-```
-
-### 9.2 Commit barrier
-
-最终硬件提交前至少确认：
-
-```text
-measurement generation valid
-safety epoch unchanged / refreshed
-command still allowed
-executor has final hard-safety gate
-```
-
-Policy 层可以保持纯；最终瞬时硬件复核应集中在 executor/safety-commit，不要散在多个 policy。
-
-## Phase 10 — Multiple Sources of Truth / Product Envelope
-
-搜索同一个约束是否被多处重算：
-
-```text
-300W limit
-PV × 8A
-BAT × 6A / 6.6A
-Duty max/min
-Battery OV threshold
-Relay state
-```
-
-Defence-in-depth 可以存在，但必须区分：
-
-- **Policy owner**：计算业务限制
-- **Safety validator**：只验证结果未越硬件绝对边界
-
-### 10.1 强制数值/公式重复搜索
-
-若 Application 已产生：
-
-```c
-power_limit_mw
-duty_limit_permille
-```
-
-则搜索算法/driver 中是否又硬编码：
-
-```text
-300000
-8000
-6000
-pv_mv * 8000
-bat_mv * 6000
-```
-
-“数值目前相同”不是通过理由；将来 6A→6.6A 只改一处就会分叉。
-
-### 10.2 接口语义、缓存与诊断回流
-
-- 从生产者到实际消费者查合法零、未启用、无效、明确停机及限制来源。相同最小值可能来自不同限制，亦可能改变资格、诊断或恢复。逐项对照缓存键与所缓存的字段，验证同序号但有效位、采集时刻、模式、策略值或来源改变时，哪些能留用、哪些需要失效或收紧。
-- 追踪 shadow 对照、遥测和测试标志的实际消费者。发现它们进入生产批准、候选发布、停机或恢复决策时，列出触发路径和依据。迁移对照可在 Host 双算，生产采用已批准的正式路径。
-- 检查协议接收、转发与界面是否保持约定值域和编码，本地执行约束是否在明确的责任方生效。新增拒收/限幅/停机需有协议、产品需求或既有保护依据，依据不足时报告具体场景，按范围请用户定夺。
-
-## Phase 11 — Producer / Consumer / Recovery Reachability
-
-对每个 safety-relevant enum、fault bit、action、event 建表：
-
-| Symbol | Producer | Consumer | Clear/Recovery | Reachable? |
-|---|---|---|---|---|
-| `APP_FAULT_RELAY_FAULT` | ? | disposition | ? | 若无 producer = zombie |
-| `APP_MPPT_ACTION_ZERO_HOLD` | ? | charge/output | reset path | 若无 producer = zombie |
-
-必须同时查：
-
-- public header 定义
-- private header 定义
-- switch case 消费
-- 实际赋值/return producer
-- recovery/clear producer
-
-不能因为 Zombie 已经移到 private header 就忽略；private dead contract 仍会误导维护者。
-
-### 11.1 Hardware-capability audit
-
-Fault 名称与硬件实际观测能力必须一致：
-
-- 只有 GPIO ODR：只能证明 MCU 请求/寄存器状态
-- 有 IDR：也未必证明继电器触点物理闭合
-- 有辅助触点/电压反馈：才可命名 `relay_contact_closed`
-
-如果 `RELAY_FAULT` 描述“吸合反馈异常”但硬件没有反馈且代码无 producer，应明确报告。
-
-## Phase 12 — Config Ownership 与 Layer Contract
-
-不允许一个 `app_config.h` 成为所有层的参数垃圾桶。
-
-审查每个配置项属于：
-
-- Product/Safety
-- Charge policy
-- Algorithm tuning
-- Driver/HW
-- Debug/Telemetry
-
-如果算法工程师为了调 Kp/Ki 必须打开充电/Relay/Protection 全部宏，说明配置边界失败。建议按 Owner 拆文件，例如 `app_config.h` + `mppt_config.h`。
-
-同时检查：
-
-- Driver 不得 include `main.h` 只为了一个配置宏
-- Driver-specific compile option 应在 driver contract/config
-- Product config 不应复制到 algorithm config 形成第二真值
-
-## Phase 13 — Static Tooling / Tests：PASS 不能只靠眼睛
-
-在环境可用时，至少尝试：
-
-1. **严格编译**：GCC/Clang `-Wall -Wextra -Werror` 或项目等价设置
-2. **静态分析**：`gcc -fanalyzer` / `clang --analyze` / 已配置 analyzer
-3. **include/call SCC**：脚本、CodeGraph 或 code-review-graph
-4. **全局 symbol/write-site 搜索**：PWM/Relay/fault/reset/start/stop
-5. **现有 host tests**：尤其算法合同、policy、replacement tests
-
-工具不可用时记录缺口，不得虚报。
-
-### 13.1 安全负向测试清单
-
-若有 Host/HIL 能力，优先增加这些回归：
-
-- PWM 第一个非零周期立即触发 COMP fault，必须 HardTrip
-- `read comparator high` 与 `mark armed` 之间注入下降沿，不得丢 fault
-- algorithm step 与 final commit 之间注入新 fault，旧 disposition 不得继续生效
-- RUN→STOP 只发生一次 session reset
-- `try_start()` 在非 OFF 状态不能报告“新启动成功”
-- relay 只有 ODR、无触点反馈时，不得伪造 contact-closed fault/pass
-- Product current limit 修改后，不得存在 algorithm 内旧常量悄悄限幅
-
-## Application 内部分层基准
-
-`app/` 和 `driver/` 分开只是第一层。复杂控制固件至少区分：
-
-```text
-Scheduler / Application Coordinator
-        |
-        +--> Measurement Adapter (sample snapshot)
-        +--> Safety Policy (protection)
-        +--> Domain Policy (charge stage / battery)
-        +--> Algorithm (MPPT)
-        +--> Output Policy
-        +--> Output Executor / Safety Commit
-        +--> Driver
-
-Observability (debug/telemetry)
-        ^
-        |
-   read-only snapshots
-```
-
-推荐主链：
-
-```text
-ADC Driver
-   -> Sample Snapshot
-   -> Protection Evaluate
-   -> Charge/Stage Policy
-   -> Algorithm Candidate
-   -> Safety Recheck (same-generation snapshot)
-   -> Application Approval
-   -> Output Policy
-   -> Executor Final Gate
-   -> PWM/Relay Driver
-```
-
-快速故障例外链：
-
-```text
-COMP/ADC/Break ISR
-   -> HardTrip immediately
-   -> latch/pending minimal evidence
-   -> main-loop protection archives/recovery policy
-```
-
-禁止的依赖方向：
-
-```text
-Algorithm -> Charge Stage / Protection / Driver
-Driver -> main/app policy
-Debug -> 反向控制 Charge/Protection
-Sample -> 为 telemetry 反向拉取 Charge/Output/Protection
-Output policy -> 偷偷重跑 Charge/Protection 业务判据
-Peer module <-> peer module 双向修改状态
-```
-
-# 审查完成门：没有完成这些，不得下“没问题”结论
-
-按审查范围核对以下适用项。全面审查逐项给出证据或缺口，局部审查说明查到的路径和边界：
-
-1. **Owner 表**：包含 session、stage、algorithm、fault、PWM/Relay、lifecycle reset、COMP live window
-2. **依赖图 + SCC**：同时检查 `app↔app` 和 `driver→app` 逆向边
-3. **Actuator writer 表**：PWM/Relay/HardTrip 所有写点
-4. **Safety-edge timeline**：至少审一次 PWM `0→非0` 和 fault `safe→unsafe→HardTrip`
-5. **ISR guard/TOCTOU 表**：谁置 armed/window/seen，何时相对 PWM 生效
-6. **Snapshot generation 检查**：二次 protection/epoch recheck 是否整体刷新
-7. **Lifecycle side-effect 表**：init/reset/start/stop 是否多 Owner/重复调用
-8. **Producer-consumer reachability 表**：fault/action/event 是否有真实 producer
-9. **Multiple Sources of Truth 搜索**：产品功率/电流/Duty/OV 等关键约束
-
-对改动声明逐项核对实际行为。等价重构使用指定基线和当前目标的同输入对照，覆盖发生变化的状态、时序、限制来源和异常分支。Flash 收益须注明目标、工具链、构建选项与镜像或 MAP 的前后差值，源码行数、Host 对象大小和旧目标记录各有自己的证据边界。区分确认通过、证据不足、已失败和未运行。
-
-如果用户要求“全面复核”，**只跑单元测试或只看几个头文件不足以判 PASS**。
-
-# 审查输出格式
-
-先给结论，再给证据。不得只说“建议重构”。
-
-## 1. 总结
-
-```text
-当前最大风险：Safety-edge 空窗 / Owner 不唯一 / Mixed Snapshot / 依赖成环 / 算法边界泄漏 / PWM安全...
-```
-
-并明确：
-
-```text
-ARCHITECTURE_PASS / PARTIAL / FAIL
-SAFETY_TIMING_PASS / PARTIAL / FAIL
-STATIC_VALIDATION_PASS / PARTIAL / NOT_RUN
-BOARD_VALIDATION_PASS / NOT_RUN
-```
-
-## 2. 问题表
-
-| ID | 严重度 | 类型 | 文件/函数 | 证据 | 风险 | 建议 Owner/修复方向 |
-|---|---|---|---|---|---|---|
-
-类型统一使用：
-
-- Architecture Defect
-- Ownership Inversion
-- Boundary Violation
-- Distributed State Machine
-- Bidirectional Semantic Coupling
-- Dependency Cycle
-- Fat Interface
-- Type Ownership Error
-- Hidden Dependency
-- Mixed Snapshot / Generation Mismatch
-- Multiple Sources of Truth
-- Peer-to-Peer Mutation
-- Temporal Coupling
-- Safety-edge Window
-- TOCTOU / ISR Race
-- Semantic Overloading
-- Dead Contract / Zombie Interface
-- Lifecycle Multi-Owner
-- API Truthfulness Bug
-- Hardware Capability Mismatch
-- Hardware Single-Writer Violation
-
-## 3. Owner 表
-
-列出“当前 Owner / 应有 Owner / 冲突模块”。
-
-## 4. 依赖/调用图
-
-至少给关键链：
-
-```text
-sample -> protection -> charge -> algorithm -> application validation
-       -> safety recheck -> output policy -> executor -> driver
-```
-
-指出环、逆向边和 driver→app 违规。
-
-## 5. Safety-edge Timeline
-
-涉及执行器且能从现有证据还原边沿时，至少画出一条实际路径。缺证据时标出无法确认的步骤：
-
-```text
-Task tick N:
-  comparator window ?
-  -> Arm PWM
-  -> non-zero duty
-  -> first physical pulse
-  -> ISR guard state ?
-Task tick N+1:
-  ...
-```
-
-不能只说“COMP 有 ISR，所以有保护”。
-
-## 6. 整改顺序
-
-按 **P0/P1 行为安全 → snapshot/并发 → ownership/boundary → SCC/config → naming/dead code**。大型工程禁止一次推倒重写；优先切清边界并保持行为，再做下一刀。
-
-## 7. 验证缺口
-
-明确哪些是：源码证实 / host test / static analyzer / Keil build / 台架示波器。
-
-# 审查红旗清单
-
-看到以下任一情况必须停下来深挖，而不是继续表面整理：
-
-- `xxx_controller_t` 内嵌另一个上层业务状态机 ctx
-- 算法模块 include `charge_stage.h` / `protection.h` / `drv_pwm.h`
-- 跨模块接口直接收整个 `app_sample_t *`，实际只用 3~5 个字段
-- `charge_stage` 输出 `clear_xxx_integral`
-- Protection disposition 出现算法内部术语 `reset_tracking`
-- 同一硬件被多个 `.c` 写
-- 同一个 fault/session 在两个模块分别 debounce/reset
-- `step()` 已传 snapshot，内部又读硬件/全局 latest
-- 发生二次 protection service 后只刷新 `fault=true`，但 mask/disposition 仍旧
-- PWM `Arm/SetDuty` 先发生，COMP/Break live window 下一拍才建立
-- ISR 用 `armed/seen_high/window_open` 早退，但置位发生在 PWM 生效之后
-- main 先读硬件再置 ISR guard，中间允许 ISR 抢占
-- RUN→OFF 的 reset 在外层、transition helper、stop wrapper 重复调用
-- `try_start()` 在状态没变化时返回 true
-- 业务模块 include `debug.h` 只为 telemetry bit
-- sample/measurement 模块为日志反向读取 charge/output/protection
-- Driver include `main.h` 或 app policy header
-- 公共 header 暴露私有算法 ctx
-- 同一参数 `0` 同时表示 hard-stop 和 soft-zero
-- enum/action 在消费者里有分支，但生产者永远不产生
-- fault 名称声称“触点反馈异常”，实际只有 GPIO ODR 且无 producer
-- Application 已传 power_limit，Algorithm 又硬编码 300W/8A/6A
-- 文件夹看起来分层，但 include/call graph 存在 SCC
-
-# 边界
-
-- 默认只读审查。暂存、取消暂存、停止跟踪、提交、改提交说明、切换或创建分支、合并、变基、推送及等效操作都要求当次明确授权，实施授权不能代替 Git 授权。
-- 不为了“架构漂亮”改变保护阈值、硬件时序、协议或产品行为。
-- 无法确认业务语义时标记“需要产品确认”，不得自行发明。
-- 发现 P0/P1 时优先报告，不能被注释/格式问题淹没。
-- 对安全时序没有证据时，不得用“应该没问题”“看起来没问题”收尾。
-
-# 报告按实际审查范围回答
-
-1. 这是功能 bug、并发 bug、时序 bug，还是架构/设计 bug？
-2. 哪个状态/决策/lifecycle 的 Owner 错了？
-3. 现在是否存在两个模块同时解释同一事实？
-4. PWM/Relay 的**第一拍和最后一拍**保护是否完整？
-5. ISR guard 是否可能被 TOCTOU 绕过？
-6. Protection recheck 后是否混用了不同 generation 的事实？
-7. 换 MCU / 换算法 / 加新充电阶段 / 修改 6A→6.6A 时，哪里最容易再次出错？
-8. 最小安全整改切口是什么？
-9. 哪些结论尚未通过 Keil/板卡/示波器验证？
+本版将原先散落的门禁合并为以上工作流；详细检查保留在按主题加载的参考中，并修正固定架构、固定严重度和重复授权的冲突。

@@ -1,6 +1,6 @@
 {
   "skill_name": "code_zl",
-  "version": "V0.2.10",
+  "version": "V0.2.11",
   "evals": [
     {
       "id": 18,
@@ -10,12 +10,12 @@
     {
       "id": 1,
       "prompt": "/code_zl src/modbus.c src/host_comm.c",
-      "expected_behavior": "Should read both files, add standard function header comments (Name/Input/Output/Description), add // inline comments for key if/while/switch logic, and use short .c section comments like /* 静态函数声明 */ without equal-sign decoration. Must not use /* ==================== */ in .c. Report summary table at end."
+      "expected_behavior": "Read both files and relevant project style. Add exact Name/Input/Output/Description contracts to in-scope public, task, IRQ, complex or safety-relevant functions and useful plain Chinese notes to key control flow. Simple private helpers and obvious assignments need no forced comments. Apply short .c section comments when appropriate and report the actual scope without extending to unrelated headers."
     },
     {
       "id": 2,
       "prompt": "整理我暂存的代码",
-      "expected_behavior": "Should first run git diff --cached --name-only to identify changed files, then only comment the changed parts (new functions get headers, new fields get inline comments). Should NOT touch unchanged old code."
+      "expected_behavior": "Read cached file list, cached diff and indexed source, then compare worktree changes. Comment only the selected change scope and related contracts using that version’s semantics; preserve unrelated old code and the index unless separately authorized. If overlapping worktree logic makes a comment incompatible, give a reviewable version-specific snippet and continue the remaining scope."
     },
     {
       "id": 3,
@@ -30,17 +30,17 @@
     {
       "id": 5,
       "prompt": "/code_zl Application/driver/src/bsp_pwm.c",
-      "expected_behavior": "Init functions must use short /* 分节：配了什么 */ titles (clock, GPIO pins, timer base, complementary PWM, Break protection) plus only non-obvious trailing //. Must not annotate every DDL field, and must not write long principle paragraphs inside Init."
+      "expected_behavior": "Inspect the real PWM configuration and approved project style. By default explain Init using short configuration-stage headings and a few non-obvious trailing comments, with actual pins, mode and protection behavior only when verified. Do not assume complementary PWM, a frequency or automatic recovery from a template. Follow explicit finer line-by-line requests when present."
     },
     {
       "id": 6,
       "prompt": "/code_zl Application/driver/src/drv_device.c — 函数头里写了待上板验证",
-      "expected_behavior": "Must add // todo: markers on specific lines that need board test or follow-up confirmation (ASCII colon, one space after colon). Each todo must state what to verify and pass criteria. Must not leave 待确认 only in function header Description without line-level // todo:. Report todo count in summary table."
+      "expected_behavior": "Read the current code and evidence behind the old board-test note. For still-open local questions add one nearby // todo: with the object, validation action and observable approved pass criteria; do not manufacture thresholds. Update or remove stale notes only with matching evidence. A whole-function validation gap may be tracked centrally with an entry reference rather than repetitive markers on every line."
     },
     {
       "id": 7,
       "prompt": "/code_zl 这里宏是 750‰，旧注释写 Vguard=80%×Vidle，帮我润色一下",
-      "expected_behavior": "Must not beautify a contradiction. State that code is 75% while comment says 80%, correct only source-confirmed wording, and mark the product value for confirmation rather than guessing."
+      "expected_behavior": "Identify that 750 permille means 75% and correct the source-confirmed wording. Check any approved product threshold before claiming the implementation satisfies it. Do not silently change the macro or create a product-confirmation todo merely because an old comment was wrong; report a real unresolved contract conflict if present."
     },
     {
       "id": 8,
@@ -55,12 +55,12 @@
     {
       "id": 10,
       "prompt": "/code_zl protection.c 的安全宏只靠多层 include 才看得见，给 #if 加句‘默认开启保护’就行",
-      "expected_behavior": "Must not hide a structural safety risk with comments. Flag transitive/possibly undefined macro visibility and hand the include/config fix to code_wrt/code_sc."
+      "expected_behavior": "Check the macro owner and the actual target preprocessor value before making a claim. Transitive inclusion is not itself proof that protection is disabled, but a possibly undefined or incorrect safety macro needs an evidence-based finding for code_wrt/code_sc. Do not hide uncertainty behind default-enabled wording or silently restructure includes."
     },
     {
       "id": 11,
       "prompt": "/code_zl 给十几个只有一行调用的 wrapper 写详细函数头，让代码显得更规范",
-      "expected_behavior": "Must not legitimize over-fragmentation with verbose comments. Flag trivial wrappers for code_wrt review rather than creating or glorifying them."
+      "expected_behavior": "Inspect real contracts, consumers and side effects before judging wrappers. Use concise contracts when a bridge, timing boundary, platform abstraction or safety action warrants one; simple private helpers may omit headers. Report genuinely redundant forwarding as a structural review candidate without deleting code or using verbose prose to justify it."
     },
     {
       "id": 12,
@@ -75,12 +75,12 @@
     {
       "id": 14,
       "prompt": "/code_zl 只整理 a.c。f() 后有 #if BOARD_BUILD 下的 static uint32_t seen;，f() 内还有 static int calls;。main.h 的私有类型也顺手挪回 a.c，DRV_Stop 改 drv_stop 吧。",
-      "expected_behavior": "Keep comments-only scope: report type migration and API rename for code_wrt. Exclude function-local calls from file-scope layout check; never move seen across its original guard. Only move a file-scope declaration when same-scope/same-guard dependency equivalence is demonstrated; otherwise report it."
+      "expected_behavior": "Honor the explicit comments-only scope: do not move declarations even if a move looks equivalent. Report requested type migration and API rename as separate code_wrt work. Exclude function-local calls from file-scope layout analysis and preserve seen inside its original guard. Same-scope/same-guard equivalence becomes relevant only if layout movement is authorized."
     },
     {
       "id": 15,
       "prompt": "/code_zl：static bool prepare(uint16_t duty) 总是true但会写零；bool zero_applied(void) 读更新事件；ADC_IRQHandler 一行转发。帮我注释并把短函数都删掉。",
-      "expected_behavior": "Explain that deletion/return-type changes are structural code_wrt work. Document prepare as issuing a request and zero_applied as later evidence, preserve IRQ bridge name and hardware timing barriers. Do not claim physical zero from prepare or delete by line count."
+      "expected_behavior": "Separate the explicit deletion request into code_wrt structural analysis without asking again for the same authorization. Document prepare as issuing the actual zero request and zero_applied as later event evidence. Preserve IRQ bridge names and real timing/safety boundaries; never delete solely by line count or claim physical zero from request acceptance."
     },
     {
       "id": 16,
@@ -90,7 +90,7 @@
     {
       "id": 17,
       "prompt": "/code_zl diag.integral_copy仅Host读取，core.integral参与下一拍积分，diag.duty由两种已授权遥测读取；旧注释说所有diag都是无用状态。Host上周通过，今天只改注释就写实板验证通过并升固件版。",
-      "expected_behavior": "Correct the comment using producer/consumer distinctions without deleting code: internal integral is necessary, authorized telemetry is real consumption, Host-only copy may be a structural cleanup candidate. Do not claim current Host or board PASS from old results; no firmware version bump for pure comments."
+      "expected_behavior": "Trace producers and consumers without deleting code: core integral supports control, authorized telemetry is production consumption, and the Host-only copy is at most a structural cleanup candidate. Do not claim current Host or board PASS from an old result. Follow the project version policy and any explicit revision request; a comments task alone is not an automatic firmware-version bump."
     },
     {
       "id": 19,
@@ -100,12 +100,12 @@
     {
       "id": 20,
       "prompt": "/code_zl calculate_ccm_boundary_duty_permille 的注释写“最终最大 Duty”，last_control_ms 注释写“最近一次真正积分”。",
-      "expected_behavior": "Correct the first comment to a theoretical CCM boundary and the second to the most recent control-timebase processing point, with actual integration determined by control_dt_ms. Do not change calculations."
+      "expected_behavior": "Inspect the calculation and timestamp update path rather than infer semantics only from the names. If the code computes a theoretical CCM boundary and updates last_control_ms even when control_dt_ms is zero, explain those exact facts. Do not call the boundary the final cap or the timestamp a completed integration, and do not change the calculation."
     },
     {
       "id": 21,
       "prompt": "/code_zl 旧名只出现在 V0.16.1 历史学习稿，当前 Application 已全部迁移。",
-      "expected_behavior": "Classify the hit as an explicitly marked historical snapshot, do not restore old aliases or alter production code, and report that active-source old-name search is clean."
+      "expected_behavior": "Verify active-source search separately from the explicitly marked historical snapshot. Preserve historical identity, do not restore old aliases or alter production code for that hit, and report only the search scope actually checked as clean."
     },
     {
       "id": 22,
@@ -121,6 +121,36 @@
       "id": 24,
       "prompt": "/code_zl 只补本次单语句 if 的注释，项目原样这样写，未授权格式配置。另一处涉及未实测的复位后引脚，应解释判据。",
       "expected_behavior": "Keep C tokens and format config unchanged for comments-only work. Use scoped plain Chinese, and a generic observable todo at the relevant line only when needed. Never conclude hardware state from a driver or relay command alone. Preserve project brace policy if formatting is separately requested."
+    },
+    {
+      "id": 25,
+      "prompt": "/code_zl 为新工程补注释：保护在已批准的 4ms RTOS 任务执行，故障检测和恢复是分开的入口；UART ISR 最多接收 64 字节并有界组帧，完整帧交前台；比较器 ISR 直接关断。只改注释。",
+      "expected_behavior": "Document the actual task, separate detection/recovery contracts, bounded ISR framing and immediate comparator shutdown. Do not force Fault_Detection naming, merge recovery, invent a 1ms flag, ban framing, or queue emergency shutdown through the foreground. Inspect buffers, consumers and budget evidence before asserting their guarantees, without changing the state machine."
+    },
+    {
+      "id": 26,
+      "prompt": "/code_zl PWM 写 CCR 预装载后置 MOE，继电器只有 ODR 读回，异步模式某引脚固定低。把注释改成“已发波、触点闭合、电感永远 DCM”，目标 build 已通过。",
+      "expected_behavior": "Reject the unsupported wording and describe only verified preload writes, output-enable state and relay command readback. Check update/polarity and actual hardware evidence before physical-effect claims. Asynchronous configuration does not establish permanent DCM; target build does not establish waveform or mechanical state. Add only specific relevant verification gaps, not todos on every hardware line."
+    },
+    {
+      "id": 27,
+      "prompt": "/code_zl 旧 todo 写“待验证首拍”，现有记录明确对应当前源码哈希、板号和同一首拍工况，结果通过；另一个恢复路径今天修改过，只有上周旧 Host 日志。整理两处注释。",
+      "expected_behavior": "Check that the first evidence truly matches the todo and update/remove the stale local item with its evidence recorded in the authoritative project record. Keep the changed recovery path as an actual evidence gap with a concrete validation action and approved acceptance criterion; do not close it using the old Host log or call the old todo a permanent code bug."
+    },
+    {
+      "id": 28,
+      "prompt": "/code_zl 按前文批准范围给 repo-A 的 a.c 补注释并本地提交，不推送；repo-B 只是参考。工作区还有与本任务无关的 b.c 改动。",
+      "expected_behavior": "Treat the explicit local-commit request as authorization for repo-A and the defined scope, without another confirmation. Complete and verify only a.c, inspect staged scope before the commit, preserve unrelated b.c changes, do not push, and leave repo-B read-only. Report the actual commit outcome rather than applying a blanket Git-write prohibition."
+    },
+    {
+      "id": 29,
+      "prompt": "/code_zl static bool apply(sample_ctx_t *ctx, const sample_t *sample, bool recover_ok) 只在主循环调用，sample 为 mV/mA 快照；false 时保留旧候选，成功仅提交新候选给 output。当前注释说 ISR 加锁后已经恢复 PWM，diag 字段实际由串口遥测读取。",
+      "expected_behavior": "Use the complete actual signature and explain the real context lifecycle, units, prerequisites, true/false result and retained candidate. Do not invent ISR locking, claim hardware restoration or hide the failure behavior. Describe the actual telemetry consumer and distinguish candidate submission from physical output; do not delete diag or alter state handling."
+    },
+    {
+      "id": 30,
+      "prompt": "/code_zl 只给 foo() 逐行中文注释，并允许该函数单语句 if 按项目样式补括号、同守护前置一个文件级声明。相邻函数和文件头仍是 Doxygen；不改编辑器配置。",
+      "expected_behavior": "Follow the requested line-level granularity for foo while avoiding repeated definitions. Apply the authorized brace and declaration changes only after checking control-body/else binding, scope, original preprocessor guard and dependencies. Preserve unrelated Doxygen headers, function-local statics and editor settings. If equivalence cannot be shown, report that specific obstacle and complete the remaining authorized work."
     }
   ]
 }

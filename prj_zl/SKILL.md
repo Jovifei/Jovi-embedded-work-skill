@@ -1,208 +1,93 @@
 ---
 name: prj_zl
-description: "Reorganize embedded C firmware (Keil MDK / G32F031 / IAP) into app/driver layers with inc/src split. Use when the user says prj_zl, 工程整理, 目录整理, 应用驱动分离, app driver 分层, Config Include Source 重组, or wants Application/Bootloader restructured to app/inc app/src driver/inc driver/src Project/MDK. Also use when renaming IAP_Application1 to IAP_Application or fixing Keil include paths after a folder move."
+description: "Reorganize embedded firmware files and Keil MDK project paths while preserving build membership, hardware settings and behavior. Use for prj_zl, 工程整理, 目录迁移, app/driver 文件归属, Config/Include/Source 重组, or approved IAP project renaming. Route business-state-machine changes to code_wrt; do not equate moving files with MCU decoupling."
 ---
 
-# Prj_ZL 嵌入式工程目录整理
+# Prj_ZL 工程目录与构建引用整理
 
-**Version: V0.1.0**
+**Version: V0.2.0**
 
-将 **Application / Bootloader**（及同类固件根目录）从厂商默认的 `Config/`、`Include/`、`Source/` 整理为 **应用层 app** 与 **驱动层 driver** 分离的标准结构。`.c` 放 `src/`，`.h` 放 `inc/`。Keil 工程路径同步更新。
+先确认本轮目标根目录、基线和允许的目录变化，再移动文件并更新实际构建引用。保持产品参数、代码语义、外部 ABI、目标选项与部署约定。已有清楚结构时优先局部整理，不强制重建目录。
 
-## 版本记录
+## 1. 执行边界
 
-- **V0.1.0**：首次发布。`app/inc`、`app/src`、`driver/inc`、`driver/src`、`Project/MDK` 标准结构；`git mv` 迁移；Keil IncludePath/FilePath/分组同步；`IAP_Application1` → `IAP_Application`；与 `code_zl` 配对（目录 vs 注释）。
+- 区分目录迁移、业务重构、BUG 修复和功能变化。本 skill 负责文件归属与构建路径；混合文件中需要拆函数、换接口或改调度时，作为明确的结构工作交给 `code_wrt`，不能藏在搬目录中。
+- 先读现有 AGENTS/CLAUDE、README、计划、目标工程与版本记录；以当前用户要求和已批准合同确定范围。已有授权覆盖的迁移、验证和提交继续执行，不重复请示。
+- 用户只指定 Application 时只改 Application 及为它完成迁移所必需的共同引用；不顺便迁移 Bootloader。发现另一目标受影响时说明事实及最小处理范围。
+- 保留用户已有未提交改动。不自动 reset/clean、覆盖文件、删除历史资料或重排无关代码。Git 提交/推送按用户已经给出的仓库与范围授权执行。
+- 以下路径是组织示例，不是所有项目必须采用的布局；当前 C300 的六任务、参数和库要求不是其他工程的默认值。
 
-与 `code_zl`（注释整理）配对：`prj_zl` 管目录与工程文件，`code_zl` 管注释。
+## 2. 建立文件与构建映射
 
-## 触发条件
+用 `rg --files`、`git ls-files` 列出目标根内源码、头文件、汇编、工程、链接配置、脚本和依赖。记录每个活动目标的源文件成员、包含路径、宏、器件、输出名及前后构建步骤。
 
-- `/prj_zl` 或用户说：**工程整理、目录整理、应用驱动分离、app/driver 分层**
-- 用户提供 `Application`、`Bootloader` 或类似路径要求重组
-- Keil 工程仍指向旧 `Config/Include`、`Source/` 路径
+至少形成：
 
-## 使用方式
+| 旧路径 | 新路径/保持 | 实际职责 | 所属 target | 引用位置 | 迁移验证 |
+|---|---|---|---|---|---|
+| 待定文件 | 先据源码分类 | 应用/驱动/启动/共享 | 明确工程与目标 | XML/include/脚本/文档 | 存在/同一成员/待构建 |
 
-```bash
-/prj_zl                          # 整理当前仓库 Application + Bootloader
-/prj_zl Application Bootloader   # 指定根目录
-/prj_zl Application             # 只整理 Application
-```
+区分活动源码、SDK、生成文件、历史备份和测试替身。不能仅按文件名或旧目录猜归属；混合职责无法靠移动解决时保留并记录后续拆分。
 
-## 目标目录结构（标准模板）
+## 3. 归属与目录建议
 
-每个固件根目录（如 `Application/`、`Bootloader/`）应变为：
+| 位置 | 可放内容 | 注意事项 |
+|---|---|---|
+| `app/inc`、`app/src` | 业务公共接口、main 编排、充电/保护/交互等产品逻辑 | 产品阈值与业务状态归实际 Owner，不塞进万能 main.h |
+| `driver/inc`、`driver/src` | 外设访问、板级引脚/通道、ADC/PWM/CMP/GPIO/UART/WDT/时基 | 硬件配置不能因名字含 app 就留在应用层 |
+| 现有 startup/CMSIS/板级位置 | 向量、system/时钟、设备初始化 | 保留供应商约定与链接归属，不因目录美观移动 system/startup |
+| `Shared` 或既有共享处 | APP/BL 真正共用的分区、记录格式、CRC 等 | 不在两工程重新复制常量，也不汇集杂散业务全局量 |
+| 现有 `Project/MDK` | `.uvprojx`、`.uvoptx`、链接配置及必要构建入口 | 保留现有正确位置，不强制所有启动文件都移到此处 |
+| 现有 docs、tests、产物目录 | 文档、主机替身、可追溯构建结果 | 测试替身不得被目标固件编译；历史产物不冒充本版 |
 
-```
-<FirmwareRoot>/
-├─ app/
-│  ├─ inc/      业务公共头、应用参数、运行时接口
-│  └─ src/      业务模块、main、ISR 桥接、system_*.c
-├─ driver/
-│  ├─ inc/      BSP/外设驱动头、板级与设备配置头
-│  └─ src/      BSP/外设驱动实现、设备配置实现
-└─ Project/
-   └─ MDK/      startup_*.s、*.uvprojx、*.uvoptx（编译产物不跟踪）
-```
+IRQ 入口可能受供应商文件或 startup 合同约束。可以保留薄入口，具体外设处理归驱动；上报事件或快照在前台消费。普通应用命令走驱动接口。文件移动后应用仍直接读寄存器时，只能报告“目录迁移完成，硬件隔离未完成”。
 
-### Application 参考实例（mppt-charger-300w）
+## 4. 执行迁移
 
-```
-Application/
-├─ app/
-│  ├─ inc/   main.h, g32f031_int.h, app_hw_config.h
-│  └─ src/   main.c, g32f031_int.c, system_g32f031.c
-├─ driver/
-│  ├─ inc/   bsp_*.h, g32f031_device_cfg.h
-│  └─ src/   bsp_*.c, g32f031_device_cfg.c
-└─ Project/MDK/
-```
+1. 在已明确的映射下创建必要目录。已跟踪文件优先 `git mv`，新增/未跟踪文件使用适合其状态的移动方式；记录改动，保留原有用户内容。
+2. 同步 `.uvprojx/.uvoptx` 的受影响引用，以及实际链接、构建后处理、烧录/OTA 脚本、CI 和相关文档。只改指定目录但忽略它的真实构建消费者不算完成。
+3. 裸文件名 `#include "x.h"` 能继续正确解析时保持；相对路径或大小写必须修改才能等价解析时，做最小修正并记录。不得坚持“不改 include”而留下失效引用，也不得借机改条件编译或宏语义。
+4. 保持目标的源文件成员、文件级编译选项、宏、器件、链接区域、库版本及优先级。替换路径时按路径组成处理，不能全局把 Source/Include 字符串替换到 SDK 或无关目标。
+5. 只有确认目录为空且所有活动引用已处理后才移除旧空目录；历史路径与 SDK 的合法命中记录为允许残留，不为达到零搜索结果删除资料。
 
-### Bootloader 参考实例
+## 5. Keil 路径和命名
 
-```
-Bootloader/
-├─ app/
-│  ├─ inc/   main.h, g32f031_int.h, boot_flash.h
-│  └─ src/   main.c, g32f031_int.c, system_g32f031.c, boot_flash.c
-├─ driver/
-│  ├─ inc/   g32f031_device_cfg.h, g32f031_usart_cfg.h
-│  └─ src/   g32f031_device_cfg.c, g32f031_usart_cfg.c
-└─ Project/MDK/
-```
+修改前读 [Keil 路径与构建核对](references/keil-paths.md)。对每个受影响 target 分别核对 FilePath、IncludePath、ScatterFile、文件级选项、输出名、前后构建和下载脚本；保留 `.uvoptx` 的调试设置。
 
-## 文件归属规则
+- 项目文件中的相对路径按对应项目/工具实际基准解析，不按仓库根臆测；动态路径、设备包和外部依赖单列。
+- `IAP_Application1` 可能承载发布或烧录约定。仅在用户要求或本轮明确包含重命名时修改，不能假定数字 1 一定无意义。
+- 改工程文件名、TargetName、OutputName 是不同操作。需要改变哪些就改哪些，同步实际消费者；不能假定 AfterMake 的所有写法都会自动跟随。
+- 厂商 SDK/闭源 `.lib` 是构建依赖，不默认把整个 Libraries 加入忽略。保留现有可复现获取方式、版本/哈希和许可证要求。
+- `.gitignore` 只按实际规则补本地产物。用户已版本化的发布镜像、烧录资源、工具和有意跟踪的配置不能擅自停止跟踪。`.uvoptx` 是否纳入版本管理沿用项目约定。
 
-| 层级 | 放什么 | 识别特征 |
-|------|--------|----------|
-| **app/inc** | 应用入口头、ISR 头、应用级硬件参数/常量 | `main.h`、`g32f031_int.h`、`app_hw_config.h`、业务模块对外 `.h` |
-| **app/src** | 入口、ISR 实现、CMSIS system、Bootloader 业务逻辑 | `main.c`、`g32f031_int.c`、`system_*.c`、`boot_flash.c` |
-| **driver/inc** | BSP 驱动头、`*_device_cfg.h`、`*_usart_cfg.h` 等板级契约 | `bsp_*.h`、`g32f031_device_cfg.h` |
-| **driver/src** | BSP 驱动 `.c`、设备/外设配置 `.c` | `bsp_*.c`、`g32f031_device_cfg.c` |
-| **Project/MDK** | Keil 工程、startup 汇编 | 已在 `Project/MDK/` 的不动；旧路径的 startup 移入此处 |
+## 6. 验证
 
-**归类原则**：能抽象成「换板子还要改」的进 **driver**；产品逻辑、入口、OTA 状态机进 **app**。拿不准时优先 driver（BSP 边界更清晰）。
+按本轮风险完成以下检查；缺工具或依赖时区分缺失原因，不据此宣称代码逻辑有 BUG。
 
-**旧目录 → 新目录映射**：
+1. 检查 `git diff --check` 和变更范围，核对旧→新映射，确认无覆盖和漏移。
+2. 解析项目 XML，核对每 target 的成员、宏、关键选项和链接范围前后等价；检查重复编译、大小写、失效 include、误加测试替身和遗漏回调/IRQ 实现。
+3. 对迁移后的项目使用本技能的只读路径检查器：
 
-| 旧路径 | 新路径 |
-|--------|--------|
-| `<Root>/Include/*.h` | `app/inc/`（应用头）或 `driver/inc/`（驱动头，按上表） |
-| `<Root>/Source/*.c` | `app/src/` 或 `driver/src/` |
-| `<Root>/Config/Include/*.h` | 多为 `driver/inc/`；`app_hw_config.h` → `app/inc/` |
-| `<Root>/Config/Source/*.c` | 多为 `driver/src/` |
+   ```bash
+   python3 <skill-dir>/scripts/check_keil_paths.py Application/Project/MDK/app.uvprojx
+   ```
 
-## 执行流程
+   退出 0 仅表示检查到的字面路径通过；退出 2 表示路径/解析问题；退出 3 表示动态或当前主机不可解析的路径需要人工核对。输出不是目标编译结果，也不证明启动向量或业务功能正确。
+4. 在可用的匹配工具链进行本版全量构建。没有 Keil/依赖时仍完成静态核对，记录 `BUILD_NOT_RUN/BLOCKED` 和复现命令，不拿旧 map/旧镜像代替。
+5. 若涉及调用链、硬件访问、复位/启动或部署变化，交叉应用 `code_sc/code_wrt` 的适用检查，并列清所需板测；纯目录移动不擅自增加业务改动。
+6. 同步目录说明、构建入口、版本/变更记录和受影响的学习资料，已授权工作完成后继续交付。
 
-### 1. 调研（必做）
+## 7. 输出
 
-1. `Glob` / `git ls-files` 列出目标根目录下所有 `.c/.h/.s` 及 Keil 工程
-2. 按「文件归属规则」列清单：**旧路径 → 新路径**
-3. 确认 Keil 工程文件路径（常见 `Project/MDK/*.uvprojx`）
-4. **禁止**未读清单就批量移动
+报告实际目标身份、文件映射和范围、已保留的构建合同、修改的引用、每项验证结果、未执行项及原因。明确区分：
 
-### 2. 创建目录并 git mv
+- 文件与路径迁移是否完成。
+- 应用/驱动职责与硬件隔离是否真正完成。
+- 本版目标构建是否执行。
+- 实板或部署行为是否执行验证。
 
-```bash
-# 对每个 <Root>（Application、Bootloader）
-mkdir -p <Root>/app/inc <Root>/app/src <Root>/driver/inc <Root>/driver/src
-git mv <old> <new>   # 逐个移动，保留历史
-```
+不把“新目录已经存在”“搜索不到旧路径”“XML 能解析”写成整个重构已验收。
 
-- 用 **`git mv`**，不要裸 `mv`
-- **不修改** `#include "xxx.h"` 内容（裸文件名 + Keil IncludePath 即可）
-- 移动后删除空的 `Config/`、`Include/`、`Source/`
+## 本版变化
 
-### 3. 更新 Keil 工程（每个 .uvprojx + .uvoptx）
-
-**Include 路径**（相对 `Project/MDK/`）：
-
-```
-..\..\app\inc;..\..\driver\inc;..\..\..\Libraries\CMSIS\Include;...
-```
-
-移除旧项：`..\..\Include`、`..\..\Config\Include`
-
-**源文件 FilePath**：
-
-| 旧 | 新 |
-|----|-----|
-| `..\..\Source\main.c` | `..\..\app\src\main.c` |
-| `..\..\Source\system_*.c` | `..\..\app\src\system_*.c` |
-| `..\..\Config\Source\bsp_*.c` | `..\..\driver\src\bsp_*.c` |
-| `..\..\Config\Source\g32f031_device_cfg.c` | `..\..\driver\src\g32f031_device_cfg.c` |
-
-**分组 GroupName**：`Config` → `driver`，`Application` → `app`
-
-**`.uvoptx`** 中 `PathWithFileName` 与 `.uvprojx` 保持一致。
-
-### 4. Keil 工程命名规范
-
-| 问题 | 处理 |
-|------|------|
-| `IAP_Application1` | 改为 **`IAP_Application`**（与 `IAP_Bootloader` 对称；`1` 多为 Keil 重名后缀） |
-| 重命名 | `git mv IAP_Application1.uvprojx IAP_Application.uvprojx`，同步 `.uvoptx` |
-| OutputName | `<OutputName>IAP_Application</OutputName>` |
-| 编译产物 | `IAP_Application.axf` / `.bin`（AfterMake `@L.bin` 自动跟随） |
-
-### 5. .gitignore（若仓库尚未配置）
-
-```
-<FirmwareRoot>/Project/MDK/Objects/
-<FirmwareRoot>/Project/MDK/Listings/
-<FirmwareRoot>/Project/MDK/*.bin
-<FirmwareRoot>/Project/MDK/*.hex
-<FirmwareRoot>/Project/MDK/*.axf
-*.uvguix*
-```
-
-Keil **配置**仍跟踪：`*.uvprojx`、`*.uvoptx`、`startup_*.s`
-
-**保存格式（Ctrl+S）**：与 `code_zl` 共用根目录 `.clang-format`，见 `code_zl` 技能 `references/clang-format`。
-
-### 6. 验证
-
-```bash
-git status --short
-git ls-files <Root>          # 确认新路径已跟踪
-git check-ignore -v <Root>/Project/MDK/Objects/...   # 编译产物已忽略
-```
-
-在 Keil 中 Rebuild。Grep 确认无残留：`Config/Include`、`Config/Source`、`/Include/`、`/Source/`（工程 XML 与源码路径）
-
-## 约束
-
-- **不修改代码逻辑**，仅移动文件 + 更新工程路径/分组/命名
-- **禁止**擅自 `git commit/push`（除非用户明确要求）
-- **Libraries/** 厂商库：通常整目录 `.gitignore`，不在 `prj_zl` 移动范围内
-- 多 Target / 多工程时，**每个** `.uvprojx`/`.uvoptx` 都要改
-- Windows 路径在 Git/Keil XML 中用 `\` 或 `/` 均可，与工程内现有风格一致
-
-## 完成后报告
-
-```markdown
-## prj_zl 整理报告
-
-| 根目录 | app/inc | app/src | driver/inc | driver/src |
-|--------|---------|---------|------------|------------|
-| Application | N | N | N | N |
-
-- Keil 工程：<路径列表>
-- 工程重命名：<有/无>
-- 待用户在 Keil Rebuild 确认
-```
-
-## 常见问题
-
-**Q: 移动后编译找不到头文件？**  
-A: 检查 `IncludePath` 是否含 `..\..\app\inc;..\..\driver\inc`，且顺序在 Libraries 之前无硬性要求但路径必须存在。
-
-**Q: 需要改 #include 路径吗？**  
-A: 一般不需要。保持 `#include "bsp_adc.h"`，靠 Keil IncludePath 解析。
-
-**Q: startup_*.s 放哪？**  
-A: 保持在 `Project/MDK/`，已在工程中引用 `./startup_*.s` 的不移动。
-
-## 延伸阅读
-
-- 详细 Keil XML 字段说明见 [references/keil-paths.md](references/keil-paths.md)
+V0.2.0：按职责和现有布局迁移；取消自动工程重命名、禁止改 include 和默认忽略 Libraries 的误导规则；明确事件上行/命令下行、硬件隔离、当前证据、部署消费者；增加只读路径检查器与相应场景。详细硬件数值仍由具体工程合同提供。

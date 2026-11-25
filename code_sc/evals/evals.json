@@ -1,6 +1,6 @@
 {
   "skill_name": "code_sc",
-  "version": "V0.3.3",
+  "version": "V0.3.4",
   "evals": [
     {
       "id": 31,
@@ -10,37 +10,37 @@
     {
       "id": 1,
       "prompt": "/code_sc 审查这个 MPPT 工程，为什么 mppt_controller 里面有 charge_stage_ctx？",
-      "expected_behavior": "Must classify this as an architecture/design defect rather than a style issue, identify Ownership Inversion and Boundary Violation, build an Owner table, trace bidirectional coupling, and explain concrete behavior risks such as two modules interpreting the same relay/session state differently."
+      "expected_behavior": "First establish whether the controller is an independent algorithm, the approved charge coordinator, or a vendor ABI structure. Trace state writers, lifecycle ownership and bidirectional semantic dependencies. Report an architecture defect only when actual responsibility conflicts or excess private coupling are evidenced, with a minimal remedy and consequence-based severity. Do not force a separate algorithm layer merely because charge state and original library calls share the C300 charge owner."
     },
     {
       "id": 2,
       "prompt": "/code_sc 检查 app/ 和 driver/ 已经分层的工程，看看 Application 内部还有没有架构问题",
-      "expected_behavior": "Must not stop at directory layout. It must inspect include/call directions, SCC/cycles, peer-to-peer mutation, hidden dependencies, state ownership, single-writer hardware ownership, debug reverse dependencies, driver-to-application reverse includes, and internal layering across orchestration/policy/algorithm/safety/executor/observability."
+      "expected_behavior": "Inspect include/call/write/callback directions, SCC, peer mutation, hidden dependencies, lifecycle and actual ownership beyond directory names. Separate logical responsibilities from file count, normal power commits from immediate ISR hard-trip, and neutral upward callbacks from driver dependence on application-private state. Do not require orchestration/policy/algorithm/safety/executor to be separate modules."
     },
     {
       "id": 3,
       "prompt": "/code_sc 算法接口现在直接收 app_sample_t*、battery_profile*、protection*，这样可以吗？",
-      "expected_behavior": "Must flag Fat Interface / Overexposed Context, inspect which fields are actually consumed, recommend a narrow scalar/DTO contract with units, and keep charge stage/fault/relay/profile semantics out of the algorithm unless they are truly part of its domain."
+      "expected_behavior": "Inspect consumed fields, mutability, ownership, coherent-snapshot needs and ABI before judging Fat Interface. Recommend a narrow scalar/DTO only where excess private coupling is established; an existing read-only coherent snapshot or fixed vendor interface may be valid. Preserve units and approved library layouts rather than automatically replacing them."
     },
     {
       "id": 4,
       "prompt": "/code_sc output_step 已经传 hw snapshot 了，但函数里又 DRV_PWM_IsOutputEnabled()，审查一下",
-      "expected_behavior": "Must identify Hidden Dependency and Mixed Snapshot risk, distinguish intentional final safety recheck from an impure policy function, and recommend moving last-moment hardware verification into the executor/safety-commit layer if that is the intended behavior."
+      "expected_behavior": "Trace the second read and its consumers. Distinguish accidental hidden or mixed-generation input from an intentional last-moment execution safety recheck. Keep the recheck in the existing execution responsibility with explicit invalidation semantics; do not require a new executor file merely to express this logical boundary."
     },
     {
       "id": 5,
       "prompt": "/code_sc 检查 PWM、Relay、保护、中断和恢复是否有竞争或多 Owner",
-      "expected_behavior": "Must inspect hardware single-writer ownership, ISR/main races, Break/COMP behavior, fault epoch recheck, relay debounce/session semantics, shadow/preload duty meaning, STOP/recovery ordering, and report P0/P1 findings before readability issues. It must also build at least one safety-edge timeline rather than only inspect steady-state code."
+      "expected_behavior": "Inspect normal power-write ownership, allowed immediate hardware/driver ISR hard-trip, ISR/main races, fault epoch, relay/session meaning, shadow/preload semantics and STOP/recovery ordering. Build an actual safety-edge timeline. Report evidenced high-impact findings first, but derive severity from reachable consequences and do not make emergency shutdown wait for foreground output."
     },
     {
       "id": 6,
       "prompt": "/code_sc 只看看代码风格，顺便帮我直接改掉",
-      "expected_behavior": "The prompt explicitly authorizes the style fix. State the bounded findings, route comment/format work to code_zl and structural changes to code_wrt as applicable, then continue within that authorization without asking again. A pure review request without the fix instruction would remain read-only."
+      "expected_behavior": "The prompt explicitly authorizes bounded style fixes. State relevant findings, use available code_zl/code_wrt guidance if useful, then continue within existing authorization without another approval. Do not require another skill to be installed. A pure review request remains read-only and style permission does not authorize product behavior changes."
     },
     {
       "id": 7,
       "prompt": "/code_sc PWM 从 WAIT_ZERO 切到 ACTIVE 的这一拍，pwm_supervise_comp2() 先看到 MOE=0 清掉 seen_high，随后 pwm_apply() 才 Arm 并写非零 Duty；下一次 1ms task 才 MarkOutputHigh。这样安全吗？",
-      "expected_behavior": "Must build an ordered first-cycle timeline, identify a protection-window gap if COMP2 ISR requires seen_high/armed before it reacts, estimate the exposure in task/PWM-cycle terms when possible, classify as Safety-edge Window P1 or P0 depending consequence, and recommend moving live-window arming into the PWM executor/driver transaction before the first hazardous pulse."
+      "expected_behavior": "Build an ordered first-cycle timeline and check the actual ISR guard, hardware latch and any independent protection. Confirm a gap only where a reachable hazardous pulse can escape required protection, then grade its demonstrated consequence. Recommend establishing the required live window within the existing PWM execution transaction; do not automatically assign P0/P1 from ordering alone."
     },
     {
       "id": 8,
@@ -50,22 +50,22 @@
     {
       "id": 9,
       "prompt": "/code_sc 一拍里 protection_service_runtime() 跑了两次，第二次只更新 protection_fault 和 epoch，但 fault_mask/disposition 还是第一次的值",
-      "expected_behavior": "Must classify this as Mixed Snapshot / Generation Mismatch, require a same-generation safety snapshot containing epoch/mask/disposition/pending, and state that after a second protection evaluation the whole decision bundle must be refreshed before charge/output consumes it."
+      "expected_behavior": "Trace consumers of the changed and old fields and identify mixed-generation decisions where they are combined. Require a coherent decision bundle after the second evaluation, using a complete refresh or an equivalent atomic/versioned contract. Do not mandate a particular new struct, and grade the actual effect of stale mask/disposition rather than the pattern name."
     },
     {
       "id": 10,
       "prompt": "/code_sc STOP 时外层先 mppt_reset，RUN->OFF transition 里又 reset，stop wrapper 最后又 reset；reset 是幂等的所以应该没问题吧？",
-      "expected_behavior": "Must not accept idempotence as proof of good ownership. It must identify Lifecycle Multi-Owner, locate the single transition owner that should perform reset exactly once, and explain that duplicated lifecycle effects create future non-idempotent regression risk and confuse session semantics."
+      "expected_behavior": "Do not accept idempotence as evidence of correct ownership. Trace whether separate callers independently interpret the same session end; consolidate that decision under a defined lifecycle owner if confirmed. Distinguish unnecessary repeated reset from intentional retry, emergency stop/archive separation or different temporal barriers. Avoid automatic P1 or a universal exactly-one-call rule."
     },
     {
       "id": 11,
       "prompt": "/code_sc app_charge_try_start() 在非 OFF 状态调用 start() 什么都不做，但前置保护条件通过后仍 return true",
-      "expected_behavior": "Must identify an API Truthfulness Bug, distinguish precondition-passed from transition-happened/command-accepted/already-running semantics, and require the return contract to match the actual state change."
+      "expected_behavior": "Inspect the return contract and callers before declaring a bug. True for a newly completed transition must reflect a real transition; true for an already-satisfied target state or accepted request may be valid. Missing contract is a concrete evidence gap, while precondition-only success that violates the established caller contract is an API truthfulness bug."
     },
     {
       "id": 12,
       "prompt": "/code_sc Application 已经传 power_limit_mw，但 mppt_algorithm 里又硬编码 300000、PV*8000、BAT*6000 做 envelope，数值现在一样",
-      "expected_behavior": "Must flag Multiple Sources of Truth even if values currently match, search duplicated formulas/constants, distinguish policy owner from independent absolute safety validator, and explain regression when one product limit changes without the other."
+      "expected_behavior": "Trace duplicated formulas and distinguish one product-policy source from independent absolute safety validation. Matching values do not establish equivalent ownership. Explain how a one-sided limit change can diverge; if the behavior belongs to a retained vendor library, verify supported parameters and ABI rather than demanding private-field edits or library replacement."
     },
     {
       "id": 13,
@@ -75,12 +75,12 @@
     {
       "id": 14,
       "prompt": "/code_sc include 图没环了，是不是依赖就干净了？drv_comp.c 还 include main.h，sample.c 为了日志直接读 charge/output/protection",
-      "expected_behavior": "Must reject include-only PASS, detect driver-to-application reverse dependency and observability leakage, inspect call/write edges in addition to includes, and require debug/telemetry to consume read-only snapshots rather than measurement/driver layers pulling higher-level state."
+      "expected_behavior": "Do not accept an include-only PASS. Inspect the symbols actually imported from main.h, and call/write/callback edges; show application-private dependency or owner leakage rather than inferring it from a filename alone. Measurement pulling charge/output/protection solely for telemetry should be reviewed against sample ownership, with diagnostics consuming defined snapshots."
     },
     {
       "id": 15,
       "prompt": "/code_sc 全面复核，现有 host tests 全 PASS，可以直接说没问题了吗？",
-      "expected_behavior": "Must not conclude PASS from unit tests alone. It must enforce the completion gate: Owner table, SCC/reverse edges, actuator writer table, safety-edge timeline, ISR guard/TOCTOU analysis, snapshot-generation check, lifecycle side-effect table, producer-consumer reachability, duplicated product-limit search, and clearly separate source/static/Keil/board validation levels."
+      "expected_behavior": "Do not conclude overall PASS from Host tests. Cover applicable owners, dependency/write edges, normal versus emergency power writers, safety timelines, ISR guards, coherent snapshots, lifecycle, reachability, product constraints, sampling/time/WDT and config/protocol/deployment contracts. Separate source, analyzer, current target build and scoped board results, with failed/not-run/blocked items explicit."
     },
     {
       "id": 16,
@@ -90,32 +90,32 @@
     {
       "id": 17,
       "prompt": "/code_sc 两个分支各自 PASS，merge 后 old public header 和新 private header 同时存在，CI 还没跑",
-      "expected_behavior": "Must treat merge as new code, detect resurrected/zombie public contracts, check API consumers/project membership, and require post-merge tests rather than inheriting parent PASS."
+      "expected_behavior": "Treat merge contents as new code. Determine whether resurrected public and private contracts are required compatibility surfaces or stale/conflicting owners by tracing declarations, implementations, callers and project membership. Check applicable post-merge evidence rather than inheriting parent PASS or declaring every retained old header a defect."
     },
     {
       "id": 18,
       "prompt": "/code_sc protection.c 里 #if(APP_COMP2_FAULT_ENABLE) 但该宏没有直接包含，output.c 通过另一个头定义了 1",
-      "expected_behavior": "Must inspect preprocessing semantics and flag a safety-critical silent-disable risk if the macro can be undefined in that translation unit. Require unique owner, direct include/shared config, and definedness guard."
+      "expected_behavior": "Inspect the actual protection translation unit, include contract and target defines; output.c having a macro does not define it in another unit. An undefined #if macro evaluates as zero, but prove whether it is actually undefined and which reachable protection is disabled. Recommend clear ownership and reliable inclusion/definition checks subject to existing authorization; missing direct include alone is not P1."
     },
     {
       "id": 19,
       "prompt": "/code_sc NVIC_EnableIRQ(USART_IRQn) 已经调用，startup 里有 weak USART_IRQHandler，但工程没有强实现",
-      "expected_behavior": "Must classify this as an interrupt completeness/runtime hang defect: first IRQ can land in Default_Handler. Trace enable -> vector -> strong handler -> driver handler -> consumer and mark P1 unless intentionally disabled."
+      "expected_behavior": "Trace the current linked vector/handler, including aliases or assembly, and peripheral/NVIC enable and reachability. If it really enters Default_Handler on a possible IRQ, report the resulting runtime failure with severity based on the affected function and recovery; do not assign fixed P1 solely from a weak declaration."
     },
     {
       "id": 20,
       "prompt": "/code_sc ADC stale 让 PWM 停到0，MPPT 内部仍保留 600‰；样本恢复后第一次重新 Arm 直接写 600‰",
-      "expected_behavior": "Must build the re-arm timeline and flag stale-command/duty jump. Recommend an executor-owned first-duty cap/rebuild ramp; preserving algorithm memory does not justify physical 0->large-duty step."
+      "expected_behavior": "Build the re-arm timeline and distinguish retained algorithm state, candidate identity, driver setting and physical output. Check the actual approved first-duty/recovery constraints, polarity and stale-command exposure. Where violated, fix the existing execution lifecycle and evaluate candidate-to-hardware dynamics; do not impose a universal ramp or silently change closed-loop behavior without a demonstrated requirement."
     },
     {
       "id": 21,
       "prompt": "/code_sc 新增 power_inhibited() 但 charge/output/restart 都没调用它，这个函数以后会用",
-      "expected_behavior": "Must classify this as an orphan/Zombie Safety Gate and build a veto reachability matrix across every hazardous admission/commit/restart path."
+      "expected_behavior": "Build a veto reachability matrix across actual hazardous start/commit/restart/relay paths and check equivalent existing gates. A new unused declaration does not establish protection coverage; classify it as an unimplemented approved requirement, dead contract or evidence gap as applicable. Claim a runtime safety bug and severity only when the required veto and reachable consequence are established."
     },
     {
       "id": 22,
       "prompt": "/code_sc 看门狗 MAIN+CONTROL+ADC 三票一直正常，1ms 任务里有 sqrtf，tick 只是一个 bool flag，所以长期运行肯定没问题",
-      "expected_behavior": "Must distinguish liveness from real-time deadlines, analyze tick coalescing and Cortex-M0/M0+ software-float WCET, and require timing/missed-tick evidence rather than accepting watchdog health as deadline proof."
+      "expected_behavior": "Distinguish progress/liveness from deadline compliance. Check target FPU/toolchain, tick-coalescing semantics, sqrtf cost and current timing evidence; do not assume a specific MCU or prove failure from the function name. WDT tickets must represent fresh critical producer/control progress with bounded maintenance exemptions, and no stopped time source may certify itself healthy."
     },
     {
       "id": 23,
@@ -125,12 +125,12 @@
     {
       "id": 24,
       "prompt": "/code_sc 为了少文件，把很多配置通过 main.h 传递给各模块；include 图没环，算干净吗",
-      "expected_behavior": "Must reject include-count-only cleanliness. Check true ownership and Include-What-You-Use; transitive main.h aggregation is a hidden dependency even without SCC, especially for safety config."
+      "expected_behavior": "Review actual owner, public/private contract and reliable symbol visibility rather than count headers or SCC alone. Main.h aggregation can create ownership and maintenance problems even without a cycle, but missing a direct include alone is not a runtime P1. Prefer existing-owner placement and stable contracts over mandatory extra configuration headers."
     },
     {
       "id": 25,
       "prompt": "/code_sc Keil 工程把 G13 新模块和 MPPT 新模块都编进去了，但 G13 还调用旧的 app_mppt_out/app_charge_lock_startup 接口",
-      "expected_behavior": "Must identify a merge integration contract break by comparing public declarations, implementations, callers, and project membership. Compile/link compatibility of every target file is part of architecture review."
+      "expected_behavior": "Compare current declarations, definitions, callers, compatibility mappings and all target members. Establish whether old API consumers remain valid or have a concrete merge integration break; do not assume every old symbol is invalid. Current compile/link evidence and behavior contracts must cover the exact merged content."
     },
     {
       "id": 26,
@@ -140,7 +140,7 @@
     {
       "id": 27,
       "prompt": "/code_sc core.integral用于回算，last_seq防止重复积分，cached_duty在重复样本时按收紧cap重限；diag.integral_copy仅Host读，diag.limit_mw被两种授权路测帧消费，unused_counter只写。均无外部控制调用。只出审查结论。",
-      "expected_behavior": "Stay read-only. Produce file-level producer/consumer evidence and classify internal control state, authorized telemetry, Host-only mirror, and write-only counter separately. Recommend removing or migrating only proven redundant surfaces; preserve seq/cache/relimit and both telemetry modes. Public test-only leakage is structural P2 when ownership/API cost exists, not automatically P3."
+      "expected_behavior": "Stay read-only and provide source-level producer/consumer evidence. Separate internal control state, authorized telemetry, Host-only mirror and write-only counter. Preserve seq/cache/relimit behavior and both required telemetry modes; remove only proven redundant surfaces. Report structural/API leakage separately from style and assign severity from demonstrated impact rather than automatic P2."
     },
     {
       "id": 28,
@@ -150,7 +150,7 @@
     {
       "id": 29,
       "prompt": "/code_sc 全面验收：main.h泄露算法私有enum，模块自有大小写混杂，三处重复复制同一策略；Keil当前能编译，Host只有旧SHA绿，当前CI后续skipped，debug函数头Name用(...)。",
-      "expected_behavior": "Report confirmed structure P2 separately from local naming/comment style P3, with file/line evidence and actual source identity. Do not reduce review to protection or accept build as architecture PASS; current tests skipped/old SHA are unresolved. Flag incomplete/mixed function-header contracts and no board evidence."
+      "expected_behavior": "Report confirmed ownership/private-contract and duplicated-rule issues separately from naming/comment drift, with actual file/line and current content identity. Grade by evidenced impact rather than fixed P2/P3 labels. Build success is not architecture or board PASS; old SHA Host results and skipped current jobs are unresolved evidence, not automatically code bugs."
     },
     {
       "id": 30,
@@ -171,6 +171,31 @@
       "id": 34,
       "prompt": "/code_sc 当前工单只改接收字段单位。报告声称两个一行的模式入口已分层，实际 shared(mode) 持模式状态；Host shadow 不同就置 inhibit，且解码时拒收协议允许但超过板卡执行上限的值。",
       "expected_behavior": "Trace actual owners and state writers and show where shadow becomes a production veto. Check receiver behavior against the wire contract and keep board limit at the existing executor. Separate findings from authorized remediation scope and distinguish confirmed code behavior from unverified physical effects."
+    },
+    {
+      "id": 35,
+      "prompt": "/code_sc 原 C300 是300W/10A/CC6A，保留 HT32_Mppt_Solar 原库，charge 统一调用和复位，六类业务职责。参考B是165W/7A/CC5A。当前版把B搜索算法及参数搬入，增加四层MPPT包装，报告称只是结构整理。请只审查。",
+      "expected_behavior": "Remain read-only. Record distinct original/reference/current identities and compare against the approved C300 preservation contract. Separate structural migration from library/parameter and closed-loop behavior changes. Preserve original library ABI and charge ownership, reject unjustified wrapper proliferation without requiring exactly six files, and grade only evidenced functional effects rather than architectural shape."
+    },
+    {
+      "id": 36,
+      "prompt": "/code_sc 正常PWM和功率继电器都由output调用驱动；比较器ISR直接关MOE并累积事件，前台protection归档。LED由mmi调用GPIO。审核要求所有写硬件先排队到output，所有下行命令必须走ISR。",
+      "expected_behavior": "Reject the proposed blanket rule. Preserve immediate hardware/driver ISR emergency shutdown and foreground normal power ownership; do not delay hard-trip or run a complete output state machine in ISR. Distinguish upward hardware events from ordinary downward driver calls, allow non-power GPIO under its owner, and still inspect race-safe recovery and stale-command vetoes."
+    },
+    {
+      "id": 37,
+      "prompt": "/code_sc sample复采替换电流但仍用旧power/max，重复seq把captured_at更新为now；校准每次sample_task都跑。漏20ms服务时charge_time只加1，稳定条件补循环20次，main还在转就喂WDT。",
+      "expected_behavior": "Trace snapshot/window/calibration and derived-power provenance, reject rebranding old samples as fresh, and keep calibration in explicit startup/recovery flows. Separate elapsed-time timers from counts of new valid samples; define bounded integration/missing-sample behavior without fabricated ADC samples. Check producer/control progress and a non-self-certifying watchdog window, and distinguish static/Host findings from target timing evidence."
+    },
+    {
+      "id": 38,
+      "prompt": "/code_sc 新平台先改运行态，Flash失败仍返回成功并清dirty；APP外长和BL内层block_len各自小于上限却不核对关系。新BL冷启动要有效完成记录，工厂只烧APP/BL，只有OTA成功记录。",
+      "expected_behavior": "Review atomic configuration publication/rollback and persistence failure truthfulness, including dirty/index/saved-value retention. Validate actual outer/inner/offset/received-length relationships and APP/BL shared formats. Trace required completion metadata through factory first install, old/new compatibility and downgrade; OTA success alone cannot pass deployment. Use actual format and source/tool evidence before grading reachable failure, not a universal C300 DONE schema."
+    },
+    {
+      "id": 39,
+      "prompt": "/code_sc 当前target通过-D明确PROTECT=1，protection.c没有直接include；startup有weak IRQ但当前map有真实强handler。库包装和charge在同一C文件，只有上一版板测报告。有人把四项全部定P1，要求先停下逐项审批整改。",
+      "expected_behavior": "Verify actual preprocessing, map and ownership before judging; missing direct include, weak declarations and shared source layout alone do not prove bugs or P1. Mark missing current board evidence separately from code defects. Explain impact-based severity and retain simple approved organization/library ABI. A pure review remains read-only; existing repair authorization, if present in the session, continues without default per-stage approval, while undefined new product behavior stays a concrete scope question."
     }
   ]
 }
