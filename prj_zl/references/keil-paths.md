@@ -1,5 +1,7 @@
 # Keil 路径与构建核对
 
+本文件针对 Keil 的字段和路径语义给出检查方法，不规定产品文件名、目录结构或函数归属。XML 字段是工具接口；示例中的路径仅用于演示解析，不是应创建或迁入的目录。
+
 ## 目录
 
 1. 路径基准与关键字段
@@ -9,12 +11,14 @@
 
 ## 1. 路径基准与关键字段
 
-先读取原工程再改。以下仅是项目位于 `Application/Project/MDK/` 时的例子，不复制它的 SDK 层级或器件到其他工程：
+先读取原工程，确定每条引用实际使用的路径基准，再修改受影响部分。
+
+**相对路径举例（非规范）：**假设项目文件位于 `firmware/build/`，源文件位于根目录的 `components/`，下列引用展示如何从项目目录找到它们。真实工程沿自己的位置计算，不要求采用这些目录或源文件：
 
 ```xml
-<IncludePath>..\..\app\inc;..\..\driver\inc;原有且已核对的SDK路径</IncludePath>
-<FilePath>..\..\app\src\main.c</FilePath>
-<PathWithFileName>..\..\app\src\main.c</PathWithFileName>
+<IncludePath>..\..\components\include;原有且已核对的SDK路径</IncludePath>
+<FilePath>..\..\components\module.c</FilePath>
+<PathWithFileName>..\..\components\module.c</PathWithFileName>
 ```
 
 FilePath 与 IncludePath 通常相对于各项目文件所在目录。宏、设备包路径、外部绝对路径及前后构建命令按当前 Keil/项目约定解析；不能用当前主机查不到就判目标固件逻辑错误。
@@ -22,9 +26,9 @@ FilePath 与 IncludePath 通常相对于各项目文件所在目录。宏、设�
 | 字段/对象 | 核对内容 |
 |---|---|
 | 每个 Target/Group/File | 移动后仍编译原有正确文件；文件类型、排除选项、单文件选项保持 |
-| IncludePath | 字面路径存在、大小写正确，顺序改变不引入同名头遮蔽；不要误替换 SDK 的 Include |
+| IncludePath | 字面路径存在、大小写正确，顺序改变不引入同名头遮蔽；不要误改依赖的包含目录 |
 | FilePath | 规范化后无遗漏或单 target 重复源码；SDK 和测试替身分别归类 |
-| ScatterFile/链接选项 | APP/BL 地址、大小、RAM/SRAM 分区与原合同一致；仅修路径 |
+| ScatterFile/链接选项 | 每个目标的地址、大小及存储区域与原合同一致；仅修路径 |
 | PathWithFileName | 已有 uvoptx 的相应视图引用同步，其他调试/下载设置保留 |
 | TargetName/OutputName | 不与工程文件名混为同一操作，明确本轮实际允许变化 |
 | BeforeMake/AfterMake | 工具、工作目录、引号、输入输出、硬编码文件名及实际消费者 |
@@ -34,13 +38,13 @@ FilePath 与 IncludePath 通常相对于各项目文件所在目录。宏、设�
 
 保存本次允许的旧→新路径映射，再比较各 target 的原始成员与配置。用 XML 解析器或精确局部编辑保留未涉及的节点；不要因重排 XML 丢掉单文件宏、排除开关或调试器配置。
 
-移动含相对 include 的文件时，以源文件的新位置重新核对。例如 `#include "../Include/board.h"` 可能需最小路径更新；检查目标仍为同一声明，而不是只保证存在一个同名文件。
+移动含相对 include 的文件时，以源文件的新位置重新核对，必要时做最小引用修正。检查目标仍为同一声明，而不是只保证存在一个同名文件。
 
-比较结果至少列出：源文件集合、关键宏、设备、库、startup、scatter、前后构建和输出消费者。合法历史路径/SDK 路径可以保留，零旧名命中不是验收目标。
+比较结果至少列出：源文件集合、关键宏、设备、库、启动与链接配置、前后构建和输出消费者。合法历史路径/SDK 路径可以保留，零旧名命中不是验收目标。
 
 ## 3. 条件引用与命名
 
-`IAP_Application1` 的 1 是否只是临时后缀，由现有调用方和用户范围决定。重命名仅执行已批准部分；若用户仅改项目文件名，不擅自改变 OutputName 或固件协议版本。
+工程名中的数字、板型或版本后缀是否可以改变，由现有消费者和本次范围决定。重命名仅执行已批准部分；若用户仅改项目文件名，不擅自改变 OutputName 或固件协议版本。命名“更整齐”不能替代兼容性依据。
 
 `@L/!L` 等工具占位符仅按实际 Keil 命令解释；有些命令会引用 OutputName，有些直接写死名字，不能假定都会自动跟随。需要运行或核对每条受影响命令。
 
@@ -58,7 +62,7 @@ SDK、闭源库、烧录脚本和受跟踪发布镜像不是可任意忽略的�
 - 文件实际已匹配但大小写不同会报告；Windows 能解析不代表未来环境也能解析。
 
 ```bash
-python3 <skill-dir>/scripts/check_keil_paths.py path/to/app.uvprojx path/to/app.uvoptx
+python3 <skill-dir>/scripts/check_keil_paths.py path/to/project.uvprojx path/to/project.uvoptx
 ```
 
 退出码：0 为所检查字面路径通过；2 为发现缺失、大小写、解析或重复成员问题；3 为无上述问题但存在待人工解析的引用。任何输出都不等同于 KEIL_BUILD_PASS 或 BOARD_PASS。

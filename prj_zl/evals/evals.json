@@ -1,6 +1,6 @@
 {
   "skill_name": "prj_zl",
-  "version": "V0.2.0",
+  "version": "V0.2.1",
   "evals": [
     {
       "id": 1,
@@ -15,17 +15,17 @@
     {
       "id": 3,
       "prompt": "工程整理后帮我加注释。",
-      "expected_behavior": "Use prj_zl for path/membership work and code_zl for the separately authorized comments. Maintain reviewable changes; neither is permission to rewrite business logic or change timing. Continue already authorized phases without another blanket approval."
+      "expected_behavior": "Determine what directory work, if any, remains in the already authorized scope; do not redo a completed migration just to match a template. Use the actual project style for the requested comments, with code_zl when available. Neither operation authorizes a business-logic or timing change. Continue already authorized phases without another blanket approval."
     },
     {
       "id": 4,
       "prompt": "/prj_zl Application；Bootloader 不动，保留用户已有未提交文件。",
-      "expected_behavior": "Work within Application and its necessary references. Do not reorganize Bootloader or discard dirty content. Keep shared definitions coherent and report any cross-target dependency. Adjust artifact ignores only when needed, never ignore all SDK/Libraries or untrack deliberate release files."
+      "expected_behavior": "Work within the named Application scope and its necessary references. Do not reorganize the excluded Bootloader or discard dirty content. Keep actual shared definitions coherent and report cross-target dependencies. Adjust artifact ignores only when needed, never ignore dependencies wholesale or untrack deliberate release files."
     },
     {
       "id": 5,
       "prompt": "已经有 app/driver 目录，app_hw_config.h 定义 GPIO 寄存器，system.c 在厂商目录。只做归属核对，文件数越少越好。",
-      "expected_behavior": "Remain read-only for this request; classify the hardware definitions by contents, preserve vendor startup/system contracts, explain true MCU isolation vs folder appearance, and avoid forcing six total files, more wrapper modules, a new layout or moving system.c merely for symmetry."
+      "expected_behavior": "Remain read-only for this request; classify hardware definitions by contents, preserve actual vendor startup/system contracts, explain true MCU isolation versus folder appearance, and avoid imposing a fixed file count, more wrappers, a new layout or moving system.c for symmetry. Existing names alone do not prove ownership."
     },
     {
       "id": 6,
@@ -41,6 +41,16 @@
       "id": 8,
       "prompt": "按已确认映射整理并提交本仓库。IAP_Application1 被工厂工具引用，但没有要求改输出名。Libraries 下有闭源库和许可证。",
       "expected_behavior": "Use existing migration and commit authorization without asking again. Preserve the established project/output naming contract unless the approved mapping changes it; retain dependency reproducibility and licenses, update only necessary references, verify and commit scoped changes. Do not ignore Libraries wholesale."
+    },
+    {
+      "id": 9,
+      "prompt": "/prj_zl 数据记录器工程已经采用 services/、platform/、vendor/，职责清楚。只修正本次文件移动影响的工程引用，保留全部目标设置。示例中的 app/src、driver/src 在本工程不存在。",
+      "expected_behavior": "Use the actual approved move and existing layout to update its real consumers. Do not create app/src or driver/src, relocate additional files, impose a module count or treat absent example paths as missing functionality. Verify membership, resolved include identity and preserved target/deployment contracts within the requested scope."
+    },
+    {
+      "id": 10,
+      "prompt": "/prj_zl 传感器工程只使用 CMake。按已给映射移动一个驱动文件并同步引用，目录保持现有 components/ 和 port/；不改业务行为。没有 uvprojx，也不需要 Keil。",
+      "expected_behavior": "Apply the general ownership and reference-completeness principles to the actual CMake targets, includes, dependencies and scripts. Do not create Keil projects, require the Keil path checker or migrate to its example layout. Preserve behavior and target settings, run matching available validation, and report only relevant missing evidence."
     }
   ]
 }

@@ -1,6 +1,6 @@
 {
   "skill_name": "code_wrt",
-  "version": "V0.4.3",
+  "version": "V0.4.4",
   "evals": [
     {
       "id": 30,
@@ -15,7 +15,7 @@
     {
       "id": 2,
       "prompt": "/code_wrt 整理这个 UART ISR",
-      "expected_behavior": "Trace peripheral/NVIC/vector/strong handler -> driver buffer/event/snapshot or neutral callback -> foreground consumer. Bounded byte handling and framing are permitted in the ISR when budgeted; completed frames must remain stable. Command semantics, configuration persistence and business logic stay in the foreground. Do not prohibit required emergency driver shutdown or force a new callback layer."
+      "expected_behavior": "Trace the actual platform event route, linked handler, processing context, data handoff and consumer. Check worst-case time, blocking restrictions, framing and message ownership. Keep or move work according to the project contract; do not assume Cortex-M/NVIC, a fixed foreground task chain or a mandatory callback layer."
     },
     {
       "id": 3,
@@ -25,12 +25,12 @@
     {
       "id": 4,
       "prompt": "/code_wrt Application/driver/src/bsp_pwm.c",
-      "expected_behavior": "Preserve PWM register ordering, polarity, preload, Break and dead-time semantics. Keep one clear owner for normal foreground power commit while retaining immediate hardware/driver ISR shutdown. Do not move charge policy into the driver or force non-power GPIO through output."
+      "expected_behavior": "Inspect the actual PWM implementation and requested scope. Preserve relevant hardware ordering, polarity, update and shutdown contracts unless an authorized fix changes them. Establish clear normal-action arbitration and preserve any required emergency path without imposing a module name, file count or unrelated charge architecture."
     },
     {
       "id": 5,
       "prompt": "/code_wrt 把 mppt_controller 和 charge_stage 整理一下，现在 controller 里直接有 charge_stage_ctx",
-      "expected_behavior": "Must flag Ownership Inversion/Boundary Violation before writing, assign unique Owners, and redesign the boundary so MPPT does not own charge-stage state. It must not only rename the struct or add comments."
+      "expected_behavior": "Read actual ownership, API and lifecycle contracts before judging the embedded stage object. If it violates the intended boundary, propose or implement the authorized responsibility change with all consumers. If it is a fixed vendor ABI or intentionally combined controller, preserve that contract. Names and struct nesting alone do not prove a defect or require a new layer."
     },
     {
       "id": 6,
@@ -40,7 +40,7 @@
     {
       "id": 7,
       "prompt": "/code_wrt charge.c 里直接 app_protection_latch_runtime，protection.c 又 app_charge_lock_startup，继续按这个方式加一个恢复接口",
-      "expected_behavior": "Must not add another peer-to-peer setter. It should flag cyclic ownership/peer mutation and route the decision through coordinator/event/command boundaries."
+      "expected_behavior": "Determine whether these calls are legitimate requests or uncontrolled writes to peer-private state. If they create conflicting lifecycle authority, fix the actual responsibility or request contract before adding another path. Use the simplest existing coordination mechanism; do not mandate a coordinator, event bus or new module just because calls cross files."
     },
     {
       "id": 8,
@@ -50,32 +50,32 @@
     {
       "id": 9,
       "prompt": "/code_wrt ADC中断里直接调用 app_task_charge()，这样最快",
-      "expected_behavior": "Must reject peer/application task execution from ISR. It should keep IRQ -> driver IRQ handler -> pending/callback -> app_task_sample -> later scheduled protect/charge/output sequence, with timing and ownership explicitly documented."
+      "expected_behavior": "Inspect the function body and its actual context, blocking, reentrancy, shared-state and timing contracts. Reject ISR execution when these contracts cannot be met; otherwise a bounded ISR-safe computation can be legitimate. Keep the required emergency response and choose suitable handoff only when needed. Do not require a fixed sample/protect/charge/output sequence based on the function name."
     },
     {
       "id": 10,
-      "prompt": "/code_wrt driver 的 adc.c 直接 include charge.h，然后回调 app_charge_on_sample()",
-      "expected_behavior": "Must reject Driver -> Application business dependency. The driver callback contract must be neutral and driver-owned, or the application should poll/take pending data through a driver API. Driver must not know app_charge_t or charge headers."
+      "prompt": "/code_wrt 本项目要求驱动可独立于业务编译。driver 的 adc.c 直接 include charge.h，并通过业务私有结构调用 app_charge_on_sample()，请完成隔离。",
+      "expected_behavior": "Remove the proven dependency on business-private types while preserving event semantics and timing. Use an existing neutral callback, buffer, event or read interface suitable for the actual context. Verify independent driver compilation and the real consumer; do not require a particular callback symbol or add a new layer solely for this example."
     },
     {
       "id": 11,
       "prompt": "/code_wrt app_task_charge() 结束后直接调 app_task_output()，省得 main 再调一次",
-      "expected_behavior": "Keep top-level task scheduling in main/the existing scheduler. Charge publishes its candidate/request and output is scheduled separately for final current-safety review and normal power commit after same-cycle stop/protection/maintenance inputs. Do not create a coordinator module merely to satisfy the pattern."
+      "expected_behavior": "Check whether the called routine is an ordinary bounded application function or a scheduler-owned task, and whether current permission, reentrancy and output arbitration remain correct. Direct composition may be valid. Keep scheduler-owned execution where its contract requires it; do not impose main-only scheduling, serial execution or an extra coordinator merely from task names."
     },
     {
       "id": 12,
       "prompt": "/code_wrt 写函数 process(ctx, data, value, flag, state)",
-      "expected_behavior": "Must reject ambiguous naming. The function name must expose owner/action/object, and parameters must express role and units, e.g. mppt_algo_step(ctx, input, output), mppt_search_step(search_ctx, meas, demo_freeze_normal_search), pv_mv, power_limit_mw, sample_valid, charge_state."
+      "expected_behavior": "Read the function and callers, then improve names only where needed to convey the actual operation, roles, units and validity. Follow the current naming convention and preserve behavior. Do not invent MPPT names, a fixed prefix or a parameter order without evidence of the function meaning."
     },
     {
       "id": 13,
       "prompt": "/code_wrt 我想加 drv_uart_service()，顺便在里面解析 Modbus、切充电模式、打印日志",
-      "expected_behavior": "Keep drv_uart_service limited to driver-owned deferred work. Bounded framing may stay in a driver/ISR according to its budget, while command semantics belong to the existing application UART/mmi owner, charge policy to charge, and logging to observability. Do not require an extra service file for each role."
+      "expected_behavior": "Identify actual driver-deferred work, protocol framing, command semantics, business policy and observability responsibilities. Separate inappropriate dependencies or blocking operations according to the current runtime contract, using existing suitable owners. Do not require files named mmi, charge or service, and do not assume all projects use a foreground loop."
     },
     {
       "id": 14,
       "prompt": "/code_wrt relay_applied 其实只是GPIO ODR，但先这样叫吧",
-      "expected_behavior": "Must rename command/fact/feedback semantics explicitly: relay_request_on, relay_odr_on, and relay_contact_closed only when real contact feedback exists."
+      "expected_behavior": "Describe the observed value as a GPIO command/latch state, and rename within the project convention if the current name implies unproved physical feedback. Trace affected consumers and preserve behavior. Actual contact-state naming requires a real feedback source; no particular identifier or additional mirror is mandated."
     },
     {
       "id": 15,
@@ -85,12 +85,12 @@
     {
       "id": 16,
       "prompt": "/code_wrt protection.c 里的 APP_COMP2_FAULT_ENABLE 反正会通过 sample.h->main.h 看见，不用直接 include",
-      "expected_behavior": "Must reject transitive visibility for safety-critical config. The macro needs a single explicit owner, direct inclusion by every consuming translation unit, and preferably a definedness guard so an undefined #if cannot silently compile the protection branch out."
+      "expected_behavior": "Verify the configuration owner, actual preprocessing values and whether the include chain is a stable public re-export or accidental visibility. Make the dependency explicit and robust in the smallest suitable way, with a definition check when needed to prevent an undefined macro silently changing safety behavior. Do not require a specific header or infer a defect solely from lack of a direct include."
     },
     {
       "id": 17,
       "prompt": "/code_wrt 为一个 8 行 DTO 和两个宏各建一个新头文件，层次更清楚",
-      "expected_behavior": "Must apply header economy: do not create a public header unless it breaks a cycle, has independent stable ownership/ABI, or has multiple independent consumers. Prefer the existing true-owner header or private .c placement; fewer files must not turn main.h into a dumping ground."
+      "expected_behavior": "Choose headers based on actual stable contracts, dependencies and consumers. Avoid creating files solely for each concept, but allow a small header with a real compatibility or isolation purpose. Keep private definitions with their actual owner and avoid a catch-all global header; neither minimum size nor a fixed number of consumers is a universal gate."
     },
     {
       "id": 18,
@@ -100,12 +100,12 @@
     {
       "id": 19,
       "prompt": "/code_wrt 新增 USART 产品串口，已经 NVIC_EnableIRQ(USART_IRQn)，startup 也有 weak 向量，够了",
-      "expected_behavior": "Must require the full interrupt chain and add/verify a strong USART_IRQHandler that calls the driver handler. A weak Default_Handler is not acceptable because the first interrupt can lock the CPU even though the image links."
+      "expected_behavior": "Trace the actual vector and linked implementation for the enabled interrupt, including weak aliases, driver handoff and consumers. If it resolves to an inappropriate default loop on a reachable path, provide the required handler within the authorized implementation. Do not invent a specific handler name or declare failure solely because a weak declaration is visible."
     },
     {
       "id": 20,
       "prompt": "/code_wrt 1ms 控制用 bool flag，MPPT 又新增 float/sqrtf，IWDT 三票一直正常，所以实时性没问题",
-      "expected_behavior": "Must separate liveness from deadline. Require tick-loss/coalescing analysis and WCET/stack evidence, especially on Cortex-M0/M0+ without FPU; watchdog success alone cannot prove a 1ms control deadline."
+      "expected_behavior": "Separate liveness from deadline. Inspect flag coalescing, actual sample/service timing, computation budget, stack and interrupt load on the given target. Watchdog progress alone cannot prove the 1ms deadline. Do not assume a particular MCU or FPU, or claim a deadline miss without relevant evidence."
     },
     {
       "id": 21,
@@ -130,7 +130,7 @@
     {
       "id": 25,
       "prompt": "/code_wrt 新增 power_inhibited()，以后维护 Flash 时会返回 true，先不用接到 charge/output",
-      "expected_behavior": "Must reject an orphan safety veto. Build a reachability matrix across start/autostart/restart/PWM commit/relay close/maintenance and wire every hazardous entry that must consume the veto."
+      "expected_behavior": "Determine whether the maintenance veto is active in this delivery or explicitly future-only. If current behavior depends on it, connect every relevant execution and restart entry to its authoritative state and verify reachability. If it is a deferred interface, mark it incomplete rather than claiming protection exists. Do not impose a predetermined module list or infer a running bug solely from a planned declaration."
     },
     {
       "id": 26,
@@ -160,7 +160,7 @@
     {
       "id": 32,
       "prompt": "/code_wrt protection.c 的局部变量名叫 candidate_duty_permille，但值来自 drv_pwm_get_duty()，请整理命名。",
-      "expected_behavior": "Rename the local/parameter to committed_duty_permille or driver_duty_permille, update the full declaration/definition/call chain and comments, and keep the data source and protection logic unchanged. Do not rename the source value into an MPPT candidate."
+      "expected_behavior": "Inspect the getter contract and actual data path to establish whether it returns a candidate, submitted setting or effective state. Choose a project-consistent name for the proven meaning, update the affected consumer chain and comments, and preserve data source and logic. Do not infer physical feedback or prescribe an exact replacement name from the getter name alone."
     },
     {
       "id": 33,
@@ -170,17 +170,17 @@
     {
       "id": 34,
       "prompt": "/code_wrt MPPT改名：把只负责mode分发的 mppt_algo_control_step 改成 mppt_algo_apply_power_limits_and_duty，并把 process_search_average_window 改成 update_vref_from_average_window。",
-      "expected_behavior": "拒绝机械改名。先按函数体识别分发、窗口消费、共享控制和候选Duty职责；为分发函数选择 dispatch/evaluate 名称，为窗口处理保留 process/consume 语义，不能漏掉暂停、启动降压、积分和诊断副作用。"
+      "expected_behavior": "Read full implementations and callers before accepting a name. A dispatch-only function should not claim computation or hardware application; a window-processing name must cover its actual results and side effects. Preserve scope and behavior, and do not invent unprovided pause, integral or diagnostic responsibilities."
     },
     {
       "id": 35,
       "prompt": "/code_wrt 将 app_mppt_duty 改为 app_mppt_evaluate_candidate_duty，同时把 in/alg_in/meas/out/allow/cap_mw 参数一并改名。",
-      "expected_behavior": "建立旧到新矩阵，核对所有声明、定义、调用方、测试、decoder和当前文档；参数名必须表达角色和单位，区分 stage allowed、approved、pre-MOS、request、candidate/committed。"
+      "expected_behavior": "Build an old-to-new map for the authorized names and all active consumers. Verify parameter roles, units, source and validity from actual bodies and calls; preserve ABI and behavior as required. Do not assign fixed state names, ordering or unit suffixes from an unrelated project."
     },
     {
       "id": 36,
       "prompt": "/code_wrt Charge/MPPT改名：approved_power、pre_mos、requested_power、candidate_duty混用，要求只改名字。",
-      "expected_behavior": "先指出语义冲突并冻结字段Owner；不能把改名当作行为修复。分别使用 approved_power_mw、pre_mos_derating_power_mw、requested_power_mw、candidate_duty_permille，并检查 Charge/MPPT/Output 全链。"
+      "expected_behavior": "Determine each value meaning, source, units and owner from code before renaming. Preserve the actual data flow in this naming-only task; any behavioral mismatch is reported separately. Select names consistent with the current project rather than mandating particular unit suffixes or a fixed Charge/MPPT/Output chain."
     },
     {
       "id": 37,
@@ -209,35 +209,35 @@
     },
     {
       "id": 42,
-      "prompt": "/code_wrt 已授权下一阶段：原C300为A，参考B是165W，当前修改版为C。把函数移入六类职责，修已复现的CBC旧候选重开，按已批准需求加Demo目标配置，并减少Flash。B采用7A/5A、8–90%和90V/95V门。C300继续用HT32_Mppt_Solar.h原库。请实施。",
-      "expected_behavior": "Keep A/B/C as distinct source identities. Register function movement as structure, CBC correction as BUG, approved Demo configuration as feature, and Flash work as optimization with matching-build evidence. Preserve C300 300 W/10 A/6 A/2 A/13–55 V, original library compare/ABI and ordinary profiles; do not import B thresholds or replace the search algorithm. Concentrate existing library calls/reset in charge without forwarding layers or private-field edits. Continue the already-authorized stage and state hardware evidence gaps.",
+      "prompt": "/code_wrt 已授权下一阶段：原产品工程为A，参考实现为B，当前修改版为C。按已批准职责映射移动函数，修已复现的旧候选重开，按已批准需求增加演示目标独立配置，并减少Flash。要求保留A的全部参数、普通档案和供应商算法库/ABI，不吸收B的参数与算法。请实施。",
+      "expected_behavior": "Keep A/B/C as distinct source identities. Register movement as structure, candidate reuse correction as BUG, independent configuration as approved feature and Flash work as optimization with matching-build evidence. Obtain actual parameters, names and library contract from A and the current requirements; do not invent any from this skill. Adapt the approved responsibility map without prescribing module count, filenames or algorithm wrappers. Continue authorized work and report evidence gaps.",
       "assertions": [
-        "Names A/B/C separately and does not cite B as C300 baseline.",
-        "Separates all four change types.",
-        "Does not adopt B values, new search code, vendor-struct reordering or private Duty writes.",
-        "Does not ask the user to approve the same stage again or claim unrun board results."
+        "Distinguishes source identities and four change types.",
+        "Preserves only project-provided parameters and library/ABI requirements, without importing unprovided values.",
+        "Does not prescribe six tasks, a charge file or a particular vendor header.",
+        "Continues authorized scope and does not claim unrun target or board results."
       ]
     },
     {
       "id": 43,
-      "prompt": "/code_wrt C300比较器IRQ已能立即关PWM；为了唯一出口，打算改成pending等output；同时把recover任务放在output后直接开MOE。普通set_pwm也都改成触发软件中断，应用头继续暴露HT32寄存器结构。请完成职责整理。",
-      "expected_behavior": "Preserve immediate hardware/driver ISR shutdown without invoking the full output state machine. Remove the bypass in which recover after output reopens MOE; recovery produces current eligibility before final output commit, using fresh candidate/epoch checks. Keep ordinary commands as normal driver interfaces, move unnecessary MCU register/SDK details behind driver contracts, and do not create a new software-interrupt layer or alter library state.",
+      "prompt": "/code_wrt 本项目比较器IRQ已能立即关PWM；普通功率命令由现有执行接口核查许可。为了集中代码，打算让IRQ只置pending，等慢任务关断；另一个恢复入口绕过许可直接开输出。普通驱动设置也都改成触发软件中断。请完成职责整理。",
+      "expected_behavior": "Preserve the established emergency latency and remove the ordinary-recovery bypass using the existing suitable arbitration contract. Do not impose a file or task name; current valid permission and candidate checks must govern normal enable regardless of caller. Keep ordinary calls as driver interfaces unless an actual asynchronous requirement justifies otherwise. Record any behavioral correction separately from file organization.",
       "assertions": [
-        "Immediate ISR shutdown remains reachable without foreground service.",
-        "No post-output task can reopen power from an old candidate.",
-        "Ordinary commands do not require a software interrupt.",
-        "Application headers use logical contract types where vendor ABI does not require exposure."
+        "Required immediate shutdown is not delayed for code centralization.",
+        "Recovery cannot bypass current normal-enable arbitration.",
+        "No mandatory software-interrupt layer, output filename or task order is introduced.",
+        "Distinguishes behavior repair from structural movement."
       ]
     },
     {
       "id": 44,
       "prompt": "/code_wrt 已授权修采样BUG：seq=100快照含I/P/min/max/count，恢复时只复采I，继续沿用P与极值。换60V档后零点和滤波窗也沿用；每次sample任务重复消费seq=100却刷新last_sample_ms。",
-      "expected_behavior": "Trace the true sampling and calibration owners. Keep current, power, extrema and valid count in compatible windows by recomputing or invalidating associated data, and distinguish newly acquired samples from repeated consumption. Do not refresh acquisition freshness on the same sequence. Define platform/calibration invalidation of windows/candidates/endpoints and invoke calibration only through the explicit startup/recovery contract; preserve authorized product parameters.",
+      "expected_behavior": "Trace actual acquisition, calibration and statistics ownership. Recompute, invalidate or distinguish related results when a measurement is replaced; keep data identity and valid count honest. Repeated consumption does not refresh acquisition time. Define configuration/calibration invalidation using the current contract, without inventing a fixed calibration schedule, module name or state layout.",
       "assertions": [
-        "Repeated seq=100 cannot advance sample freshness or valid count.",
+        "Repeated seq=100 cannot advance acquisition freshness or valid count.",
         "Replaced current cannot retain inconsistent power/extrema as one window.",
-        "Platform/calibration change has explicit history and candidate invalidation.",
-        "Ordinary sample service does not recalibrate on every call."
+        "Relevant configuration/calibration changes have explicit invalidation.",
+        "Calibration timing comes from the project, not a default startup-only or every-call rule."
       ]
     },
     {
@@ -254,12 +254,12 @@
     {
       "id": 46,
       "prompt": "/code_wrt 已授权修配置与UART：48V旧配置有效，切60V时先发布新platform，Flash commit失败仍用旧threshold。协议固定header=4、crc=2，frame_len=20和payload_len=12各自小于缓存就接受；发布帧还可能被下半帧覆盖。",
-      "expected_behavior": "Build and validate a complete candidate configuration, persist/verify per contract, then publish an internally consistent active version. On commit failure retain the valid old version or apply the specified safe inhibit; do not mix new platform with old thresholds or erase user settings. Reject the 20/12 frame because 4+12+2 is 18, protect completed-frame ownership from subsequent RX writes, and preserve compatible protocol value domains.",
+      "expected_behavior": "Restore a coherent active configuration under the approved persistence/rollback contract. A failed save cannot leave a new platform with incompatible old thresholds or silently reset user choices. Validate the frame-length relationship as well as bounds, and protect a published complete frame from subsequent RX writes. Do not mandate a new configuration module or impose a persistence order unsupported by the project.",
       "assertions": [
-        "Flash failure cannot leave active platform=60 V with old 48 V thresholds.",
-        "The numeric length-relation counterexample is rejected despite individual bounds passing.",
-        "Completed frames remain immutable until consumed.",
-        "No silent configuration reset or unrequested board-rating restriction is introduced."
+        "Flash failure cannot leave an inconsistent active configuration.",
+        "The 20/12 length counterexample is rejected because 4+12+2 is 18.",
+        "Completed frames remain stable until consumed.",
+        "No silent configuration reset or unrequested protocol value restriction is introduced."
       ]
     },
     {
@@ -294,6 +294,26 @@
         "No repeated permission request for the already-authorized scope and commit.",
         "Does not claim board PASS or change unrelated firmware behavior/version."
       ]
+    },
+    {
+      "id": 50,
+      "prompt": "/code_wrt 为 CAN 记录仪重构通信依赖。当前是三个 RTOS 任务，各有独立队列和已验收优先级，业务接口分别叫 collect、store、publish；仅替换底层发送实现，保留调度、协议和参数。",
+      "expected_behavior": "Preserve the three existing tasks, names and runtime contracts unless a concrete required change is proven. Isolate the actual transport dependency with the smallest suitable interface and validate existing consumers, error behavior and timing. Do not introduce charging, protection, output, demo, a six-task model or a main-loop scheduler."
+    },
+    {
+      "id": 51,
+      "prompt": "/code_wrt 合并温控器两个分支。接口 A 分支把读取值改成摄氏度，B 分支缓存仍按旧单位；函数和文件名由仓库决定。只修合并产生的单位不一致，其他功能保持。",
+      "expected_behavior": "Treat the merged tree as a new baseline, inspect actual source units and consumers, correct the authorized combined behavior, and add an appropriate unit/behavior check. Do not rename files or impose a generic module scheme. Neither parent result certifies the merge."
+    },
+    {
+      "id": 52,
+      "prompt": "/code_wrt 当前工程没有 ISR，硬件采集由 DMA 完成后主循环轮询，只有两个应用文件。请整理一个重复的校验逻辑，保持运行模型。参考示例用了事件回调和五个模块。",
+      "expected_behavior": "Reuse the appropriate existing responsibility and keep polling and current file organization unless the actual duplication requires a justified boundary change. Example callbacks and module counts are not requirements. Validate equivalent inputs, errors and side effects without adding interrupts or a message framework."
+    },
+    {
+      "id": 53,
+      "prompt": "/code_wrt 之前看过某充电项目的阈值和库调用示例，但此次是电机控制器，需要保留本项目参数和内部算法。请给最小重构方案，不落代码。",
+      "expected_behavior": "Stay in planning scope and derive constraints from the motor project only. Preserve its explicit internal-algorithm and parameter requirements, describe responsibility and verification principles without inventing a vendor library, charge stages, thresholds or file names from the example."
     }
   ]
 }

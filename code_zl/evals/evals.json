@@ -1,6 +1,6 @@
 {
   "skill_name": "code_zl",
-  "version": "V0.2.11",
+  "version": "V0.2.12",
   "evals": [
     {
       "id": 18,
@@ -10,7 +10,7 @@
     {
       "id": 1,
       "prompt": "/code_zl src/modbus.c src/host_comm.c",
-      "expected_behavior": "Read both files and relevant project style. Add exact Name/Input/Output/Description contracts to in-scope public, task, IRQ, complex or safety-relevant functions and useful plain Chinese notes to key control flow. Simple private helpers and obvious assignments need no forced comments. Apply short .c section comments when appropriate and report the actual scope without extending to unrelated headers."
+      "expected_behavior": "Read both files, their consumers and the project-adopted comment style. Add one accurate contract for in-scope public, task, IRQ, complex or safety-relevant functions; use Name/Input/Output/Description only when that style is adopted. Keep actual names and locations. Add useful plain Chinese notes to key control flow without forcing comments on simple private helpers or extending to unrelated headers."
     },
     {
       "id": 2,
@@ -25,12 +25,12 @@
     {
       "id": 4,
       "prompt": "给 can.c 添加注释，参照 docs/协议表.md",
-      "expected_behavior": "Should first read docs/协议表.md for protocol details, then add comments referencing protocol field meanings, register addresses, bit definitions. Comments should cite the protocol document path."
+      "expected_behavior": "Read the user-specified protocol document and actual code before explaining fields, units, limits or bit/register semantics that are present. Cite the real document path and relevant section. Do not invent register mappings, required files or a protocol layout from a skill example."
     },
     {
       "id": 5,
       "prompt": "/code_zl Application/driver/src/bsp_pwm.c",
-      "expected_behavior": "Inspect the real PWM configuration and approved project style. By default explain Init using short configuration-stage headings and a few non-obvious trailing comments, with actual pins, mode and protection behavior only when verified. Do not assume complementary PWM, a frequency or automatic recovery from a template. Follow explicit finer line-by-line requests when present."
+      "expected_behavior": "Inspect the actual PWM configuration and approved project style. Explain initialization using actual configuration stages and non-obvious effects, with pins, mode and protection behavior only when verified. Preserve function names, file placement and code. Do not assume complementary PWM, frequency, recovery policy or a required initialization wrapper from a template; follow explicit finer-grained requests."
     },
     {
       "id": 6,
@@ -65,7 +65,7 @@
     {
       "id": 12,
       "prompt": "/code_zl 这段首拍 COMP2 保护已经过 source guard，注释直接写‘首拍绝对安全’",
-      "expected_behavior": "Must avoid unsupported safety claims. State the source-order guarantee and add a measurable board/scope todo for real hardware response latency if evidence is missing."
+      "expected_behavior": "Avoid the unsupported absolute safety claim. Describe only the source-order guarantees actually established, and identify what hardware-response evidence is missing. Add a specific measurable todo only for a relevant unresolved validation requirement; do not invent a delay threshold or mark every hardware statement as untested."
     },
     {
       "id": 13,
@@ -84,7 +84,7 @@
     },
     {
       "id": 16,
-      "prompt": "/code_zl 函数实际为 static uint16_t duty_get(const sample_t *sample)，上面同时有 @brief 和 Name: duty_get(...)。同文件还有简单私有 clamp()。项目已有.clang-format，用户只允许改两个.c注释。",
+      "prompt": "/code_zl 项目已采用 Jovi 函数头样式。函数实际为 static uint16_t duty_get(const sample_t *sample)，上面同时有 @brief 和 Name: duty_get(...)。同文件还有简单私有 clamp()。项目已有.clang-format，用户只允许改两个.c注释。",
       "expected_behavior": "Use one contract header with exact static uint16_t duty_get(const sample_t *sample), correct Input/Output, and remove duplicate old header. Simple private clamp may omit a header. Do not change project format config or claim whole-scope style from merely preserving it; inspect both allowed files."
     },
     {
@@ -125,7 +125,7 @@
     {
       "id": 25,
       "prompt": "/code_zl 为新工程补注释：保护在已批准的 4ms RTOS 任务执行，故障检测和恢复是分开的入口；UART ISR 最多接收 64 字节并有界组帧，完整帧交前台；比较器 ISR 直接关断。只改注释。",
-      "expected_behavior": "Document the actual task, separate detection/recovery contracts, bounded ISR framing and immediate comparator shutdown. Do not force Fault_Detection naming, merge recovery, invent a 1ms flag, ban framing, or queue emergency shutdown through the foreground. Inspect buffers, consumers and budget evidence before asserting their guarantees, without changing the state machine."
+      "expected_behavior": "Document the actual approved task period, separate detection/recovery contracts, bounded ISR framing and immediate comparator shutdown. Preserve the existing entry names and structure; do not substitute a fixed naming pattern, period or foreground-only emergency path from an example. Inspect buffers, consumers and budget evidence before asserting guarantees, without changing the state machine."
     },
     {
       "id": 26,
@@ -151,6 +151,16 @@
       "id": 30,
       "prompt": "/code_zl 只给 foo() 逐行中文注释，并允许该函数单语句 if 按项目样式补括号、同守护前置一个文件级声明。相邻函数和文件头仍是 Doxygen；不改编辑器配置。",
       "expected_behavior": "Follow the requested line-level granularity for foo while avoiding repeated definitions. Apply the authorized brace and declaration changes only after checking control-body/else binding, scope, original preprocessor guard and dependencies. Preserve unrelated Doxygen headers, function-local statics and editor settings. If equivalence cannot be shown, report that specific obstacle and complete the remaining authorized work."
+    },
+    {
+      "id": 31,
+      "prompt": "/code_zl 这是串口采集记录工程，项目采用 Doxygen。工作线程由各组件创建，线程入口和状态保持私有。只整理 telemetry/record_task.c 的注释，保持 C token 和现有工程结构。",
+      "expected_behavior": "Use the project-adopted Doxygen form and actual source contracts. Preserve thread ownership, visibility, names, file placement and all C tokens. Do not impose the Jovi block format, central task creation, a main-header export, a fixed number of modules or charging-specific concepts. Apply only relevant context, lifetime, buffer and evidence checks."
+    },
+    {
+      "id": 32,
+      "prompt": "/code_zl 我只要温控工程的注释。实际 API 叫 sensor_read，结构体按业务含义分组，项目没有按类型分组要求。技能例子里的采样快照函数和输出停止函数在本项目都不存在。",
+      "expected_behavior": "Explain the actual sensor_read contract and existing semantic groups from the code. Treat the example APIs as illustrations, not missing requirements. Do not add or rename functions/files, invent charging or power-output roles, or report the member layout as a defect solely because it differs from a type-grouping example. Preserve comments-only scope and state genuine missing evidence separately."
     }
   ]
 }

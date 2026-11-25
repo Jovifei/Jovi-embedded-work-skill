@@ -1,445 +1,116 @@
-# code_wrt 实施与验证样例（V0.4.3）
+# 实施与合并原则的非约束性示例
 
-这些示例说明合同和判断方法。自有 MPPT 分层示例只适用于已采用该结构的工程；当前 C300 保留原库，按 [C300 实施边界](references/c300-contract.md) 执行，不为示例新建算法层、DTO 或文件。
+以下示例只演示如何从需求、源码和证据作判断。各节的项目条件均为假设；函数名、文件名、任务数、类型和实现方案不属于通用规则。实际任务缺少这些前提时，不得照搬示例的结论或把示例当作验收条件。
 
-## 有界收口：生产镜像、恒真准备与命名
+## 例 1：重构不预设模块数量
 
-当前授权结构整理且无外部布局约束时，按声明类型分组，例如：
+**假设：** 某记录仪已有两个 RTOS 任务，一个采集数据，一个编码并发送消息。用户只要求让通信实现可替换，现有优先级和数据丢弃策略保持。
 
-```c
-/* 整理前 */
-typedef struct {
-    float gain;
-    uint8_t mode;
-    bool ready;
-    float limit;
-    uint8_t retry;
-    bool valid;
-} control_t;
+先找协议语义与外设发送的实际耦合，再为必要边界形成稳定接口，保留两个任务的调度和既有模块。可移植性由不可移植依赖是否隔离证明，不由新增几个文件证明。
 
-/* 整理后：同类型内原顺序不变 */
-typedef struct {
-    float gain;
-    float limit;
-    uint8_t mode;
-    uint8_t retry;
-    bool ready;
-    bool valid;
-} control_t;
-```
+不能因为别的产品采用采样、充电、保护等划分，就给记录仪补齐同名模块；也不能把现有 RTOS 改成单一主循环来迎合示例。
 
-重排前核查所有初始化器、offsetof/sizeof、raw memcpy/序列化及外部布局消费者；位置式初始化须相应保持原字段值，指定式也要检查依赖。packed Flash/协议/DMA/寄存器、bitfield、ABI/汇编/回调固定布局保持原样并说明例外。优先项目组序，未规定时通常按目标自然对齐/宽度从大到小；bool 不与 uint8_t 混组。不为此改函数形参、另套嵌套结构或新增头，也不在缺目标证据时宣称固定 RAM 收益。
+## 例 2：保留库合同与吸收参考实现
 
-用户授权删除公开 PI 镜像和多余 wrapper 时，先列真实调用：私有积分、采样序号、缓存限幅参与控制应保留；公开 `integral_copy` 仅测试读可删除并调整测试对实际内部状态/行为的断言。当前授权的两种遥测仍读 `limit_mw`，保留输出能力并选择满足观测目的的最少字段，更新实际 receiver 的中文字段、单位及两种解码检查。不能恢复公开镜像迎合旧 fixture，也不能一概删除 diag。
+**假设：** 工程要求保留现有供应商算法库及 ABI，只借鉴另一项目的故障交接方式。参考项目还有不同额定值和启动顺序。
 
-`bool prepare_zero()` 全路径恒真且 caller 只检查假失败，可改 `void` 并更新声明/定义/调用/测试/函数头。其 stop→写零→清旧标志顺序不变，后续 `zero_applied()` 仍等自然更新；arm 写前、写后、恢复中断后否决分开对照。只删无独立合同的 `Disarm→Stop` 别名，保留真正 stop、向量桥和有授权消费者的短 getter。
+吸收时核实故障交接依赖的中断模型、数据寿命和恢复资格，逐项适配。保留库的输入输出、状态布局和调用时序，不带入参考项目的参数或另写算法。库调用放在哪个现有职责中，由当前维护责任确定。
 
-自有 `DRV_PWM_Stop→drv_pwm_stop` 要检查全部消费者及项目/decoder/docs，保留 `COMP_IRQHandler`、SDK/CMSIS 及外部回调 ABI。私有类型和宏放真实 Owner；同值但不同生命周期的上限不盲合并，同真源别名可保留。最小方案任务只交方案，不声称实际实施、Host、Keil 或实板已经通过；纯注释不升固件版，固件改动也不顺带升技能版。
+若另一个任务明确允许替换库，评审重点改为算法、兼容和动态验证；“永远保留某库”不能从这个例子推广出去。
 
-跨模块实施先写清 **Owner / Caller / Callee / Timing / Data / Side Effect**；Layer 用于描述职责，不规定文件层数。涉及中断时核对 `IRQ -> Driver -> callback/pending -> 前台消费`，并保留硬件/驱动 ISR 的立即关断通道。小范围命名和注释按风险检查，不机械扩展成全工程架构项目。
+## 例 3：同名任务可以有不同执行合同
 
-## 例 1：自有算法不拥有 Charge Stage
+**假设 A：** 一个名为任务的函数是普通可重入计算，调用有界且允许在多个上下文执行。
 
-错误：
+仅凭名称不能禁止另一个函数调用它。应查共享状态、输入寿命和预算，而非强制由某个固定入口调度。
 
-```c
-typedef struct
-{
-    app_mppt_algorithm_ctx_t algorithm;
-    app_charge_stage_ctx_t charge_stage;
-} app_mppt_controller_t;
-```
+**假设 B：** 另一个同样名为任务的函数使用阻塞等待，且只允许由 RTOS 调用。
 
-该自有对象将充电业务状态交给了算法 Owner。应把 TC/CC/CV/FC 放回业务责任方；若是供应商库固定结构，先核对库合同，不能自行重定义其 ABI。
+将它放进 ISR 会违背已给出的上下文合同。应保留短交接，在适用上下文消费；并非所有带“任务”的函数都必须采用这一组织方式。
 
-正确方向：
+## 例 4：普通提交与紧急动作的仲裁
 
-```text
-现有 charge 业务实现
-    -> 必要输入/约束（标量、既有快照或确需的 DTO）
-    -> 自有算法候选
-    -> output 最终复核并通过驱动提交
-```
+**假设：** 某执行器要求比较器立即关断，普通命令可能在中断前完成资格检查、中断后才写使能。
 
-## 例 2：先写层级和调用合同
+交错顺序为：普通检查通过 → 中断关断并记录故障 → 普通调用恢复，写入旧使能。修复应保证较新的否决不被旧提交覆盖，同时保持紧急响应时限。
 
-例如 ADC + 充电控制：
+可以在现有接口内建立短提交事务、使用硬件锁存或适用的握手。具体方案依目标时限与硬件能力确定；无需为此新增一个固定名称的输出模块。
 
-```text
-L1 Driver:
-  drv_adc_irq_handler()
-      owns: DMA/ADC IRQ flags, raw block, sequence
-      caller: ADC/DMA IRQ wrapper
-      callee: none / neutral callback only
+## 例 5：事件交接保持事实
 
-L2 Adapter:
-  app_task_sample()
-      owns: engineering-value sample snapshot
-      caller: main/coordinator
-      callee: drv_adc_block_take(), sample_convert()
+**假设：** 前台先读取事件位图，再清空；中断可能在两步之间发布新事件。
 
-L3 Domain:
-  app_task_protect()
-      reads: sample snapshot
-      outputs: safety decision
+新事件可能被清空而未被消费。可按平台能力使用短临界区、原子交换或其他一致交接方式，验证事件发生在交接前、中、后都不会丢失。
 
-  app_task_charge()
-      reads: sample + safety snapshot
-      calls: charge policy + app_mppt_duty()
-      outputs: candidate charge command
+位图如果按合同允许合并同类事件，不必改成逐次计数；也不能直接把每次事件消费解释为持久故障解除。
 
-L2 Executor:
-  app_task_output()
-      reads: candidate command + final safety facts
-      owns: final approval and normal power commit
-      calls: drv_pwm_* / drv_gpio_*
-```
+## 例 6：独立配置不是新增模块
 
-这些是已有函数的职责说明；不要求为 L2/L3 各建文件。普通驱动命令可由对应应用职责直接调用，不强制通过 ISR。
+**假设：** 一个产品有多个运行平台，演示目标需要独立调整，但当前默认值与普通运行目标相同，未来设置入口未确定。
 
-## 例 3：中断不能直接进业务任务
+在现有配置维护职责内区分两个目标来源即可。验证改变某个平台的演示项，不影响其他平台和普通设置。默认值来自本次项目资料；不能套用示例外的电压、电流或平台数量。
 
-错误：
+此需求不自动包含设置页面、协议字段、非易失存储或新文件。若后续增加这些功能，再分别明确提交和失败恢复合同。
+
+## 例 7：实际时间与新样本分别判断
+
+**假设：** 标称周期服务发生延迟，但统计仍每次调用只累计一次，文档将结果解释为真实能量。
+
+在相同功率和真实时间下比较不同服务节奏，判断累计是否改变。按照项目的测量合同选择真实时间积分或缺样处理，不能补跑循环制造不存在的新采样。
+
+如果当前功能原本就是统计服务次数，则计数可以保留，只需准确命名。示例并不要求所有计数器改成时间戳。
+
+## 例 8：缓存保留完整依赖
+
+**假设：** 候选结果由测量、运行模式、当前限制和故障状态共同决定，而缓存只比较测量编号。
+
+模式或限制改变后，即使测量编号不变，结果或资格也可能不同。根据实际依赖补失效条件，或在没有明显收益时保留简单重算。
+
+只有一个稳定输入的纯计算不需要照抄这套依赖列表。缓存字段由真实计算决定，不要求每个项目引入统一“代次”对象。
+
+## 例 9：命名依据实际产物
+
+**假设：** 某接口只把采样请求排入队列，却被命名为“读取完成”。
+
+核对实际返回、回调和消费者，按项目命名风格表达“请求已接受”。若调用者确实需要完成结果，额外接口或行为变化应单列，不能只改名称就声称流程修好。
+
+**完整签名示例，仅演示报告粒度：**
 
 ```c
-void ADC_IRQHandler(void)
-{
-    app_task_charge(drv_time_now_ms());
-}
+bool telemetry_encode_record(const measurement_t *record,
+                             uint8_t *buffer,
+                             uint16_t capacity,
+                             uint16_t *written);
 ```
 
-正确：
+实际报告还需说明缓冲容量和已写长度的单位、失败时输出及对象寿命。此例不要求建立这些类型、函数或参数顺序。
 
-```c
-void ADC_IRQHandler(void)
-{
-    drv_adc_irq_handler();
-}
-```
+## 例 10：结构布局服从真实消费者
 
-然后：
+**假设 A：** 用户授权整理一个内部状态结构，项目约定按声明类型分组，没有外部字节布局消费者。
 
-```text
-ADC IRQ
- -> drv_adc_irq_handler
- -> raw block / pending
- -> app_task_sample
- -> sample snapshot
- -> app_task_protect
- -> app_task_charge
- -> app_task_output
-```
+可以核对初始化器和布局后重排，并以目标工具验证资源变化。
 
-业务任务由 main/既有调度者调用，不由 IRQ 嵌套调用。比较器故障的硬件/驱动 ISR 仍立即关断；该路径不等待前台任务，也不调用完整 output 状态机。
+**假设 B：** 另一个结构直接作为协议记录传输。
 
-## 例 4：Driver callback 必须是“中性的”
+即使字段类型交错也应保持已确定的布局；需要改动时作为格式迁移处理。不能因 A 的习惯改变 B 的兼容合同。
 
-错误：
+## 例 11：合并成功不代表行为已经整合
 
-```c
-/* driver/src/adc.c */
-#include "charge.h"
+**假设：** 两个分支分别调整了接口含义与调用者缓存，均在各自版本通过测试，文本合并没有冲突。
 
-static void adc_eos_isr(void)
-{
-    app_charge_on_sample(&g_charge, &raw_adc);
-}
-```
+核对合并后调用者是否仍使用正确语义、缓存是否包含新的依赖，再验证最终树。必要时修正双方组合产生的问题；不能继承任一父分支的通过记录。
 
-Driver 已经反向依赖 Application。
+涉及仓库、路径、命名和发布方式由本次合并任务给出，不要求采用固定分支名或合并策略。
 
-正确可以是 callback：
+## 例 12：验证与交付相称
 
-```c
-typedef void (*drv_adc_block_cb_t)(const drv_adc_block_t *block,
-                                   void *user_ctx);
-```
+**假设 A：** 只整理注释，保持 C token 和预处理意义。
 
-或者 pending/take：
+核对真实行为及前后差异，必要时做语法检查；不为文字修改扩展完整板级验证。
 
-```c
-bool drv_adc_block_take(drv_adc_block_t *out_block);
-```
+**假设 B：** 修改执行器重新启用或持久化失败恢复。
 
-Application 再在 `app_task_sample()` 中消费。Driver 不依赖 `charge.h`。选择已有简单机制即可，不要求新建回调层；若在 ISR 回调，写明上下文和 payload 生命周期。
+需要能暴露相关竞争或失败路径的反例，并列出实际目标与硬件验证条件。条件缺失时完成可做工作，准确报告未执行项，不能以 Host 通过冒充硬件通过。
 
-## 例 5：`service()` 不能变成垃圾桶
-
-错误：
-
-```c
-void drv_uart_service(void)
-{
-    modbus_parse();
-    app_charge_select_mode();
-    telemetry_print();
-}
-```
-
-正确拆分：
-
-```text
-drv_uart_service()      -> driver-owned deferred RX/TX only
-app_task_uart()/mmi     -> foreground command/protocol semantics
-app_task_charge()       -> charge policy
-app_task_telemetry()    -> logging/telemetry
-```
-
-`service` 表示“服务本 Owner 的 pending/deferred work”，不是“所有事情都塞这里”。
-
-## 例 6：按真实需要选择跨模块输入
-
-错误：
-
-```c
-mppt_step(sample, profile, protection, charge_ctx);
-```
-
-如果自有算法实际只用 Vpv/Ipv/Ppv/Vbat 和功率/Duty 上限，先看显式参数或既有只读快照是否足够；确需新的稳定 DTO 时可以写：
-
-```c
-typedef struct
-{
-    int32_t pv_mv;
-    int32_t pv_i_ma;
-    int32_t pv_power_mw;
-    int32_t bat_mv;
-    uint32_t power_limit_mw;
-    uint16_t committed_duty_permille;
-    uint16_t max_duty_permille;
-} app_mppt_duty_in_t;
-```
-
-不要把无关 Fault、Relay、Charge Stage、Battery Profile 整体泄漏给算法，也不为形式创建 DTO/header/wrapper。C300 原库的签名与结构布局按原合同保留，调用集中 charge。
-
-## 例 7：函数名要说明“谁 + 做什么 + 对谁做”
-
-差：
-
-```c
-process(ctx, data, value, flag, state);
-```
-
-好：
-
-```c
-mppt_search_result_t mppt_search_step(mppt_search_ctx_t *ctx,
-                                      const mppt_measurement_t *meas,
-                                      bool demo_freeze_normal_search);
-
-bool mppt_algo_step(mppt_algo_ctx_t *ctx,
-                    const mppt_algo_input_t *input,
-                    mppt_algo_output_t *output);
-```
-
-角色一眼能看懂：
-
-```text
-mppt_search_ -> MPPT 搜索层入口
-mppt_algo_   -> MPPT 算法编排层入口
-_step        -> 单次确定性推进
-ctx        -> Owner state
-in         -> 只读 DTO
-now_ms     -> 时间单位明确
-out_diag   -> 输出方向明确
-```
-
-## 例 8：参数必须带角色和单位
-
-不要：
-
-```c
-set_limit(uint32_t value, uint32_t time, bool flag);
-```
-
-应该类似：
-
-```c
-void app_charge_power_limit_set(uint32_t power_limit_mw,
-                                uint32_t timeout_ms,
-                                bool limit_enable);
-```
-
-跨模块参数确需 `state/mode/status` 时，补充对象：
-
-```text
-charge_state
-mppt_mode
-protection_status
-```
-
-## 例 9：command / mirror / real feedback 必须区分
-
-错误：
-
-```c
-bool relay_applied;
-```
-
-但实际只是读 GPIO ODR。
-
-应该：
-
-```text
-relay_request_on     # Application command
-relay_odr_on         # GPIO register mirror
-relay_contact_closed # 只有真实触点反馈才这样叫
-```
-
-PWM 同理：
-
-```text
-pwm_request_enable
-pwm_moe_on
-hardware_duty_permille
-```
-
-## 例 10：Duty 控制流水线名字不要都叫 `duty`
-
-```text
-candidate_duty_permille   # 算法候选
-approved_duty_permille    # Application/Safety 批准
-committed_duty_permille   # 提交 output/driver
-hardware_duty_permille    # 有硬件证据支持的实际生效值
-```
-
-这样出现“算法候选 320‰，示波器观察 304‰”时能沿链排查。CCR、MOE 和物理波形不是同一事实，比较计数与导通比例先核对极性/更新模式。
-
-## 例 11：参数不能一值多义
-
-错误：
-
-```text
-power_allow_mw == 0
-  有时表示 Fault hard-stop
-  有时表示 CV soft-zero
-```
-
-正确：
-
-```text
-numeric power_limit + explicit mode/session semantics
-TRACK / HOLD / SOFT_ZERO
-hard-stop -> 不调用算法或明确 session invalid
-```
-
-## 例 12：保护、充电、输出不要 peer-to-peer mutation
-
-危险：
-
-```text
-charge -> protection_latch()
-protection -> charge_lock_startup()
-output -> protection_latch() + charge_lock_startup()
-```
-
-不要继续加第四条互相修改内部状态的 setter。通过既有 main 编排或单向 request/event 合同让各 Owner 更新自身状态；不因此新建 coordinator 文件或消息总线。
-
-## 例 13：顶层 task 不互相调用
-
-错误：
-
-```c
-void app_task_charge(uint32_t now_ms)
-{
-    ...
-    app_task_output(now_ms);
-}
-```
-
-正确：
-
-```c
-while (1)
-{
-    if (drv_time_1ms_taken())
-    {
-        app_task_recover(tick_ms); /* 只评估恢复资格，不直接开功率 */
-        app_task_protect(tick_ms);
-        app_task_charge(tick_ms);
-        app_task_output(tick_ms); /* 最终复核后提交正常功率 */
-    }
-}
-```
-
-调度顺序由 main/既有调度者负责。示例任务名不要求新建文件；同轮 STOP、命令、保护和维护请求都须在最终功率提交前生效，output 后的任务不能再绕过审核开功率。
-
-## 例 14：函数签名必须说真话
-
-如果：
-
-```c
-void app_output_step(const app_output_hw_t *hw);
-```
-
-内部又：
-
-```c
-DRV_PWM_IsOutputEnabled();
-app_protection_latest();
-```
-
-先判断这是隐藏依赖还是有意的最终安全复核；有意的现场复核保留在输出提交职责并写进 API 合同，不额外新建 safety-commit 文件。实际接口改动列完整旧/新签名和所有消费者，不能只给函数名或省略参数。
-
-## 注释示例：写出时间、失败和有效性
-
-```c
-/* 超时每次服务按真实时间检查，不等待下一个 ADC 样本。 */
-if ((uint32_t)(now_ms - qualification_start_ms) >= qualification_timeout_ms)
-{
-    qualification_cancel();
-    return;
-}
-
-/* 前台服务：无效段撤销资格，旧快照不刷新采集时刻或补造新样本。 */
-if (!sample->valid)
-{
-    qualification_cancel(); /* 此示例的批准合同：无效样本中断连续窗口。 */
-    return;
-}
-if (sample->sequence == last_sequence)
-{
-    return;
-}
-
-last_sequence = sample->sequence;
-/* 后续仅用本次新样本推进批准的资格判据。 */
-```
-
-这只是函数内片段，实际函数头需给完整签名、上下文和失败合同。若窗口规则已有缺陷，注释整理应记录问题，修复按已授权 BUG 范围实施。使用当前项目样式和可用的 code_zl，不硬编码其他技能版本。
-
-## 例 15：C300 吸收参考实现不吸收产品参数
-
-用户已授权把 B 的职责组织和有证据的缺陷修复移入 C300。先分别记录原 C300、B/165W 和当前工作树；保留 C300 的 300 W、10 A、6 A/2 A、13–55 V、原库比较范围与普通 12 档。B 的 165 W、7 A、5 A、8–90% 和独立 90 V/95 V 门不跟随代码迁入。
-
-搬函数登记为结构整理，修 CBC 旧候选重启登记为 BUG，批准的 Demo 目标登记为功能，实测热点预计算登记为优化。直接保留 `HT32_Mppt_Solar.h` 对应原库，调用/复位集中 charge；不重写库结构、不写私有 Duty、不加转发层。原库未换仍需验证候选和实际 CCR 的闭环动态。
-
-## 例 16：紧急关断与最后正常提交可以同时成立
-
-比较器在 charge 已生成候选、output 尚未写入时触发。驱动 ISR 立即关断并发布故障事实/代次；output 最终检查发现旧候选代次不再合格，保持关闭。禁止把紧急关断排队等下轮，禁止 ISR 调完整 output，也不能在 ISR 改库 Duty 或恢复 MOE。
-
-普通请求如设置候选、读取供电或请求复位用清晰的驱动/应用普通接口。LED 写入不强塞进功率 output。恢复资格先更新，最终功率在 output 审核提交；同轮后续 debug/mmi 不可重放旧合闸请求。
-
-## 例 17：数据同源、服务延迟和 WDT
-
-序号 100 的快照包含 I、P、极值与有效计数。复采只替换 I 却保留旧 P/极值，必须重算相关量、失效原窗口或另建明确身份，不能继续称同一窗口。平台切换/重新校准使哪些历史和候选失效要列清，不在每次普通采样重新校准。
-
-一次服务延迟 8 ms 不能虚构 8 个有效样本；超时采用真实 elapsed，连续证据采用新有效样本数，积分按批准缺样策略处理。若 ADC 或 tick 停止但 main 仍转，不能无条件喂狗；健康检查观察关键进展，维护例外有总预算，不用停走的 tick 自证健康。
-
-## 例 18：配置、UART 与首装是一条失败恢复链
-
-旧的 48 V 配置完整有效，请求切到 60 V，持久化在 commit 前失败：当前有效配置不得成为“60 V 平台配 48 V 阈值”。按合同保留旧配置或禁止功率，不清空用户设置掩盖写失败。
-
-协议定义固定头 4 字节、CRC 2 字节。`frame_len=20`、`payload_len=12` 各自低于缓冲上限，但 `4+12+2 != 20`，仍须拒绝；完整帧发布后不能被后续半帧覆盖。ACK 入队不是 TX complete。
-
-新 BL 要求有效完成记录：只有 APP 镜像的空白新板首装也要有合法记录与校验工具。状态保存失败不能继续擦除依赖恢复信息的旧镜像；覆盖该失败点、掉电、有限重试、同镜像重入及实际新旧 APP/BL 组合。
-
-## 例 19：预计算与缓存必须有失效依据
-
-某系数只依赖已提交配置，可在完整提交后预计算。输出候选还依赖样本有效性、温度、目标、模式和限制来源，不能仅用相同 sequence 或最终 min 值复用。换平台、校准和保护代次变化应重算或撤销；没有热点/收益证据则优先保持简单计算。
-
-优化收益用本版同条件 map/耗时测量；不因减少几行删除边界、保护或现场诊断。
-
-## 例 20：已有授权与缺少硬件条件
-
-用户已授权按阶段整理并修已确认缺陷，当前只改本模块私有函数名；环境缺少 ponytail 和目标板。读取完整使用链，按本技能完成范围相称的源码/必要编译检查，记录实际完成与未执行项，继续可做阶段。不得要求重新批准相同步骤，不为缺工具新造包装，也不填写实板 PASS。
+以上例子不提供永久问题清单。每次都以本次工程的需求、源码和证据重新判断。

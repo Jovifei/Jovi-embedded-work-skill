@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "scope": "Raw independent synthetic inputs for generic-principle use; no expected answers, product contracts or hardware proof are supplied by the skill.",
+  "cases": [
+    {
+      "id": "rtos_plan",
+      "skill": "code_wrt",
+      "request": "阅读工程资料，使用给定的重构原则与 code_wrt，为本工程下一批职责整理和硬件移植准备给出可执行的修改计划与验证标准。保留已确认产品行为，只输出 PLAN.md，不修改源码、不提交 Git。",
+      "files": {
+        "README.md": "这是独立合成示例 MeterNode。产品只采集温度并经串口记录，没有功率执行器。现有设计采用 RTOS：AcquireTask 每 20ms 读取一次，RecordTask 按队列通知记录；这是已批准的执行模型。采集任务允许运行期间根据维护请求更新校准，任务间经已有队列交接副本。外部串口协议的温度单位固定为 0.1 摄氏度，持久化校准格式保持不变。下一批目标是使硬件访问依赖清楚、方便更换 MCU，并整理既有接口。没有新增产品功能需求。当前只有所列源码片段，未提供工具链、RTOS 实现、硬件或完整构建工程。\n",
+        "logic/measurement.c": "#include \"../port/device_access.h\"\nextern void queue_copy_temperature(int temperature_dC);\nextern int calibrate_temperature(int raw);\nvoid acquire_once(void)\n{\n    int raw = (int)device_registers()->sample;\n    queue_copy_temperature(calibrate_temperature(raw));\n}\n",
+        "logic/record.c": "extern void uart_send_temperature(int temperature_dC);\nvoid record_temperature(int temperature_dC)\n{\n    uart_send_temperature(temperature_dC);\n}\n",
+        "port/device_access.h": "#ifndef DEVICE_ACCESS_H\n#define DEVICE_ACCESS_H\n#include <stdint.h>\ntypedef struct { volatile uint32_t sample; } DeviceRegisters;\nDeviceRegisters *device_registers(void);\n#endif\n",
+        "port/device_access.c": "#include \"device_access.h\"\nextern DeviceRegisters *board_register_base(void);\nDeviceRegisters *device_registers(void)\n{\n    return board_register_base();\n}\n"
+      }
+    },
+    {
+      "id": "merge_review",
+      "skill": "code_sc",
+      "request": "阅读三份版本快照和工程说明，使用给定的重构原则与 code_sc 审查这次合并的实际结果。写清结论、事实、触发条件、影响、最小处理方向与验证标准。只输出 REVIEW.md，不修改输入源码、不提交 Git。",
+      "files": {
+        "README.md": "独立合成示例 ThermLog。设备只记录和显示温度，没有执行器。原始采集值单位为 0.01 摄氏度；线上报文 reading 字段单位固定为 0.1 摄氏度，合法范围由既有协议定义，本批不改变协议或客户端。baseline 是已部署源码片段。producer_branch 是转换逻辑整理分支，consumer_branch 是显示逻辑整理分支，merged 是待审合并结果；两分支均声称只整理代码。用户要求审核最终行为，不依据分支测试宣称已通过。只有源码片段，没有目标工程或实板。\n",
+        "baseline/encode.c": "#include <stdint.h>\nint16_t encode_reading(int16_t centidegrees) { return (int16_t)(centidegrees / 10); }\n",
+        "baseline/display.c": "#include <stdint.h>\nfloat display_celsius(int16_t reading) { return (float)reading / 10.0f; }\n",
+        "producer_branch/encode.c": "#include <stdint.h>\nstatic int16_t scale_sample(int16_t value) { return value; }\nint16_t encode_reading(int16_t centidegrees) { return scale_sample(centidegrees); }\n",
+        "consumer_branch/display.c": "#include <stdint.h>\nfloat display_celsius(int16_t reading) { const float units_per_degree = 10.0f; return (float)reading / units_per_degree; }\n",
+        "merged/encode.c": "#include <stdint.h>\nstatic int16_t scale_sample(int16_t value) { return value; }\nint16_t encode_reading(int16_t centidegrees) { return scale_sample(centidegrees); }\n",
+        "merged/display.c": "#include <stdint.h>\nfloat display_celsius(int16_t reading) { const float units_per_degree = 10.0f; return (float)reading / units_per_degree; }\n"
+      }
+    }
+  ]
+}

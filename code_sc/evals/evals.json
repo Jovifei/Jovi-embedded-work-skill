@@ -1,16 +1,16 @@
 {
   "skill_name": "code_sc",
-  "version": "V0.3.4",
+  "version": "V0.3.5",
   "evals": [
     {
       "id": 31,
-      "prompt": "/code_sc 私有struct是float gain,uint8_t mode,bool ready,float limit,uint8_t retry,bool valid，有位置式初始化器；packed Flash结构字段也交错，汇编按固定offset读取。有人建议bool和uint8同宽混组并保证省6字节。",
-      "expected_behavior": "Review private layout for separate declared-type groups preserving gain/limit, mode/retry and ready/valid order; inspect all initialization and raw/offset/size contracts before recommending changes. Preserve external packed/Flash/assembly layout and record exception. Reject same-width bool/uint8 mixing and unproven fixed RAM savings; retain project group order and function parameter contracts. Pure review remains read-only."
+      "prompt": "/code_sc 本例项目规则已明确：可整理的内部结构按相同声明类型集中，同类保持原顺序。私有struct是float gain,uint8_t mode,bool ready,float limit,uint8_t retry,bool valid，有位置式初始化器；packed Flash结构字段也交错，汇编按固定offset读取。有人建议bool和uint8同宽混组并保证省6字节。",
+      "expected_behavior": "Apply the grouping style only because this prompt supplies it. Inspect initializers and raw/offset/size/ABI consumers before recommending a change; preserve the externally fixed Flash/assembly layout. Reject unproved memory savings, retain parameter contracts, and do not generalize this project style to others. Pure review remains read-only."
     },
     {
       "id": 1,
       "prompt": "/code_sc 审查这个 MPPT 工程，为什么 mppt_controller 里面有 charge_stage_ctx？",
-      "expected_behavior": "First establish whether the controller is an independent algorithm, the approved charge coordinator, or a vendor ABI structure. Trace state writers, lifecycle ownership and bidirectional semantic dependencies. Report an architecture defect only when actual responsibility conflicts or excess private coupling are evidenced, with a minimal remedy and consequence-based severity. Do not force a separate algorithm layer merely because charge state and original library calls share the C300 charge owner."
+      "expected_behavior": "First establish the actual interface and responsibility contract: independent algorithm, approved business coordinator, or vendor ABI structure. Trace writers, lifecycle ownership and dependencies. Report defects only from evidenced conflicts and consequences; do not infer a fixed module split, library choice or file layout from a name or from skill examples."
     },
     {
       "id": 2,
@@ -135,16 +135,16 @@
     {
       "id": 26,
       "prompt": "/code_sc Flash维护时会暂停ADC并设置maintenance_busy，但只在Flash driver里检查PWM=0，恢复后立即允许自动启动",
-      "expected_behavior": "Must review the entire maintenance transaction: veto reachability before entry, sample invalidation, watchdog/deadline effects, resume qualification with fresh generations, and restart admission. Local driver checks alone are insufficient."
+      "expected_behavior": "Review the complete maintenance transaction: required inhibition before entry, pending commands, measurement validity, watchdog/deadline effects, failure handling and resume qualification. Check whether data and permission remain valid under the actual project contract; a local driver check alone does not prove the transaction safe. Do not require a new module, fixed sample-generation layout or a universal maintenance sequence."
     },
     {
       "id": 27,
       "prompt": "/code_sc core.integral用于回算，last_seq防止重复积分，cached_duty在重复样本时按收紧cap重限；diag.integral_copy仅Host读，diag.limit_mw被两种授权路测帧消费，unused_counter只写。均无外部控制调用。只出审查结论。",
-      "expected_behavior": "Stay read-only and provide source-level producer/consumer evidence. Separate internal control state, authorized telemetry, Host-only mirror and write-only counter. Preserve seq/cache/relimit behavior and both required telemetry modes; remove only proven redundant surfaces. Report structural/API leakage separately from style and assign severity from demonstrated impact rather than automatic P2."
+      "expected_behavior": "Stay read-only and provide source-level producer/consumer evidence. Separate internal control state, authorized telemetry, Host-only mirror and write-only counter. Preserve seq/cache/relimit behavior and both required telemetry modes; recommend removal only for proven redundant surfaces. Report structural/API leakage separately from style and assign severity from demonstrated impact rather than automatic P2."
     },
     {
       "id": 28,
-      "prompt": "/code_sc 按已授权整改继续：DRV_PWM_Stop改drv_pwm_stop；COMP_IRQHandler和HAL_TIM_Enable也转小写。prepare始终return true，但先stop/clear-update；zero_applied等自然更新，arm在enable前后各读pending。",
+      "prompt": "/code_sc 按已授权整改继续：DRV_PWM_Stop 是项目自有接口，改 drv_pwm_stop；COMP_IRQHandler 是启动向量，HAL_TIM_Enable 是供应商公开接口，也想转小写。prepare始终return true，但先stop/clear-update；zero_applied等自然更新，arm在enable前后各读pending。",
       "expected_behavior": "Continue within repair authorization without a second approval, reject mechanical renaming of external vector/SDK contracts. Require owned-symbol migration across declarations/definitions/callers/callbacks/project/tests/decoder/docs. Allow prepare void after checking all return and caller paths; preserve zero-update gate and both pending barriers, not treating short functions as automatically redundant."
     },
     {
@@ -174,8 +174,8 @@
     },
     {
       "id": 35,
-      "prompt": "/code_sc 原 C300 是300W/10A/CC6A，保留 HT32_Mppt_Solar 原库，charge 统一调用和复位，六类业务职责。参考B是165W/7A/CC5A。当前版把B搜索算法及参数搬入，增加四层MPPT包装，报告称只是结构整理。请只审查。",
-      "expected_behavior": "Remain read-only. Record distinct original/reference/current identities and compare against the approved C300 preservation contract. Separate structural migration from library/parameter and closed-loop behavior changes. Preserve original library ABI and charge ownership, reject unjustified wrapper proliferation without requiring exactly six files, and grade only evidenced functional effects rather than architectural shape."
+      "prompt": "/code_sc 原工程A已发布，明确保留其参数表和供应商库；参考B使用另一硬件和不同参数。当前合入结果替换A的库和参数，增加多层只转发的包装，报告称只是结构整理。请只审查。",
+      "expected_behavior": "Remain read-only. Record original/reference/current identities and use the preservation requirements supplied in this prompt. Separate structural migration from library, parameter and behavior changes, and check hardware and timing prerequisites. Evaluate added wrappers by actual responsibility/compatibility value. Do not prescribe library names, numerical limits, module count, files or functions absent from the input."
     },
     {
       "id": 36,
@@ -184,18 +184,33 @@
     },
     {
       "id": 37,
-      "prompt": "/code_sc sample复采替换电流但仍用旧power/max，重复seq把captured_at更新为now；校准每次sample_task都跑。漏20ms服务时charge_time只加1，稳定条件补循环20次，main还在转就喂WDT。",
-      "expected_behavior": "Trace snapshot/window/calibration and derived-power provenance, reject rebranding old samples as fresh, and keep calibration in explicit startup/recovery flows. Separate elapsed-time timers from counts of new valid samples; define bounded integration/missing-sample behavior without fabricated ADC samples. Check producer/control progress and a non-self-certifying watchdog window, and distinguish static/Host findings from target timing evidence."
+      "prompt": "/code_sc 本例明确要求仅启动或显式请求时做零点校准。sample复采替换电流但仍用旧power/max，重复seq把captured_at更新为now；现在每次sample_task都跑校准。漏20ms服务时charge_time只加1，稳定条件补循环20次，main还在转就喂WDT。",
+      "expected_behavior": "Trace measurement identity, calibration conditions, derived-data coherence, actual elapsed time and counts of new valid samples. In this case repeated calibration conflicts with the supplied policy; do not turn that policy into a ban on legitimate online calibration elsewhere. Check actual watchdog implementation and monitored progress before asserting hardware refresh failure. Explain evidence and consequences without inventing task names, periods or fields."
     },
     {
       "id": 38,
       "prompt": "/code_sc 新平台先改运行态，Flash失败仍返回成功并清dirty；APP外长和BL内层block_len各自小于上限却不核对关系。新BL冷启动要有效完成记录，工厂只烧APP/BL，只有OTA成功记录。",
-      "expected_behavior": "Review atomic configuration publication/rollback and persistence failure truthfulness, including dirty/index/saved-value retention. Validate actual outer/inner/offset/received-length relationships and APP/BL shared formats. Trace required completion metadata through factory first install, old/new compatibility and downgrade; OTA success alone cannot pass deployment. Use actual format and source/tool evidence before grading reachable failure, not a universal C300 DONE schema."
+      "expected_behavior": "Review atomic configuration publication/rollback and persistence failure truthfulness, including dirty/index/saved-value retention. Validate actual outer/inner/offset/received-length relationships and APP/BL shared formats. Trace required completion metadata through factory first install, old/new compatibility and downgrade; OTA success alone cannot pass deployment. Use actual format and source/tool evidence before grading reachable failure, not a universal completion-record schema."
     },
     {
       "id": 39,
       "prompt": "/code_sc 当前target通过-D明确PROTECT=1，protection.c没有直接include；startup有weak IRQ但当前map有真实强handler。库包装和charge在同一C文件，只有上一版板测报告。有人把四项全部定P1，要求先停下逐项审批整改。",
       "expected_behavior": "Verify actual preprocessing, map and ownership before judging; missing direct include, weak declarations and shared source layout alone do not prove bugs or P1. Mark missing current board evidence separately from code defects. Explain impact-based severity and retain simple approved organization/library ABI. A pure review remains read-only; existing repair authorization, if present in the session, continues without default per-stage approval, while undefined new product behavior stays a concrete scope question."
+    },
+    {
+      "id": 40,
+      "prompt": "/code_sc RTOS 温湿度记录器采用采集、存储、通信三个任务，没有充电或功率输出。需求保留当前调度和公开接口；在线校准是批准功能。此次只审采样缓冲交接的合并。",
+      "expected_behavior": "Review only the actual ISR/task/buffer producers and consumers, data lifetime, synchronization, approved online-calibration behavior, loss/overflow policy and merged interfaces/build membership. Request missing source evidence as needed. Do not impose six tasks, charging/protection/output modules, serial foreground scheduling, startup-only calibration, a particular MCU library, or example file/function names."
+    },
+    {
+      "id": 41,
+      "prompt": "/code_sc 还没有决定硬件、文件、函数。我要以后能用于不同工程的合并与重构审查原则。",
+      "expected_behavior": "Provide reusable principles for baseline identity, change classification, responsibility, interface/behavior contracts, conflict resolution, dependencies, failure recovery and evidence. Distinguish principle, project constraint, implementation choice and illustrative example. Do not invent a file table, API signature, numerical threshold, task count or a current-project defect from earlier examples."
+    },
+    {
+      "id": 42,
+      "prompt": "/code_sc 两个分支功能分别通过，合并后没有文本冲突。项目是事件驱动传感器固件，协议兼容要求由本次输入给定；没有 bootloader 或 OTA。是否能直接验收？",
+      "expected_behavior": "Treat the combined contents as a new integration result and inspect applicable behavior/interface/state/build/dependency interactions. Parent test passes and lack of textual conflicts do not prove semantic equivalence. Use the supplied event-driven and protocol contracts; mark bootloader/OTA/power review as inapplicable rather than requiring such features. Give risk-proportionate current-content validation without prescribed file or function structure."
     }
   ]
 }
